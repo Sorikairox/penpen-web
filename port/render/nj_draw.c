@@ -32,6 +32,10 @@ void nj_state(rd_state *s, int list, uint32_t tex, int use_alpha) {
   s->list = (uint32_t)list; s->tex = tex;
   s->mode = RD_M_SRC(nj_blend_src) | RD_M_DST(nj_blend_dst) | RD_M_ZFUNC(6) | RD_M_SHADE(3) | (nj_filter ? RD_M_FILTER : 0) |
             (use_alpha ? RD_M_ALPHA : 0) | (list == RD_TR ? 0 : RD_M_ZWRITE) | (nj_fog_on ? RD_M_FOG : 0);
+  /* the SDK's polygon context builder sets PCW bit 7 ("shadow": modifier volumes apply) from njControl3D:
+   * 0x400 always, 0x1000 only for polygons without alpha */
+  uint32_t ctl = rd32(NJG_CTRL3D);
+  if ((ctl & CTRL3D_SHADOW) || ((ctl & CTRL3D_SHADOW_OPAQUE) && !use_alpha)) s->mode |= RD_M_SHADOW;
   memcpy(s->clip, nj_clip, sizeof s->clip);
 }
 

@@ -34,6 +34,7 @@ enum { RD_OP = 0, RD_OM = 1, RD_TR = 2, RD_PT = 3 };
 #define RD_M_NOTEXA (1u << 18)                      /* ignore the texture's alpha */
 #define RD_M_OFFSET (1u << 19)                      /* add the offset (specular) colour */
 #define RD_M_FOG (1u << 20)                         /* table fog */
+#define RD_M_SHADOW (1u << 21)                      /* PCW "shadow": opaque modifier volumes darken it */
 
 typedef struct { float x, y, iw, u, v; uint32_t col, ofs; } rd_vtx; /* 28 bytes; colours ARGB */
 

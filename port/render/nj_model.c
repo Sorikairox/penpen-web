@@ -245,7 +245,11 @@ static void plist(uint32_t a, int depth) {
       if (t & 1) { mat.dif = rd16(q) | (uint32_t)rd16(q + 2) << 16; q += 4; }
       if (t & 2) { mat.amb = rd16(q) | (uint32_t)rd16(q + 2) << 16; q += 4; }
       if (t & 4) { mat.spe = rd16(q) | (uint32_t)rd16(q + 2) << 16; q += 4; }
-    } else if (t >= 64 && t <= 75) strip_chunk(a, t, fl);
+    } else if (t >= 64 && t <= 75) {
+      /* njControl3D CNK_CONSTANT_ATTR: the SDK masks the strip header with njSetConstantAttr's AND/OR words */
+      if (rd32(NJG_CTRL3D) & CTRL3D_CNK_CONSTANT_ATTR) fl = (((h & rd32(NJG_CATTR_AND)) | rd32(NJG_CATTR_OR)) >> 8) & 0xFF;
+      strip_chunk(a, t, fl);
+    }
     else if (t >= 56 && t <= 58) { /* modifier volume: not drawn yet */ }
     else n_unknown_p++;
     a += 4 + size * 2;

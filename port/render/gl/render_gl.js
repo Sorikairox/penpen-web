@@ -161,10 +161,13 @@ void main() {
       const shadow = u32[22] ? (u32[22] & 255) / 256 : 160 / 256; // cheap shadow intensity (njSetCheapShadowMode)
       // pass 0: opaque + punch-through; pass 1: opaque modifier volumes (stencil parity) and the darkening;
       // pass 2: translucent (already sorted back to front)
+      // stencil: bit 7 = the visible opaque pixel's polygon has the PCW shadow bit (written in pass 0), bit 0 =
+      // the volume parity (pass 1); only pixels with both are darkened
       for (let pass = 0; pass < 3; pass++) {
         let vols = 0;
+        if (pass === 0) { gl.enable(gl.STENCIL_TEST); gl.stencilMask(0x80); gl.stencilOp(gl.KEEP, gl.KEEP, gl.REPLACE); }
         if (pass === 1) {
-          gl.enable(gl.STENCIL_TEST); gl.colorMask(false, false, false, false); gl.depthMask(false);
+          gl.enable(gl.STENCIL_TEST); gl.colorMask(false, false, false, false); gl.depthMask(false); gl.stencilMask(1);
           gl.stencilFunc(gl.ALWAYS, 0, 1); gl.stencilOp(gl.KEEP, gl.KEEP, gl.INVERT); gl.depthFunc(gl.LESS);
           gl.disable(gl.BLEND); gl.uniform1i(U.u_hastex, 0); gl.uniform1i(U.u_punch, 0);
         }
@@ -175,6 +178,7 @@ void main() {
           if (x1 <= x0 || y1 <= y0 || !count || !((listMask >> list) & 1)) continue;
           gl.scissor(x0, H - y1, x1 - x0, y1 - y0);
           if (pass === 1) { gl.drawArrays(gl.TRIANGLES, first, count); vols++; draws++; continue; }
+          if (pass === 0) gl.stencilFunc(gl.ALWAYS, (m >>> 21) & 1 ? 0x80 : 0, 0xFF);
           gl.depthFunc(ZF[(m >>> 7) & 7]);
           gl.depthMask(list === 2 ? ((m >>> 6) & 1) === 1 : true);
           if (list === 2) { gl.enable(gl.BLEND); gl.blendFunc(SRC[m & 7], DST[(m >>> 3) & 7]); } else gl.disable(gl.BLEND);
@@ -202,7 +206,7 @@ void main() {
           gl.colorMask(true, true, true, true);
           if (vols) { // darken where the parity is odd: the opaque surface is inside a volume
             gl.disable(gl.SCISSOR_TEST); gl.disable(gl.DEPTH_TEST);
-            gl.stencilFunc(gl.EQUAL, 1, 1); gl.stencilOp(gl.KEEP, gl.KEEP, gl.KEEP);
+            gl.stencilFunc(gl.EQUAL, 0x81, 0x81); gl.stencilOp(gl.KEEP, gl.KEEP, gl.KEEP);
             gl.enable(gl.BLEND); gl.blendFunc(gl.ZERO, gl.SRC_COLOR);
             const b = new ArrayBuffer(28 * 6), f = new Float32Array(b), w = new Uint32Array(b);
             const k = Math.round(shadow * 255), col = (0xFF000000 | (k << 16) | (k << 8) | k) >>> 0;
@@ -213,8 +217,9 @@ void main() {
             gl.bindVertexArray(vao); gl.bindBuffer(gl.ARRAY_BUFFER, vbo);
             gl.enable(gl.SCISSOR_TEST); gl.enable(gl.DEPTH_TEST);
           }
-          gl.disable(gl.STENCIL_TEST);
+          gl.disable(gl.STENCIL_TEST); gl.stencilMask(0xFF);
         }
+        if (pass === 0) gl.disable(gl.STENCIL_TEST);
       }
       gl.disable(gl.SCISSOR_TEST);
       r.stats = { frame: u32[2], cmds: ncmd, verts: nvert, uploads: nup, textures: textures.size, draws, op: u32[18], trTris: u32[19], omTris: u32[20], culled: u32[21] };

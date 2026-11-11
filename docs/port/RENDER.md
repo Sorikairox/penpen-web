@@ -39,7 +39,7 @@ same memory (the wasm memory; a dump file is its own memory with the header at 0
 - **Mode bits**: 0–2 PVR src factor, 3–5 dst factor (0 zero, 1 one, 2 other colour, 3 1 − other, 4 src α,
   5 1 − src α, 6 dst α, 7 1 − dst α), 6 depth write, 7–9 PVR depth compare on 1/w (0 never … 6 gequal, 7
   always), 10 bilinear, 11/12 clamp U/V, 13/14 flip U/V, 15–16 texture shading (0 decal, 1 modulate, 2 decal
-  alpha, 3 modulate alpha), 17 use vertex alpha, 18 ignore texture alpha, 19 offset colour, 20 fog.
+  alpha, 3 modulate alpha), 17 use vertex alpha, 18 ignore texture alpha, 19 offset colour, 20 fog, 21 PCW shadow bit (opaque modifier volumes darken it).
 - **Vertex (28 bytes)**: x, y (pixels), 1/w, u, v (floats), base ARGB, offset ARGB.
 - **Upload (4 words)**: id, width, height, pointer to RGBA8. **Free (1 word)**: id.
 
@@ -131,7 +131,15 @@ load time because the game reads the PVM into the texture buffer area and overwr
   **nearest key** (no blending yet).
 - `njDrawSprite3D(sprite, n, attr)`: the sprite quad in the model xy plane through the current matrix.
 - Cheap shadow: `njCnkModDrawModel(object)` (the shadow object) → its model's volume chunks into the opaque
-  modifier volume list; `njSetCheapShadowMode(160)` intensity.
+  modifier volume list; `njSetCheapShadowMode(160)` intensity. **Only polygons with the PCW shadow bit are
+  darkened** (S8): the SDK's polygon context builder (0x8C0E4340) sets PCW bit 7 when njControl3D has 0x400,
+  or 0x1000 and the polygon has no alpha. The game draws the course with njControl3D 0xC04 and the
+  characters with 0x004, so the player's body is not shaded. Backend: pass 0 writes stencil bit 7 from the
+  polygon's mode bit 21, pass 1 the volume parity in bit 0, the darkening needs both.
+- njControl3D 0x800 (CNK constant attr, S8): the SDK masks every chunk strip header with njSetConstantAttr's
+  AND/OR words (seen: AND 0xFFFF9FFF OR 0x2000 on the course = no environment map, flat shading; OR 0x200 =
+  ignore specular). A third global (0x8C1EF350, always 0 on the route) adds use-alpha in one draw family:
+  not modelled.
 
 ## 6. Capture path (tests)
 
@@ -163,8 +171,6 @@ house 1104, course map 1563, race 1762).
 
 Known wrong or missing (to do):
 
-- Shadows darken every opaque polygon inside the volume (the lower half of the player too); the PVR only
-  shades polygons flagged for it.
 - Translucency is sorted per triangle (no per-pixel autosort); no punch-through list is used by the game.
 - Light families L2/L3/L4 setters are still stubs (L1 values are used for every family); no specular / offset
   colour; flat shading, ignore-ambient flags ignored.

@@ -19,6 +19,9 @@ uint32_t hle_frame(void);
 
 /* Ninja globals kept by guest SDK code (pure setters run as guest code, RENDER.md 4) */
 #define NJG_CTRL3D 0x8C1EF2ECu     /* njControl3D flags */
+#define CTRL3D_CNK_CONSTANT_ATTR 0x800u /* chunk strip headers: (header & AND mask) | OR mask (njSetConstantAttr) */
+#define CTRL3D_SHADOW 0x400u            /* polygons are affected by modifier volumes (PCW bit 7) */
+#define CTRL3D_SHADOW_OPAQUE 0x1000u    /* the same, for polygons without alpha only */
 #define NJG_CATTR_AND 0x8C1EF320u  /* njSetConstantAttr masks */
 #define NJG_CATTR_OR 0x8C1EF324u
 #define NJG_CMAT 0x8C1EF328u       /* njSetConstantMaterial: NJS_ARGB {a, r, g, b} floats */
