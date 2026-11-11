@@ -32,6 +32,7 @@ typedef struct {
   int eg_state;
   int32_t eg, inc[4], dl;
   int st_l, st_r;            /* static attenuation per side (TL, DISDL/DIPAN), 0x3FF+ = off */
+  int st_fx;                 /* S8: attenuation of the DSP send (TL, IMXL), 0x400 = no send */
   int32_t pv_l, pv_r;        /* port volume/pan multipliers, Q15 */
 } voice;
 
@@ -115,8 +116,9 @@ static int32_t pcm_at(voice *v, uint32_t i) {
 
 static void set_static(voice *v, const uint16_t *r) {
   int tl = r[10] >> 8, disdl = (r[9] >> 8) & 15, dipan = r[9] & 31, imxl = (r[8] >> 4) & 15;
-  int lvl = disdl ? disdl : imxl; /* no DSP: a voice sent only to the DSP is heard dry at its send level */
+  int lvl = disdl; /* S8: the DSP send goes to the reverb (fx_*) instead of being heard dry */
   int base = tl * 4 + (lvl ? (15 - lvl) * 32 : 0x400), side = (dipan & 15) == 15 ? 0x400 : (dipan & 15) * 32;
+  v->st_fx = imxl ? tl * 4 + (15 - imxl) * 32 : 0x400;
   v->st_l = base + ((dipan & 16) ? 0 : side);
   v->st_r = base + ((dipan & 16) ? side : 0);
 }
@@ -198,6 +200,51 @@ void aica_stop_range(uint32_t a, uint32_t n) {
 }
 int aica_voices(void) { int n = 0; for (int i = 0; i < NVOICE; i++) n += vo[i].tag != 0; return n; }
 
+/* ---- S8: the AICA DSP, approximated (AUDIO.md 3.1). The banks' DSP program (SFPB, one program) is not
+ * interpreted; voices' IMXL sends feed a stereo reverb of our own (Schroeder/Moorer: 4 damped combs + 2
+ * allpasses per side, integer Q15), output at the SFOB's effect levels (EFSDL 15 hard left / hard right = full)
+ * and the master volume. ---- */
+#define FX_MAX 64
+static int32_t fx_in[FX_MAX];
+static const int comb_len[2][4] = {{1116, 1188, 1277, 1356}, {1139, 1211, 1300, 1379}};
+static const int ap_len[2][2] = {{556, 441}, {579, 464}};
+static int32_t comb_buf[2][4][1400], comb_lp[2][4], ap_buf[2][2][600];
+static int comb_pos[2][4], ap_pos[2][2];
+#define FX_FB 27525    /* comb feedback 0.84 */
+#define FX_DAMP 6554   /* damping 0.2 */
+#define FX_WET 18022   /* output gain 0.55: a steady sound sent at 0 dB comes back about 2.4 dB below its dry level (test_aica) */
+int fx_enabled = 1;
+static void fx_run(int32_t *mix, int n) {
+  int32_t mg = mvol ? gain_tab[(15 - mvol) * 32] : 0;
+  for (int s = 0; s < n; s++) {
+    int32_t in = fx_in[s] >> 2; /* four combs in parallel */
+    for (int c = 0; c < 2; c++) {
+      int32_t acc = 0;
+      for (int k = 0; k < 4; k++) {
+        int32_t *b = comb_buf[c][k];
+        int p = comb_pos[c][k];
+        int32_t o = b[p];
+        comb_lp[c][k] = (int32_t)(((int64_t)o * (32768 - FX_DAMP) + (int64_t)comb_lp[c][k] * FX_DAMP) >> 15);
+        b[p] = in + (int32_t)(((int64_t)comb_lp[c][k] * FX_FB) >> 15);
+        if (++p >= comb_len[c][k]) p = 0;
+        comb_pos[c][k] = p;
+        acc += o;
+      }
+      for (int k = 0; k < 2; k++) {
+        int32_t *b = ap_buf[c][k];
+        int p = ap_pos[c][k];
+        int32_t bo = b[p], o = bo - acc;
+        b[p] = acc + (bo >> 1);
+        if (++p >= ap_len[c][k]) p = 0;
+        ap_pos[c][k] = p;
+        acc = o;
+      }
+      mix[2 * s + c] += (int32_t)(((int64_t)acc * FX_WET >> 15) * mg >> 15);
+    }
+    fx_in[s] = 0;
+  }
+}
+
 static void voice_mix(voice *v, int32_t *mix, int n) {
   int mv = mvol ? (15 - mvol) * 32 : 0x400;
   for (int s = 0; s < n; s++) {
@@ -222,6 +269,10 @@ static void voice_mix(voice *v, int32_t *mix, int n) {
     int32_t gl = gain_tab[al > 1024 ? 1024 : al], gr = gain_tab[ar > 1024 ? 1024 : ar];
     mix[2 * s] += (int32_t)(((int64_t)x * gl >> 15) * v->pv_l >> 15);
     mix[2 * s + 1] += (int32_t)(((int64_t)x * gr >> 15) * v->pv_r >> 15);
+    if (v->st_fx < 0x400) { /* the DSP send (mono, after the port level), master volume applied at the reverb's output */
+      int af = v->st_fx + e;
+      fx_in[s] += (int32_t)(((int64_t)x * gain_tab[af > 1024 ? 1024 : af] >> 15) * ((v->pv_l + v->pv_r) >> 1) >> 15);
+    }
     /* advance */
     v->frac += v->step;
     uint32_t adv = v->frac >> 20;
@@ -242,7 +293,12 @@ static void voice_mix(voice *v, int32_t *mix, int n) {
   }
 }
 void aica_mix(int32_t *mix, int n) {
-  for (int i = 0; i < NVOICE; i++) if (vo[i].tag) voice_mix(&vo[i], mix, n);
+  while (n > 0) {
+    int k = n > FX_MAX ? FX_MAX : n;
+    for (int i = 0; i < NVOICE; i++) if (vo[i].tag) voice_mix(&vo[i], mix, k);
+    if (fx_enabled) fx_run(mix, k); else memset(fx_in, 0, sizeof fx_in);
+    mix += 2 * k; n -= k;
+  }
 }
 
 /* ---- output: the retrowser pull model (spec 4.6) ---- */

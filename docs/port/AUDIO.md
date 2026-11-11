@@ -141,8 +141,21 @@ release; times from the AICA's documented curve: 118 s at rate 2, halving every 
 (0.375 dB per step), DISDL (3 dB per step, 0 = off), DIPAN (3 dB per step on one side, bit 4 = to the left), the
 master volume (3 dB per step, 0 = off), mono. Port volume, pan and pitch on top.
 
-Not modelled: the **DSP** (reverb etc.: a voice with no direct level is heard dry at its IMXL send level), the
-filter (FLV/FEG), the LFOs, sample-accurate timing of commands within a frame (all apply at the frame).
+Not modelled: the filter (FLV/FEG), the LFOs, sample-accurate timing of commands within a frame (all apply at
+the frame; the MIDI sequencer steps every 49 samples).
+
+### 3.1 The DSP, approximated (S8)
+
+Every bank carries the same DSP set: one SFPB program (0xC60 bytes), an SFPW work area (64 KiB, no file data) and an
+SFOB output table (`'SFOB'`, 1, size, count 1, offset 0x18, then {EFSDL, EFPAN} per DSP output: 0x0F/0x1F, 0x0F/0x0F
+twice = **two outputs at full level, hard left and hard right**: a stereo effect). The program (AICA DSP
+microcode, a reverb by its use) is **not interpreted**. Instead each voice's **IMXL send** (3 dB per step from 15,
+after TL, the envelope and the port level; ISEL ignored: one bus) feeds a reverb of our own: per side 4 damped comb
+filters (1116–1379 samples, feedback 0.84, damping 0.2) and 2 allpasses (441–579 samples, 0.5), integer Q15, wet
+gain 0.55 (a steady sine sent at 0 dB comes back 2.5 dB below its dry level, `test_aica`), then the master volume.
+So the four DSP-only loops (DISDL 0, IMXL 14: the race's engine-like sounds) are now heard only through the reverb,
+and the MIDI programs' small sends (IMXL 5) add a little room. Captures: the race loops' range 2370–2460 is at −27.7
+dBFS (S7 dry: −27.8), the whole route unchanged within 0.1 dB, 0 clipped samples.
 
 Output: the voices and the CDDA are summed in 32 bits, **halved (6 dB of headroom, the AICA mixes on a wider bus)**
 and clamped to 16 bits. 735 stereo frames per game frame (44 100 / 60: the host steps the game at 60 Hz), made at
@@ -210,7 +223,8 @@ base key, a reference, the 2-byte delta, the end). S4 route, effects only (`--au
 
 - MIDI (2.4): the tick resolution (480) and the tempo unit (ms per quarter) are our reading; CC 80, modulation,
   channel pressure, the split's flag/0xFFFF fields and the layers' third word are not used.
-- The AICA DSP (SFPB programs: reverb/effects): the four DSP-only loops are heard dry at their send level.
+- The AICA DSP program itself (SFPB) is not run: our reverb stands in for it (3.1); ISEL, the DSP's own
+  coefficients and delays, and other effects it may make are not modelled.
 - The filter envelope and LFOs; the `time` argument of the port commands (always 0 in the game so far).
 - The port volume scale (linear 0..255) and the 6 dB headroom are our choices; the real driver's curve is not known.
 - `sd_CmdBytes`, `sd_CmdU8U8`, `sd_CmdReset`: logged only (meaning unknown).

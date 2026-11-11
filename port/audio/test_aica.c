@@ -178,6 +178,26 @@ int main(void) {
     rtw_audio_drain();
   }
 
+  /* S8: the DSP send (reverb approximation): a looping 441 Hz sine sent only to the DSP (DISDL 0, IMXL 15) */
+  {
+    slot(r, 0, 1, 0x1000, 0, 99, 0);
+    for (int i = 0; i < 100; i++) { int16_t v = (int16_t)(8000 * sin(2 * M_PI * i / 100.0)); aica_ram[0x1000 + 2 * i] = (uint8_t)v; aica_ram[0x1001 + 2 * i] = (uint8_t)(v >> 8); }
+    r[9] = 0; r[8] = 0xF0; /* no direct level, send 15 */
+    uint32_t hv = aica_key_on(r, 0, 0);
+    run(1000);
+    double e0 = 0; for (int i = 0; i < 1000; i++) e0 += (double)mix[2 * i] * mix[2 * i];
+    check(e0 / 1000 < 1e4, "dsp: nothing in the first 22 ms (the combs' delay)", e0 / 1000);
+    run(8192); run(8192);
+    double e = 0; for (int i = 0; i < 8192; i++) e += (double)mix[2 * i] * mix[2 * i];
+    double db = 10 * log10(e / 8192 / (8000.0 * 8000.0 / 2));
+    printf("audio dsp steady level %.1f dB re the dry sine\n", db);
+    check(db > -6 && db < 6, "dsp: the reverb's steady level within 6 dB of the dry level", db);
+    aica_key_off(hv); run(8192);
+    run(8192); run(8192); run(8192); run(8192); run(8192); run(8192);
+    double t = 0; for (int i = 0; i < 8192; i++) t += (double)mix[2 * i] * mix[2 * i];
+    check(10 * log10(t / 8192 / (8000.0 * 8000.0 / 2) + 1e-30) < -40, "dsp: the tail decays (below -40 dB after 1.3 s)", t);
+  }
+
   printf("audio %d checks, %d failures\n", checks, fails);
   return fails != 0;
 }
