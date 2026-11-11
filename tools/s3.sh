@@ -8,6 +8,7 @@
 #                               GEN=genall after `gen --ranges all --out /build/genall` tests the SDK too
 #   tools/s3.sh mutants         recompile with each mutant and count the functions that catch it
 #                               (RANGES=all: on the SDK code too; MUTS="2 7": a subset)
+#   tools/s3.sh mutate [args]   S12: run the mutants of port_work/mut/mutants.json (tools/mut_worker.py)
 #   tools/s3.sh native [args]   build + run the boot natively (disc read from penpen-disc)
 #   tools/s3.sh wasm [args]     build the boot as wasm32 + run it in node (disc read by the node host)
 # Every container that sees disc-derived data runs with --network none --read-only --cap-drop ALL; the
@@ -23,10 +24,13 @@ box() { # sandboxed container: repo read-only at /src, volumes as given by the c
     --tmpfs /tmp:exec,size=4g,mode=1777 -e HOME=/tmp -e EM_CACHE=/tmp/emcache \
     -v "$REPO/port":/src/port:ro -v "$REPO/tools":/src/tools:ro -v "$REPO/src":/src/src:ro "$@"
 }
-# What may be printed from a container that read disc-derived data: our own log vocabulary only.
-filt() { grep -E '^(S3 |audio |check_gen |sh4 |diff |mut |hle |boot |rt |io |gen |build |frame |render |shot |hw |  )[ -~]*$' || true; }
+# What may be printed from a container that read disc-derived data: our own log vocabulary only (-a: a log line
+# with a non-ASCII byte must not turn grep's output into "binary file matches": the pattern drops such lines).
+filt() { grep --line-buffered -aE '^(S3 |audio |check_gen |sh4 |diff |mut |hle |boot |rt |io |gen |build |frame |render |shot |hw |  )[ -~]*$' || true; }
 # S11: GEN=genhand HAND=1 gen = the translation without the hand-written functions (src/); GEN=x native|wasm builds
 # /build/x into /build/native-x | /build/wasm-x (tools/s11.sh wraps these)
+# S12: the run arguments go into a `sh -c` string: quote each one (a pad script's "A|SL" is not a pipe)
+qargs() { for a in "$@"; do printf "'%s' " "$(printf '%s' "$a" | sed "s/'/'\\\\''/g")"; done; }
 G=${GEN:-gen}
 SFX=${GEN:+-$GEN}
 HANDARG=${HAND:+--hand /src/src}
@@ -61,11 +65,18 @@ case "${1:-}" in
     box -v penpen-work:/work:ro -v penpen-build:/build -v "$REPO/port/symbols":/symbols:ro \
       -e RANGES=${RANGES:-game} -e MUTS="${MUTS:-1 2 3 4 5 6 7}" $IMG \
       sh /src/port/recomp/mutants.sh "$CF" $J "$*" 2>&1 | filt ;;
+  mutate)
+    # S12: tools/mut_worker.py on port_work/mut/mutants.json (tools/s11.sh mutate wraps this)
+    shift
+    # MUTSRC=dir: mutate that copy of src/ (an earlier session's, for its baseline) instead of the working tree
+    box -v penpen-disc:/disc:ro -v penpen-build:/build:ro -v "$REPO/port_work/mut":/mut:ro -e CF="$CF" \
+      -v "${MUTSRC:-$REPO/src}":/mutsrc:ro -e SRC=/mutsrc -e MUTANTS="${MUTANTS:-/mut/mutants.json}" $IMG \
+      sh -c 'python3 -I /src/tools/mut_worker.py "$MUTANTS" /src/tools/routes.tsv "$@"' sh "$@" 2>&1 | filt ;;
   native)
     shift
-    box -v penpen-disc:/disc:ro -v penpen-build:/build $IMG sh -c "sh /src/port/runtime/build.sh native /build/$G /build/native$SFX '$CF' $J && /build/native$SFX/penpen --disc /disc $*" 2>&1 | filt ;;
+    box -v penpen-disc:/disc:ro -v penpen-build:/build $IMG sh -c "{ sh /src/port/runtime/build.sh native /build/$G /build/native$SFX '$CF' $J || { echo 'build FAILED (compiler messages are not shown: they may quote generated code)'; exit 1; }; } && /build/native$SFX/penpen --disc /disc $(qargs "$@")" 2>&1 | filt ;;
   wasm)
     shift
-    box -v penpen-disc:/disc:ro -v penpen-build:/build $IMG sh -c "sh /src/port/runtime/build.sh wasm /build/$G /build/wasm$SFX '$CF' $J && /emsdk/node/22.16.0_64bit/bin/node /src/port/runtime/node/run.mjs /build/wasm$SFX/penpen.wasm /disc $*" 2>&1 | filt ;;
-  *) sed -n '2,12p' "$0"; exit 2 ;;
+    box -v penpen-disc:/disc:ro -v penpen-build:/build $IMG sh -c "{ sh /src/port/runtime/build.sh wasm /build/$G /build/wasm$SFX '$CF' $J || { echo 'build FAILED (compiler messages are not shown: they may quote generated code)'; exit 1; }; } && /emsdk/node/22.16.0_64bit/bin/node /src/port/runtime/node/run.mjs /build/wasm$SFX/penpen.wasm /disc $(qargs "$@")" 2>&1 | filt ;;
+  *) sed -n '2,13p' "$0"; exit 2 ;;
 esac

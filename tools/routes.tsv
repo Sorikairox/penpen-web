@@ -1,0 +1,20 @@
+# Test routes: the runs every gate uses (tools/s11.sh test / compare / mutate; DECOMP.md 5, 6, 11). Columns: name,
+# frames, pad script (hle_io.c: "F[+N][@P]:BTN|BTN,...": buttons held on port P (default 0 = A) during frames F..F+N-1,
+# N default 4; "0@1:" plugs a controller into port B with nothing pressed; SL/SR/SU/SD = the stick pushed fully;
+# '-' = no input), extra runtime arguments ('-' = none). Each run must reach its frame limit.
+# boot: power-on, logos, title, the attract demo (mode 8, from 2230) and its 3600-frame time-out, the title again
+boot	8000	-	-
+# route (S4): title, TRICELON, PenPen House, RACE, character, course map, a 1P race on Easy Icelon from 1766
+route	6000	600:START,700:A,1100:START,1200:A,1500:A,1700:A,1760:A	-
+# explore (S12): the stick in the character select and in the race, the pause menu (Retry, Resume), pause again ->
+# PenPen House, DRESS UP, RESULTS, back (B) to the title, TIME TRIAL, its race from 5604
+explore	7000	600:START,700:A,1100:START,1200:A,1300:SR,1360:SL,1420:SR,1500:A,1700:A,1760:A,2400+120:A|SL,2560+120:A|SR,2700+40:SU,2760+40:SD,2900:START,2960:DOWN,3000:UP,3050:A,3200+8:START,3260:DOWN,3280:DOWN,3320:A,3600:DOWN,3640:A,3900:B,4000:DOWN,4040:DOWN,4080:A,4400:B,4500:B,4800:START,4850:DOWN,4900:A,5300:A,5500:A,5600:A,5700:A	-
+# vs2 (S12): two controllers; VS ICELON, 2 Pen, both players pick, a two-player race (split mode 2: two views +
+# panel) from 2314, both steering, player 2 pauses and resumes
+vs2	4000	0@1:,600:START,650:DOWN,670:DOWN,700:A,1350:A,1650:A,1700@1:A,2250:A,2310:A,2600+100:A|SR,2650+100@1:A|SL,3000@1:START,3060@1:DOWN,3100@1:UP,3140@1:A	-
+# vs4 (S12): four controllers; VS ICELON, 4 Pen, a four-player race (split mode 3: four views + panel) from 2314
+vs4	4000	0@1:,0@2:,0@3:,600:START,650:DOWN,670:DOWN,700:A,1300:DOWN,1320:DOWN,1350:A,1650:A,1700@1:A,1720@2:A,1740@3:A,2250:A,2310:A,2600+60@2:SL,2700+60@3:SR,2800+60:A|SU	-
+# demo (S12): no input until the attract demo runs (from 2230), Start at 2600 ends it: back to the title
+demo	3400	2600:START	-
+# reset (S12): the 1P race, then the soft reset (A+B+X+Y held, Start) on controller B at 2620: back to the title
+reset	3600	0@1:,600:START,700:A,1100:START,1200:A,1500:A,1700:A,1760:A,2600+30@1:A|B|X|Y,2620@1:START	-
