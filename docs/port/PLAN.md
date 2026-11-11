@@ -301,9 +301,10 @@ sources or libraries.
 | S5 HLE: Ninja + Kamui → WebGL2 | PVR textures (VQ, twiddled, mipmaps), chunk models, TA lists, translucency order | done 2026-11-11: logos, title, menus, house, race visible (looked at); `docs/port/RENDER.md` |
 | S6 Input, VMU, rumble + retrowser module | pd (4 ports, triggers), bu on a VMU image, pdVib; the module (stepped `rtw_frame`, WebGL glue, manifest) | done 2026-11-11: resumable frames; menus to a race by keyboard in the containerised retrowser host + headless Chromium; the VMU save survives a reload; rumble; `docs/port/RTW.md` |
 | S7 Audio | Manatee `sd` command HLE + an AICA mixer for MLT banks (ADPCM/PCM, MIDI sequences); CDDA tracks from the disc | done 2026-11-11: CDDA + one-shots through `rtw_audio_*`; captures measured in the volume; MIDI and DSP left; `docs/port/AUDIO.md` |
-| S8 First race | a full race, 1 player, then 4-player split screen | race finishes |
-| S9 retrowser `dreamcast` | the host work of section 6 (retrowser repo, separate approval), local host e2e | boots from a local retrowser host |
-| S10… Decomp | hand-written C replaces recompiled code region by region, each function differential-tested | shipped build has no recompiled code |
+| S8 Fixes | title logo, shadows, lights/specular/shape blending/basic models/2D, MIDI sequences, DSP reverb, RTC, wasm trim | done 2026-11-11: node transforms fixed (the title logo shows), shadow bit per polygon, MIDI + reverb, RTC from the browser clock (fixed in tests), wasm 47 → 24.6 MB; HANDOFF S8 |
+| S9 First race | a full race, 1 player, then 4-player split screen | race finishes |
+| S10 retrowser `dreamcast` | the host work of section 6 (retrowser repo, separate approval), local host e2e | boots from a local retrowser host |
+| S11… Decomp | hand-written C replaces recompiled code region by region, each function differential-tested | shipped build has no recompiled code |
 | later | Sofdec intro (MPEG-1 + ADX decoder, or skip intro), VMU LCD, options | |
 
 ## 9. Rules (every session)
@@ -346,6 +347,8 @@ sources or libraries.
   host and headless Chromium in `--network none` containers of `penpen-rtw:1`, with the disc archive from
   `penpen-raw`; e2e PNGs stay in `/build/e2e` (`tools/rtw.sh look`). Never run it in the host's browser: the user
   decides when to try it (RTW.md 6).
+- **Disassembly** (S8): `tools/ghidra.sh asm ADDR:LEN` prints instructions in the terminal; same status as
+  `decomp` (disc-derived: never committed, never pasted into docs).
 - **Audio** (S7): WAV captures (`tools/s7.sh capture`) are decoded disc audio: they stay in
   `penpen-build:/build/audio` and are only measured there (`tools/s7.sh report`: numbers); never copied to the
   host, never committed. The e2e's Chromium runs muted.

@@ -213,8 +213,9 @@ All guest code ran in `--network none --read-only --cap-drop ALL` containers; th
 
 ### S8 captures (MIDI)
 
-Mixer unit checks **23 / 0** (6 new: a synthetic SMSB/SMPB pair: note on/off at the tempo, an octave from the
-base key, a reference, the 2-byte delta, the end). S4 route, effects only (`--audio-solo sfx`): the range
+Mixer unit checks **26 / 0** (6 MIDI ones on a synthetic SMSB/SMPB pair: note on/off at the tempo, an octave
+from the base key, a reference, the 2-byte delta, the end; 3 DSP ones: the comb delay, the steady level −2.5 dB,
+the tail's decay). S4 route, effects only (`--audio-solo sfx`): the range
 1500–1635 now holds the A press and sequence 37's clip: **RMS −16.7 dBFS, peak −5.1 dBFS** (S7: 1500–1590 at
 −23.4 dBFS, the press alone); the full mix: −20.3 dBFS in the 10 frames before 1501, −12.8 dBFS in the 10 after;
 0 clipped samples; 1 note, 6 events, 0 unknown.

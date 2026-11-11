@@ -2,6 +2,63 @@
 
 Newest session first. Read `docs/port/PLAN.md` (disc facts, survey, approach, phases, rules) before working.
 
+## S8 — 2026-11-11: fixes: title logo, shadows, lights, basic models, MIDI, DSP reverb, RTC, wasm trim
+
+All guest code ran in `--network none --read-only --cap-drop ALL` containers; PNGs, dumps, WAVs and RAM dumps
+stayed in `penpen-build` (single PNGs looked at from the session scratchpad); `git log --all -- port/gen` stays
+empty. New debugging aids: `--trace F0[-F1]` (every SDK call, node and strip of those frames), `tools/ghidra.sh
+asm ADDR:LEN` (terminal only).
+
+1. **Title logo** (RENDER.md 5): the real cause was not depth or sorting: **this SDK's njTranslate /
+   njRotateXYZ / njRotateZXY / njScale return at once when the matrix argument is NULL** (S5 passed NULL for
+   "current"), so every node transform of every model tree was dropped. The ice tube (nj_MotionL3b, node
+   translate z −544, scale z .67/.27) sat at the logo's depth; the characters' limbs were all at their root.
+   Now the current matrix pointer is passed: frames 500/900/1500 show the full logo in front of the tube;
+   PenPen House and the races show articulated characters.
+2. **Shadows**: the SDK's polygon context builder (0x8C0E4340) sets the PCW shadow bit from njControl3D
+   0x400 (or 0x1000 for polygons without alpha); the game draws the course with 0xC04, the characters with
+   0x004. The backend keeps the bit in stencil bit 7 and darkens only pixels with bit 7 + odd volume parity:
+   the race frame's 4 227 shadowed pixels are all on the ground, none on the player's body. Also njControl3D
+   0x800 = njSetConstantAttr masks on chunk strip headers (the course: no env map, flat).
+3. **Renderer**: per-family lights (L1/L3/L4 one light each; L2 four lights + ambient, from the S8 trace's
+   values), specular into the offset colour (not for L1), shape-motion keys blended linearly, **basic models**
+   (the game's "nj_ObjectB" takes an NJS_MODEL: the characters' slide trails, seen on the snow in the attract
+   demo at frame 3000), njDrawPolygon / njDrawTriangle2D / njDrawLine2D (attr bits read in the SDK; none of
+   them, nor njPrint, is called in 6 000 frames of the boot or the route).
+4. **MIDI** (AUDIO.md 2.4): SMSB/SMPB formats read from the banks (structure only; grammar checked on all 51
+   sequences): Saturn-like events (notes with 1/2-byte gate and delta, references, tempo, CC, program, bend),
+   programs = layers of key splits holding AICA slot images + base key, a velocity curve. `seq.c` plays them
+   through the mixer (15 steps per frame, integer). Sequences 5–44 are one note each of program 11 = 40
+   sampled clips; the route plays **sequence 37 at frame 1501** (2.1 s clip): effects-only capture
+   1500–1635 **RMS −16.7 dBFS, peak −5.1 dBFS** (the press alone was −23.4), full mix −20.3 → −12.8 dBFS
+   around 1501, 0 clipped samples. Assumed (not in the files): 480 ticks per quarter, tempo = ms per quarter.
+5. **DSP**: the SFPB program is not interpreted; IMXL sends feed a stereo reverb of ours (4 damped combs + 2
+   allpasses per side) at the SFOB's full hard-left/right outputs. DSP-only sounds (the race's loops) are no
+   longer heard dry: 2370–2460 at −27.7 dBFS (S7 −27.8); route levels unchanged within 0.1 dB.
+6. **RTC**: the game reads the AICA clock (0xA0710000/04) through syRtc (a V-blank handler reads it every
+   frame into syRtc's cache; the only game use is the VMU save's time stamp). The module answers start value
+   + frame time; **the glue sets the start from the browser's local clock** (`penpen_set_rtc` before
+   `rtw_start`), test hosts use a **fixed 2000-01-01 00:00:00** (`--rtc N`). Saves: 2000-01-01 00:00:11 in
+   tests, the real date in the e2e. retrowser has no time import: RTW.md 3.1 has a spec proposal
+   (`rtw_time(ptr)`), retrowser unchanged.
+7. **wasm trim** (RECOMP.md 9): `recomp.py --trim` (default) keeps the game range, entries, guest SDK
+   functions, data-table callbacks and their closure, never entering HLE targets: **5 943 of 8 068
+   functions, wasm 47.1 → 24.6 MB**; identical frame lines and RAM digests over 6 000 route frames and 8 000
+   no-input frames, 0 interpreter calls (the fallback stays).
+
+Tests: sh4 **257 / 0**; mixer **26 / 0** (9 new: MIDI timing/pitch/reference/end, DSP delay/level/decay);
+harness on the trimmed translation **5 943: 5 736 pass / 0 fail / 207 untested**, on the full one **8 068:
+7 687 / 0 / 381** (as S7); native = wasm (RAM and audio digests, 3 000 route frames); `rtw.mjs check --disc`
+**OK**; e2e: playing after 70 s, title with the logo, menu, house, selection, course, race start and racing seen; the host's AudioWorklet runs (queue 113 / 92 ms, 0 dropped, 1 / 3 underruns), **58.8 game frames/s** in the race (SwiftShader, as S6/S7), rumble, the VMU save (stamped with the container's real date) loaded after the reload. **Route RAM vs S7** (native, 3 000 frames): every frame-line field equal (HLE/guest
+counts, files, heap, pads); the RAM digests differ, and a RAM diff at frame 3 000 has **166 bytes in 4 runs**:
+syRtc's clock cache (0x8C1BAC50, 4 bytes) and the Ninja matrix stack (0x8CE3F8C0–0x8CE3FBBA: the node
+transforms now really written there).
+
+Next: S9 first race (a full race, 1 player, then split screen); the per-pixel translucency sort; palettised
+textures; flat shading; the MIDI tick resolution (find it in the ARM7 driver if a song is ever played);
+`nj_ModelB` and the B-family motions if a route reaches them. The user restarts `tools/launch-local.sh` to get
+this build.
+
 ## S7 — 2026-11-11: audio: CDDA music and Manatee one-shot effects through the retrowser audio exports
 
 Design and numbers: `docs/port/AUDIO.md`. All guest code ran in `--network none --read-only --cap-drop ALL`
