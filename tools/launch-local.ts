@@ -31,5 +31,5 @@ Pen Pen TriIcelon (local, work in progress)
    Click the cartridge, pick "PenPen TriIcelon (USA).7z" (unpacked once into the browser, ~1.2 GB, ~1 min).
 
 Keys: Enter = Start, X = A, C = B, Z = X, S = Y, arrows = stick, A / D = L / R, T F G H = D-pad (or a gamepad).
-No sound yet. Ctrl+C here to stop.
+Music (CD tracks) and sound effects; MIDI sequences are still silent. Ctrl+C here to stop.
 `);
