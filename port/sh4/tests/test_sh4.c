@@ -590,6 +590,60 @@ static void t_fpu(void) {
   EQ(c->fr.u[4], 0x3FE00000u, "fcnvsd"); EQ(c->r[5], 0x00080001u, "sts fpscr");
 }
 
+/* S4: FPSCR.RM = 01 (round to zero) and DN, the game's mode (0x00040001, the reset value), against
+ * round to nearest (FPSCR = 0) on values whose two roundings differ; expected bit patterns worked out by
+ * hand from the exact values. */
+static void setd(int n, double d) { uint64_t v; memcpy(&v, &d, 8); c->fr.u[n] = (uint32_t)(v >> 32); c->fr.u[n + 1] = (uint32_t)v; }
+static void t_fpu_rz(void) {
+  static const struct { uint32_t fpscr; float x, y; int op; uint32_t want; const char *what; } v[] = {
+    {0x00040001u, 1.0f, 3.0f, 3, 0x3EAAAAAAu, "rz 1/3"},          {0x00000000u, 1.0f, 3.0f, 3, 0x3EAAAAABu, "rn 1/3"},
+    {0x00040001u, 2.0f, 3.0f, 3, 0x3F2AAAAAu, "rz 2/3"},          {0x00000000u, 2.0f, 3.0f, 3, 0x3F2AAAABu, "rn 2/3"},
+    {0x00040001u, -2.0f, 3.0f, 3, 0xBF2AAAAAu, "rz -2/3 (toward zero, not down)"},
+    {0x00040001u, 1.0f, 0x1p-25f, 0, 0x3F800000u, "rz 1 + 2^-25"}, {0x00040001u, 1.0f, -0x1p-30f, 0, 0x3F7FFFFFu, "rz 1 - 2^-30"},
+    {0x00000000u, 1.0f, -0x1p-30f, 0, 0x3F800000u, "rn 1 - 2^-30"}, {0x00040001u, 1.0f, 0x1p-30f, 1, 0x3F7FFFFFu, "rz fsub 1 - 2^-30"},
+    {0x00040001u, 1.0f, -1.0f, 0, 0x00000000u, "rz 1 + -1 = +0"},
+    {0x00040001u, 1.1f, 3.0f, 2, 0x40533333u, "rz 1.1*3"},        {0x00000000u, 1.1f, 3.0f, 2, 0x40533334u, "rn 1.1*3"},
+    {0x00040001u, 0x1p100f, 0x1p100f, 2, 0x7F7FFFFFu, "rz overflow = largest finite"},
+    {0x00000000u, 0x1p100f, 0x1p100f, 2, 0x7F800000u, "rn overflow = inf"},
+    {0x00040001u, 0x1p-70f, 0x1p-70f, 2, 0x00000000u, "dn: denormal result is zero"},
+    {0x00000001u, 0x1p-70f, 0x1p-70f, 2, 0x00000000u, "rz without dn: 2^-140 is a denormal"},
+  };
+  for (unsigned i = 0; i < sizeof v / sizeof v[0]; i++) {
+    static const uint16_t ops[] = {0xF210, 0xF211, 0xF212, 0xF213}; /* fadd/fsub/fmul/fdiv fr1,fr2 */
+    uint16_t p[2] = {ops[v[i].op], 0x0009};
+    prog(p, 2);
+    c->fpscr = v[i].fpscr; c->fr.f[2] = v[i].x; c->fr.f[1] = v[i].y;
+    RUN(1);
+    if (!strcmp(v[i].what, "rz without dn: 2^-140 is a denormal")) { EQ(c->fr.u[2], 0x00000200u, v[i].what); continue; }
+    EQ(c->fr.u[2], v[i].want, v[i].what);
+  }
+  /* denormal operand with DN: read as zero */
+  { uint16_t p[2] = {0xF210, 0x0009}; prog(p, 2); c->fr.u[2] = 0x00000001u; c->fr.u[1] = 0x00000001u; RUN(1);
+    EQ(c->fr.u[2], 0, "dn: denormal operands are zero"); }
+  /* fsqrt 5: 2.2360679775 lies between 0x400F1BBC and 0x400F1BBD, nearer the upper */
+  { uint16_t p[2] = {0xF26D, 0x0009}; prog(p, 2); c->fr.f[2] = 5.0f; RUN(1); EQ(c->fr.u[2], 0x400F1BBCu, "rz fsqrt 5");
+    prog(p, 2); c->fpscr = 0; c->fr.f[2] = 5.0f; RUN(1); EQ(c->fr.u[2], 0x400F1BBDu, "rn fsqrt 5"); }
+  /* float: 16777217 is not a single; toward zero gives 16777216, and -16777217 -> -16777216 */
+  { uint16_t p[4] = {0x415A, 0xF22D, 0x0009, 0x0009}; prog(p, 4); c->r[1] = 16777217u; RUN(2);
+    EQ(c->fr.u[2], 0x4B800000u, "rz float 2^24+1"); prog(p, 4); c->r[1] = (uint32_t)-16777219; RUN(2);
+    EQ(c->fr.u[2], 0xCB800001u, "rz float -(2^24+3)"); }
+  /* double precision (PR = 1): 1/10 = 0x3FB999999999999A to nearest, ...99 toward zero; 0.1 + 0.2 */
+  { uint16_t p[2] = {0xF243, 0x0009}; /* fdiv dr4,dr2 */
+    prog(p, 2); c->fpscr = 0x00080001u; setd(2, 1.0); setd(4, 10.0); RUN(1);
+    EQ(c->fr.u[3], 0x99999999u, "rz double 1/10 (low word)");
+    prog(p, 2); c->fpscr = 0x00080000u; setd(2, 1.0); setd(4, 10.0); RUN(1);
+    EQ(c->fr.u[3], 0x9999999Au, "rn double 1/10 (low word)");
+    uint16_t q[2] = {0xF240, 0x0009}; /* fadd dr4,dr2 */
+    prog(q, 2); c->fpscr = 0x00080001u; setd(2, 0.1); setd(4, 0.2); RUN(1);
+    EQ(c->fr.u[3], 0x33333333u, "rz double 0.1 + 0.2 (low word; nearest is ...34)");
+    uint16_t r2[2] = {0xF242, 0x0009}; /* fmul dr4,dr2 */
+    prog(r2, 2); c->fpscr = 0x00080001u; setd(2, 0.1); setd(4, 3.0); RUN(1);
+    EQ(c->fr.u[3], 0x33333333u, "rz double 0.1 * 3 (low word; nearest is ...34)");
+    uint16_t s2[2] = {0xF26D, 0x0009}; /* fsqrt dr2 */
+    prog(s2, 2); c->fpscr = 0x00080001u; setd(2, 2.0); RUN(1);
+    EQ(c->fr.u[3], 0x667F3BCCu, "rz double sqrt 2 (low word; nearest is ...CD)"); }
+}
+
 int main(void) {
   sh4_ram = calloc(1, 16 << 20);
   sh4_init_tables();
@@ -602,6 +656,7 @@ int main(void) {
   t_branch();
   t_system();
   t_fpu();
+  t_fpu_rz();
   printf("sh4 tests: %d checks, %d failures\n", checks, fails);
   return fails != 0;
 }

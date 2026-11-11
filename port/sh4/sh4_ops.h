@@ -5,10 +5,14 @@
  * constants (so the field extraction folds away). They never touch c->pc. Written from the SH-4 Software
  * Manual's descriptions; tested by port/sh4/tests/test_sh4.c.
  *
- * Deviations from the hardware, deliberate: floating point uses the host's IEEE round-to-nearest (FPSCR.RM
- * round-to-zero and DN are not modelled), no FPU exceptions/flags (NaN results are the SH-4's own qNaN); fsca and fsrra are computed exactly then
- * rounded to single (the hardware's are table approximations); cache and prefetch operations are no-ops,
- * except a prefetch of a store-queue address, which flushes that queue through sh4_io_pref.
+ * Floating point (S4): FPSCR.RM = 01 (round to zero, the mode the game and its SDK run in) and FPSCR.DN
+ * (denormals are zero) are modelled in software: each result is computed exactly, or with its exact error
+ * term (two-sum, Dekker two-product, residuals), in IEEE double on the host, then rounded toward zero; the
+ * host's round-to-nearest is used only when RM = 00 (wasm has no rounding modes). Deliberate deviations:
+ * no FPU exceptions/flags (NaN results are the SH-4's own qNaN); fsca, fsrra, fipr and ftrv are computed in
+ * double then rounded to single (the hardware's are approximations); fmac rounds the product, then the
+ * sum; cache and prefetch operations are no-ops, except a prefetch of a store-queue address, which flushes
+ * that queue through sh4_io_pref.
  */
 #ifndef SH4_OPS_H
 #define SH4_OPS_H
@@ -307,6 +311,88 @@ SH4_INLINE double dq(double x) { if (x != x) { uint64_t u = 0x7FF7FFFFFFFFFFFFul
 SH4_INLINE uint32_t *fpair(SH4 *c, int n) { return (n & 1) ? &c->xf.u[n & 14] : &c->fr.u[n]; }
 #define PR_ON (c->fpscr & FPSCR_PR)
 #define SZ_ON (c->fpscr & FPSCR_SZ)
+#define RZ_ON ((c->fpscr & FPSCR_RM) == 1)
+#define DN_ON (c->fpscr & FPSCR_DN)
+
+/* ---- rounding toward zero and denormals-as-zero, in software ---- */
+SH4_INLINE uint32_t f2u(float f) { uint32_t u; memcpy(&u, &f, 4); return u; }
+SH4_INLINE float u2f(uint32_t u) { float f; memcpy(&f, &u, 4); return f; }
+SH4_INLINE uint64_t d2u(double d) { uint64_t u; memcpy(&u, &d, 8); return u; }
+SH4_INLINE double u2d(uint64_t u) { double d; memcpy(&d, &u, 8); return d; }
+SH4_INLINE float f_dz(float x) { uint32_t u = f2u(x); return (u & 0x7F800000u) ? x : u2f(u & 0x80000000u); }
+SH4_INLINE double d_dz(double x) {
+  uint64_t u = d2u(x);
+  return (u & 0x7FF0000000000000ull) ? x : u2d(u & 0x8000000000000000ull);
+}
+/* the value d + e (e: the exact error of d, |e| <= half an ulp of d; 0 when d is exact) rounded to single
+ * toward zero. (float)d rounds to nearest: step back one ulp when that went away from zero, or when d is a
+ * single exactly and the error points toward zero. Overflow gives the largest finite value. */
+SH4_INLINE float f_rz(double d, double e) {
+  float f = (float)d;
+  if (f != f || d == 0) return f;
+  double fd = (double)f;
+  if (fabs(d) != INFINITY && (fabs(fd) > fabs(d) || (fd == d && e != 0 && ((e < 0) != (d < 0)))))
+    f = u2f(f2u(f) - 1);
+  return f;
+}
+/* d with exact error e, toward zero (doubles) */
+SH4_INLINE double d_rz(double d, double e) {
+  if (d != d || d == 0) return d;
+  if (fabs(d) == INFINITY) return d; /* overflow: the callers' rz_ovf */
+  if (e != 0 && ((e < 0) != (d < 0))) d = u2d(d2u(d) - 1);
+  return d;
+}
+SH4_INLINE double two_sum_err(double a, double b, double s) {
+  double bb = s - a;
+  return (a - (s - bb)) + (b - bb);
+}
+SH4_INLINE void dsplit(double a, double *hi, double *lo) {
+  double t = 134217729.0 * a; /* 2^27 + 1 */
+  *hi = t - (t - a); *lo = a - *hi;
+}
+SH4_INLINE double two_prod_err(double a, double b, double p) {
+  double ah, al, bh, bl;
+  dsplit(a, &ah, &al); dsplit(b, &bh, &bl);
+  return ((ah * bh - p) + ah * bl + al * bh) + al * bl;
+}
+/* single precision, rounded toward zero, denormals as zero (when DN) */
+SH4_INLINE float rz_fadd(float x, float y) { double a = x, b = y, s = a + b; return f_rz(s, two_sum_err(a, b, s)); }
+SH4_INLINE float rz_fmul(float x, float y) { return f_rz((double)x * (double)y, 0); } /* 24x24 bits: exact */
+/* a quotient or root that is a single exactly is the exact result (it cannot be within 2^-53 of a single
+ * without being one), so the double result rounded toward zero is the answer */
+SH4_INLINE float rz_fdiv(float x, float y) { return f_rz((double)x / (double)y, 0); }
+SH4_INLINE float rz_fsqrt(float x) { return f_rz(sqrt((double)x), 0); }
+/* double precision: overflow toward zero is the largest finite value */
+SH4_INLINE double rz_ovf(double r, double x, double y) {
+  if (fabs(r) == INFINITY && fabs(x) != INFINITY && fabs(y) != INFINITY) return u2d(d2u(r) - 1);
+  return r;
+}
+SH4_INLINE double rz_dadd(double x, double y) {
+  double s = x + y;
+  if (fabs(s) == INFINITY) return rz_ovf(s, x, y);
+  return d_rz(s, two_sum_err(x, y, s));
+}
+SH4_INLINE double rz_dmul(double x, double y) {
+  double p = x * y;
+  if (fabs(p) == INFINITY) return rz_ovf(p, x, y);
+  if (p == 0 || fabs(p) < 0x1p-969 || fabs(x) > 0x1p995 || fabs(y) > 0x1p995) return p; /* outside Dekker's range */
+  return d_rz(p, two_prod_err(x, y, p));
+}
+SH4_INLINE double rz_ddiv(double x, double y) {
+  double q = x / y;
+  if (fabs(q) == INFINITY) return y != 0 ? rz_ovf(q, x, 1) : q;
+  if (q != q || q == 0 || fabs(q) < 0x1p-969 || fabs(q) > 0x1p995 || fabs(y) > 0x1p995 || fabs(y) < 0x1p-969) return q;
+  double p = q * y, r = (x - p) - two_prod_err(q, y, p); /* x - q*y; the exact quotient is q + r/y */
+  if (r != 0 && ((r < 0) != (y < 0)) != (q < 0)) q = u2d(d2u(q) - 1);
+  return q;
+}
+SH4_INLINE double rz_dsqrt(double x) {
+  double q = sqrt(x);
+  if (q != q || q == 0 || q == INFINITY || q < 0x1p-480) return q;
+  double p = q * q, r = (x - p) - two_prod_err(q, q, p);
+  if (r < 0) q = u2d(d2u(q) - 1);
+  return q;
+}
 
 OPF(FMOV) {
   UNUSED;
@@ -354,31 +440,48 @@ OPF(FLDS) { UNUSED; c->fpul = c->fr.u[OPN]; }
 OPF(FSTS) { UNUSED; c->fr.u[OPN] = c->fpul; }
 OPF(FABS) { UNUSED; c->fr.u[PR_ON ? (OPN & 14) : OPN] &= 0x7FFFFFFFu; }
 OPF(FNEG) { UNUSED; c->fr.u[PR_ON ? (OPN & 14) : OPN] ^= 0x80000000u; }
-#define FBIN(name, expr)                                                                       \
-  OPF(name) {                                                                                  \
-    UNUSED;                                                                                    \
-    if (PR_ON) { int n = OPN & 14, m = OPM & 14; double x = fgetd(&c->fr, n), y = fgetd(&c->fr, m); \
-      fsetd(&c->fr, n, dq(expr)); }                                                            \
-    else { float x = c->fr.f[OPN], y = c->fr.f[OPM]; c->fr.f[OPN] = fq(expr); }                \
+/* x op y: single or double by PR; RM = 01: toward zero (software), else the host's nearest; DN: denormal
+ * operands and results are zero */
+#define FBIN(name, expr, rzs, rzd)                                                                     \
+  OPF(name) {                                                                                          \
+    UNUSED;                                                                                            \
+    if (PR_ON) {                                                                                       \
+      int n = OPN & 14, m = OPM & 14;                                                                  \
+      double x = fgetd(&c->fr, n), y = fgetd(&c->fr, m), r;                                            \
+      if (DN_ON) { x = d_dz(x); y = d_dz(y); }                                                         \
+      r = RZ_ON ? rzd : (expr);                                                                        \
+      if (DN_ON) r = d_dz(r);                                                                          \
+      fsetd(&c->fr, n, dq(r));                                                                         \
+    } else {                                                                                           \
+      float x = c->fr.f[OPN], y = c->fr.f[OPM], r;                                                     \
+      if (DN_ON) { x = f_dz(x); y = f_dz(y); }                                                         \
+      r = RZ_ON ? rzs : (expr);                                                                        \
+      if (DN_ON) r = f_dz(r);                                                                          \
+      c->fr.f[OPN] = fq(r);                                                                            \
+    }                                                                                                  \
   }
-FBIN(FADD, x + y)
-FBIN(FSUB, x - y)
-FBIN(FMUL, x * y)
-FBIN(FDIV, x / y)
+FBIN(FADD, x + y, rz_fadd(x, y), rz_dadd(x, y))
+FBIN(FSUB, x - y, rz_fadd(x, -y), rz_dadd(x, -y))
+FBIN(FMUL, x * y, rz_fmul(x, y), rz_dmul(x, y))
+FBIN(FDIV, x / y, rz_fdiv(x, y), rz_ddiv(x, y))
+/* single results of the other operations: toward zero by RM, denormals flushed by DN */
+#define FRES(c, d) (DN_ON ? f_dz(RZ_ON ? f_rz((d), 0) : (float)(d)) : (RZ_ON ? f_rz((d), 0) : (float)(d)))
+#define FIN(c, x) (DN_ON ? f_dz(x) : (x))
+#define DIN(c, x) (DN_ON ? d_dz(x) : (x))
 OPF(FCMPEQ) {
   UNUSED;
-  if (PR_ON) c->t = fgetd(&c->fr, OPN & 14) == fgetd(&c->fr, OPM & 14);
-  else c->t = c->fr.f[OPN] == c->fr.f[OPM];
+  if (PR_ON) c->t = DIN(c, fgetd(&c->fr, OPN & 14)) == DIN(c, fgetd(&c->fr, OPM & 14));
+  else c->t = FIN(c, c->fr.f[OPN]) == FIN(c, c->fr.f[OPM]);
 }
 OPF(FCMPGT) {
   UNUSED;
-  if (PR_ON) c->t = fgetd(&c->fr, OPN & 14) > fgetd(&c->fr, OPM & 14);
-  else c->t = c->fr.f[OPN] > c->fr.f[OPM];
+  if (PR_ON) c->t = DIN(c, fgetd(&c->fr, OPN & 14)) > DIN(c, fgetd(&c->fr, OPM & 14));
+  else c->t = FIN(c, c->fr.f[OPN]) > FIN(c, c->fr.f[OPM]);
 }
 OPF(FLOAT) {
   UNUSED;
-  if (PR_ON) fsetd(&c->fr, OPN & 14, (double)(int32_t)c->fpul);
-  else c->fr.f[OPN] = (float)(int32_t)c->fpul;
+  if (PR_ON) fsetd(&c->fr, OPN & 14, (double)(int32_t)c->fpul); /* exact */
+  else c->fr.f[OPN] = FRES(c, (double)(int32_t)c->fpul);
 }
 SH4_INLINE uint32_t sh4_ftrc(double x) {
   if (x != x) return 0x80000000u;
@@ -391,42 +494,56 @@ OPF(FTRC) {
   if (PR_ON) c->fpul = sh4_ftrc(fgetd(&c->fr, OPN & 14));
   else c->fpul = sh4_ftrc((double)c->fr.f[OPN]);
 }
-OPF(FMAC) { UNUSED; c->fr.f[OPN] = fq(c->fr.f[0] * c->fr.f[OPM] + c->fr.f[OPN]); }
+OPF(FMAC) {
+  UNUSED;
+  float a = FIN(c, c->fr.f[0]), b = FIN(c, c->fr.f[OPM]), d = FIN(c, c->fr.f[OPN]), p, r;
+  if (RZ_ON) { p = rz_fmul(a, b); if (DN_ON) p = f_dz(p); r = rz_fadd(p, d); }
+  else { p = a * b; if (DN_ON) p = f_dz(p); r = p + d; }
+  c->fr.f[OPN] = fq(FIN(c, r));
+}
 OPF(FSQRT) {
   UNUSED;
-  if (PR_ON) fsetd(&c->fr, OPN & 14, dq(sqrt(fgetd(&c->fr, OPN & 14))));
-  else c->fr.f[OPN] = fq(sqrtf(c->fr.f[OPN]));
+  if (PR_ON) { double x = DIN(c, fgetd(&c->fr, OPN & 14)); fsetd(&c->fr, OPN & 14, dq(DIN(c, RZ_ON ? rz_dsqrt(x) : sqrt(x)))); }
+  else { float x = FIN(c, c->fr.f[OPN]); c->fr.f[OPN] = fq(FIN(c, RZ_ON ? rz_fsqrt(x) : sqrtf(x))); }
 }
-OPF(FSRRA) { UNUSED; c->fr.f[OPN] = fq((float)(1.0 / sqrt((double)c->fr.f[OPN]))); }
+OPF(FSRRA) { UNUSED; c->fr.f[OPN] = fq(FRES(c, 1.0 / sqrt((double)FIN(c, c->fr.f[OPN])))); }
 OPF(FCNVDS) {
   UNUSED;
-  float f = fq((float)fgetd(&c->fr, OPN & 14));
+  float f = fq(FRES(c, DIN(c, fgetd(&c->fr, OPN & 14))));
   memcpy(&c->fpul, &f, 4);
 }
 OPF(FCNVSD) {
   UNUSED;
   float f; memcpy(&f, &c->fpul, 4);
-  fsetd(&c->fr, OPN & 14, dq((double)f));
+  fsetd(&c->fr, OPN & 14, dq((double)FIN(c, f))); /* exact */
 }
+/* fipr / ftrv: products exact in double, sums in double, one rounding to single */
 OPF(FIPR) {
   UNUSED;
   int n = ((op >> 10) & 3) * 4, m = ((op >> 8) & 3) * 4;
   float *f = c->fr.f;
-  f[n + 3] = fq(f[m] * f[n] + f[m + 1] * f[n + 1] + f[m + 2] * f[n + 2] + f[m + 3] * f[n + 3]);
+  double s = 0;
+  for (int i = 0; i < 4; i++) s += (double)FIN(c, f[m + i]) * (double)FIN(c, f[n + i]);
+  f[n + 3] = fq(FRES(c, s));
 }
 OPF(FTRV) {
   UNUSED;
   int n = ((op >> 10) & 3) * 4;
   float *f = c->fr.f, *x = c->xf.f;
-  float v0 = f[n], v1 = f[n + 1], v2 = f[n + 2], v3 = f[n + 3];
-  for (int i = 0; i < 4; i++) f[n + i] = fq(x[i] * v0 + x[i + 4] * v1 + x[i + 8] * v2 + x[i + 12] * v3);
+  double v[4];
+  for (int i = 0; i < 4; i++) v[i] = FIN(c, f[n + i]);
+  for (int i = 0; i < 4; i++) {
+    double s = (double)FIN(c, x[i]) * v[0] + (double)FIN(c, x[i + 4]) * v[1] + (double)FIN(c, x[i + 8]) * v[2] +
+               (double)FIN(c, x[i + 12]) * v[3];
+    f[n + i] = fq(FRES(c, s));
+  }
 }
 OPF(FSCA) {
   UNUSED;
   int n = ((op >> 9) & 7) * 2;
   double a = (double)(c->fpul & 0xFFFF) * (6.283185307179586476925 / 65536.0);
-  c->fr.f[n] = (float)sin(a);
-  c->fr.f[n + 1] = (float)cos(a);
+  c->fr.f[n] = FRES(c, sin(a));
+  c->fr.f[n + 1] = FRES(c, cos(a));
 }
 OPF(FRCHG) { UNUSED; sh4_set_fpscr(c, c->fpscr ^ FPSCR_FR); }
 OPF(FSCHG) { UNUSED; c->fpscr ^= FPSCR_SZ; }
