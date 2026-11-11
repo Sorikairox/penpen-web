@@ -41,6 +41,24 @@ uint32_t hw_call(gaddr fn, int n, uint32_t a0, uint32_t a1, uint32_t a2, uint32_
   return c->r[0];
 }
 
+uint32_t hw_call_stack(gaddr fn, int n, const uint32_t *args) {
+  SH4 *c = hw_cpu;
+  int extra = n > 4 ? n - 4 : 0;
+  if (rt_rew) { rt_log("hw call to %08x with stack arguments while rewinding", fn); rt_stop("hw call"); }
+  c->r[15] -= 4u * (uint32_t)extra;
+  for (int i = 0; i < extra; i++) wr32(c->r[15] + 4u * (uint32_t)i, args[4 + i]);
+  uint32_t r = hw_call(fn, n > 4 ? 4 : n, args[0], n > 1 ? args[1] : 0, n > 2 ? args[2] : 0, n > 3 ? args[3] : 0);
+  hw_call_arity = -1;
+  c->r[15] += 4u * (uint32_t)extra;
+  return r;
+}
+
+gaddr hw_stack_alloc(uint32_t bytes) {
+  hw_cpu->r[15] -= (bytes + 3) & ~3u;
+  return hw_cpu->r[15];
+}
+void hw_stack_free(uint32_t bytes) { hw_cpu->r[15] += (bytes + 3) & ~3u; }
+
 void hw_enter(hw_entry *e, SH4 *c, uint32_t addr, int resumable) {
   e->c = c;
   e->addr = addr;

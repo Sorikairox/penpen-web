@@ -18,6 +18,15 @@
 8c011f48	4	view_after_draw	src/core/view.c	plain
 8c011f4c	4	view_reset	src/core/view.c	plain
 8c012dc4	124	drive_watch	src/game/main.c	plain
+8c015bfc	214	sound_init	src/game/sound.c	plain
+8c015d10	748	sound_update	src/game/sound.c	plain
+8c015ffc	58	sound_download_bank	src/game/sound.c	plain
+8c016036	24	music_play	src/game/sound.c	plain
+8c01604e	44	music_stop	src/game/sound.c	plain
+8c01614c	50	sound_shot_request	src/game/sound.c	plain
+8c01617e	42	sound_shot_adjust	src/game/sound.c	plain
+8c0161a8	44	sound_midi_request	src/game/sound.c	plain
+8c0161d4	78	sound_reset_requests	src/game/sound.c	plain
 8c016248	88	video_init	src/game/main.c	plain
 8c0164b4	56	game_main	src/game/main.c	main
 8c0164ec	36	run_static_constructors	src/game/main.c	plain
@@ -25,6 +34,7 @@
 8c01666a	46	on_vsync	src/game/main.c	plain
 8c0166d8	186	game_init	src/game/main.c	plain
 8c0167f8	542	game_frame	src/game/main.c	resumable
+8c016a5a	124	sound_select_set	src/game/sound.c	plain
 8c019d0a	4	task_is_paused	src/core/task.c	plain
 8c019d14	22	port_held	src/core/pad.c	plain
 8c019dbe	54	game_reset	src/game/game.c	plain

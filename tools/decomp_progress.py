@@ -12,7 +12,7 @@ import os, re, sys, datetime
 
 REPO = sys.argv[1] if len(sys.argv) > 1 else '.'
 SESSION = sys.argv[2] if len(sys.argv) > 2 else None
-EXPORT = re.compile(r'^HW_EXPORT(_[A-Z]+)?\(([0-9a-f]{8}),\s*(.*)\)\s*$', re.M)
+EXPORT = re.compile(r'^HW_EXPORT(_[A-Z]+)?\(([0-9a-f]{8}),\s*([^\n]*)', re.M)
 WRAPPERS = {'RET', 'hw_addr', 'hw_ptr', 'task_at', 'tasktree_at', 'game_at', 'void'}
 
 funcs = {}

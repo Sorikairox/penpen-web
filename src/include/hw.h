@@ -54,6 +54,15 @@ uint32_t hw_call(gaddr fn, int n, uint32_t a0, uint32_t a1, uint32_t a2, uint32_
 #define CALL2(fn, a, b) hw_call((fn), 2, (uint32_t)(a), (uint32_t)(b), 0, 0)
 #define CALL3(fn, a, b, c3) hw_call((fn), 3, (uint32_t)(a), (uint32_t)(b), (uint32_t)(c3), 0)
 #define CALL4(fn, a, b, c3, d) hw_call((fn), 4, (uint32_t)(a), (uint32_t)(b), (uint32_t)(c3), (uint32_t)(d))
+/* a callee with more than 4 arguments: the 5th and later go on the guest stack (@r15, @(4,r15), ...), as SHC does */
+uint32_t hw_call_stack(gaddr fn, int n, const uint32_t *args);
+#define CALL5(fn, a, b, c3, d, e) \
+  hw_call_stack((fn), 5, (const uint32_t[]){(uint32_t)(a), (uint32_t)(b), (uint32_t)(c3), (uint32_t)(d), (uint32_t)(e)})
+
+/* a local whose address goes to guest code (an SDK function writes a handle through it) lives on the guest stack:
+ * hw_stack_alloc lowers r15 (4-byte units), hw_stack_free must give the same size back before the function returns */
+gaddr hw_stack_alloc(uint32_t bytes);
+void hw_stack_free(uint32_t bytes);
 
 /* ---- adapters: the translated code's view of a hand-written function ---- */
 typedef struct hw_entry {
@@ -69,6 +78,10 @@ extern int hw_ret_set; /* RET was used: the difftest compares r0 */
 #define ARG1 (hw_e_.c->r[5])
 #define ARG2 (hw_e_.c->r[6])
 #define ARG3 (hw_e_.c->r[7])
+/* the 5th and later arguments, on the guest stack at entry */
+#define ARG4 rd32(hw_e_.c->r[15])
+#define ARG5 rd32(hw_e_.c->r[15] + 4)
+#define ARG6 rd32(hw_e_.c->r[15] + 8)
 #define RET(v) do { uint32_t hw_r_ = (uint32_t)(v); if (!rt_unw) { hw_e_.c->r[0] = hw_r_; hw_ret_set = 1; } } while (0)
 
 /* HW_EXPORT(8c0102c0, task_add_child(TASK(ARG0), TASK(ARG1))): the address in lower-case hex, without 0x, then the

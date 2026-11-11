@@ -1,11 +1,11 @@
 /* Pen Pen port, S11: the Game object and its modes (game/game.h). */
 #include "game.h"
 #include "../core/view.h"
+#include "sound.h"
 #include "sdk.h"
 
 /* still translated */
 static void sb_exit_system(void) { CALL0(0x8C01022Cu); }                     /* func_8C01022C: the SDK sample's exit */
-static void sound_frame(int32_t a, int32_t paused) { CALL2(0x8C015D10u, a, paused); } /* func_8C015D10 */
 
 /* was func_8C019DBE: (re)start the game object: no mode yet, `first_mode` next. The root task keeps running when
  * the tree is paused (it is what un-pauses it). */
@@ -131,6 +131,8 @@ void game_update(gaddr game_addr) {
     if (game->mode_frames >= DEMO_MODE_FRAMES)
       game->next_mode = MODE_TITLE;
   }
-  sound_frame(1, task_is_paused(task_at(game->tree.root)));
+  /* the original hands (1, the pause state) to the sound update, which does not use them in this build */
+  (void)task_is_paused(task_at(game->tree.root));
+  sound_update();
 }
 HW_EXPORT_RESUMABLE(8c019e8c, game_update(ARG0))

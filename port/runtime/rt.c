@@ -246,6 +246,7 @@ void rt_call(SH4 *c, uint32_t a) {
   if ((h = hle_find(n))) {
     int rewinding = rt_rew; /* the yielding HLE entered again by the rewind: not a new call */
     n_hle++;
+    if (hwt_recording && !rewinding) hwt_before_hle(c);
     rt_hle_depth++;
     hle_arg_mask = 0;
     h(c);

@@ -4,8 +4,8 @@
  * gives it at that moment, during a real run (boot, route):
  *   1. the CPU state and the 16 MiB of guest RAM are copied (snapshot S);
  *   2. the call runs live (the run goes on with its result) while the results of its HLE calls are recorded (and
- *      which argument registers each HLE function read); a call that ends the frame (yields) is followed into the
- *      next frames until it returns;
+ *      which argument registers each HLE function read, and what it wrote into its caller's stack frame: the
+ *      out-parameters); a call that ends the frame (yields) is followed into the next frames until it returns;
  *   3. side A: the ORIGINAL code, in the SH-4 interpreter, from S;  side B: the hand-written function, from S;
  *      both in a sandbox: HLE calls are not executed but replayed (the k-th HLE call returns what the k-th returned
  *      live), so are hardware reads, hardware writes are logged, nothing is counted;
@@ -23,6 +23,7 @@
 int hwt_enabled, hwt_recording;
 void hwt_sandbox_call(SH4 *c, uint32_t a) { (void)c; (void)a; __builtin_trap(); }
 void hwt_sandbox_abort(int code, uint32_t at) { (void)code; (void)at; __builtin_trap(); }
+void hwt_before_hle(SH4 *c) { (void)c; }
 void hwt_record_hle(SH4 *c, uint32_t a) { (void)c; (void)a; }
 uint32_t hwt_io_read(uint32_t a) { (void)a; return 0; }
 void hwt_record_io(uint32_t a, uint32_t v) { (void)a; (void)v; }
@@ -74,15 +75,38 @@ static hwt_stat *stat_of(uint32_t a) {
 }
 
 /* ---- the live call's HLE results ---- */
-typedef struct { uint32_t t, r0, f0, f1, args; } hle_rec; /* args: the argument registers the HLE read (bits 4-7) */
+/* args: the argument registers the HLE read (bits 4-7); stk..: the words it wrote into its caller's stack frames
+ * (out-parameters such as gdFsGetFileSize's size), as offsets from r15 at the call: each sandbox side has its own
+ * stack depth, and the code still translated keeps the same frame layout, so a side gets them at its own r15 */
+typedef struct { uint32_t t, r0, f0, f1, args, stk_first, stk_n; } hle_rec;
 #define REC_MAX 200000
 static hle_rec *rec;
 static int rec_n, rec_depth;
+#define STK_AREA_LO 0x00C000u
+#define STK_AREA_HI 0x00F400u
+#define STK_MAX 400000
+static uint32_t (*stk)[2]; /* offset from r15, value */
+static uint32_t stk_n, stk_r15;
+static uint8_t stk_before[STK_AREA_HI - STK_AREA_LO];
+void hwt_before_hle(SH4 *c) {
+  if (rt_hle_depth != rec_depth) return;
+  stk_r15 = c->r[15];
+  memcpy(stk_before, sh4_ram + STK_AREA_LO, sizeof stk_before);
+}
 void hwt_record_hle(SH4 *c, uint32_t a) {
   if (rt_hle_depth != rec_depth) return; /* an HLE call made inside another HLE call (a callback): not the sample's */
   if (rec_n < REC_MAX) {
-    rec[rec_n].t = a; rec[rec_n].r0 = c->r[0]; rec[rec_n].f0 = c->fr.u[0]; rec[rec_n].f1 = c->fr.u[1];
-    rec[rec_n].args = hle_arg_mask;
+    hle_rec *r = &rec[rec_n];
+    r->t = a; r->r0 = c->r[0]; r->f0 = c->fr.u[0]; r->f1 = c->fr.u[1];
+    r->args = hle_arg_mask;
+    r->stk_first = stk_n; r->stk_n = 0;
+    uint32_t live_lo = (stk_r15 & 0xFFFFFFu) > STK_AREA_LO ? (stk_r15 & 0xFFFFFCu) : STK_AREA_LO;
+    if (memcmp(stk_before + (live_lo - STK_AREA_LO), sh4_ram + live_lo, STK_AREA_HI - live_lo))
+      for (uint32_t o = live_lo; o < STK_AREA_HI; o += 4) {
+        uint32_t x, y;
+        memcpy(&x, stk_before + (o - STK_AREA_LO), 4); memcpy(&y, sh4_ram + o, 4);
+        if (x != y && stk_n < STK_MAX) { stk[stk_n][0] = o - (stk_r15 & 0xFFFFFFu); stk[stk_n][1] = y; stk_n++; r->stk_n++; }
+      }
   }
   rec_n++;
 }
@@ -133,6 +157,8 @@ static void sbx_hle(SH4 *c, uint32_t a, int arity) {
   uint32_t h = hsh(a ^ hsh((uint32_t)k + 0x1234u));
   if (k < rec_n && k < REC_MAX && rec[k].t == a) {
     c->r[0] = rec[k].r0; c->fr.u[0] = rec[k].f0; c->fr.u[1] = rec[k].f1;
+    for (uint32_t i = 0; i < rec[k].stk_n; i++) /* its out-parameters in the caller's frame */
+      wr32(c->r[15] + stk[rec[k].stk_first + i][0], stk[rec[k].stk_first + i][1]);
   } else {
     slog->diverged = 1;
     c->r[0] = h; c->fr.u[0] = 0; c->fr.u[1] = 0;
@@ -216,6 +242,7 @@ int hwt_begin(SH4 *c, uint32_t addr) {
   cur = s;
   cur_frame = fr;
   rec_n = 0;
+  stk_n = 0;
   iorec_n = 0;
   rec_depth = rt_hle_depth;
   hwt_recording = 1;
@@ -375,7 +402,8 @@ int hwt_set(const char *opt) {
   buf_s = malloc(16u << 20); buf_a = malloc(16u << 20); buf_b = malloc(16u << 20);
   rec = malloc(sizeof *rec * REC_MAX);
   iorec = malloc(sizeof *iorec * IOREC_MAX);
-  if (!buf_s || !buf_a || !buf_b || !rec || !iorec) return -1;
+  stk = malloc(sizeof *stk * STK_MAX);
+  if (!buf_s || !buf_a || !buf_b || !rec || !iorec || !stk) return -1;
   hwt_enabled = 1;
   return 1;
 }
