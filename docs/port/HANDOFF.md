@@ -2,6 +2,49 @@
 
 Newest session first. Read `docs/port/PLAN.md` (disc facts, survey, approach, phases, rules) before working.
 
+## S5 — 2026-11-11: HLE Ninja + Kamui → draw list → WebGL2; logos, title, menus, house, race visible
+
+Design and details: `docs/port/RENDER.md`. All guest code ran in `--network none --read-only --cap-drop ALL`
+containers; dumps and PNGs stay in `penpen-build:/build/shots` (PNGs looked at from the session scratchpad only).
+
+- **Architecture**: the Ninja HLE (`port/render/nj_draw.c`, `nj_model.c`) builds a per-frame **draw list in our
+  format** (`rd.c`: PVR-style screen-space vertices with 1/w, lists OP/OM/TR/PT, polygon state, strips →
+  triangles, culling, translucent list sorted back to front per triangle) and hands it to the host through one
+  import, `env.penpen_gl_frame(ptr, len)`, at `njWaitVSync`. `gl/render_gl.js` is the WebGL2 backend (classic
+  script for the retrowser worker's OffscreenCanvas). Capture: node writes self-contained dumps of chosen frames,
+  headless Chromium (`docker/chromium`, SwiftShader) renders them with the same backend (`tools/s5.sh`).
+- **Textures**: PVRT/GBIX decode (twiddled incl. rectangles, VQ/small VQ, mipmapped top levels, rectangle/stride;
+  ARGB1555/RGB565/ARGB4444/RGB555/YUV422/ARGB8888; palettised not yet), PVM archives into the game's
+  NJS_TEXMEMLIST (global-index sharing, counts), decoded at load time (the game overwrites the PVM buffer).
+- **2D**: njDrawSprite2D (NJS_TEXANIM = 10 × Sint16, u/v in 1/256, pri → 1/w), blending modes, back colour,
+  njClip2D (argument = {tile min, tile max, pixel min, pixel max}), table fog (FOG_DENSITY from the SDK's
+  njGenerateFogTable3 run as guest code).
+- **3D**: chunk objects with motions and shape motions; **the game's nj_Model* pass an object, not a model**;
+  node transforms by the SDK's own matrix code (guest calls), the HLE reads the current matrix (pointer
+  0x8C1EF2B8); view space +z forward, y down, checked at run time against njCalcPoint; near clipping; easy light
+  (L1 setters); constant material (njControl3D 0x10); environment maps; njDrawSprite3D; cheap shadows
+  (njCnkModDrawModel volumes → stencil parity, × 160/256).
+- **Looked at** (route `--pad 600:START,700:A,1100:START,1200:A,1500:A,1700:A,1760:A`): 100 Infogrames logo;
+  300 GE logo; 500 title (3D logo, ring, ice funnel, PRESS START BUTTON); 650 mode menu (TRICELON / TIME TRIAL /
+  VSICELON); 750 = the S4 "167-sprite screen": a memory-card notice; 1150 PenPen House (menu + room + six
+  characters in 3D); 1600 course map (SWEETS, Mrs. CREAM); 2300 race start (TIME, GO!, 5/5, START arch, course,
+  rivals, player with shadow); 3000 race with fog haze (player idle: the script presses nothing).
+- **Known wrong**: the title's ice funnel lies in front of the logo in our geometry and hides it once its
+  alpha is 1 (~frame 900): motion evaluation suspect; shadows darken all opaque polygons in the volume; no
+  per-pixel translucency sort; L2–L4 lights, specular, shape blending, basic models (nj_ObjectB, attract demo),
+  njDrawPolygon/Line/Triangle2D, palettised textures not done. RENDER.md 7.
+- **Determinism**: native = wasm RAM digests over 3 000 route frames (every 50th compared); same route timings
+  as S4 (files at 1102/1104/1563/1762, CDDA 1854/2244). sh4 **257 checks, 0 failures**; harness **8 067
+  functions: 7 686 pass / 0 fail / 381 untested** (unchanged).
+- New: `port/render/*`, `docker/chromium/Dockerfile` (image `penpen-chromium:1`), `tools/s5.sh`; run.mjs
+  `--shots/--shot-dir`; wasm built with memory growth (+ `emscripten_notify_memory_growth` import, a no-op).
+
+Next: S6 input (pd: 4 ports, analog stick and triggers from `rtw_input`/`rtw_triggers`), VMU (`bu` on a 128 KiB
+image = `rtw_save_*`, the notice at 750 then finds a card), rumble (pdVib → `rtw_rumble`); retrowser module
+packaging (glue: `penpen_gl_frame` → `PenpenGL.create(OffscreenCanvas).frame(memory.buffer, ptr)`, stepped
+`rtw_frame` instead of the njWaitVSync loop). Renderer follow-ups: the title funnel, L2/L3 lights, basic models
+for the attract demo, shape-motion blending, shadow flag per polygon.
+
 ## S4 — 2026-11-11: HLE files + memory + timers; the boot reaches a race
 
 All runs in `--network none --read-only --cap-drop ALL` containers (`tools/s3.sh`); generated C and logs stay

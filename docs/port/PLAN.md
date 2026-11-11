@@ -9,7 +9,10 @@ Read this first, then `docs/port/HANDOFF.md`. Method reference: retrowser's spec
 (`~/Code/retrowser/spec/`), the `retrowser-decomp-port` skill, and the Pokémon Snap port
 (`~/Code/pokemonsnap/docs/port/PLAN.md`, `RTW.md`).
 
-Status: **S4 HLE files + memory + timers done (2026-11-11)**: the boot runs the SDK's own pure code (heap,
+Status: **S5 renderer done (2026-11-11)**: Ninja/Kamui drawing is HLE that builds a per-frame draw list (our
+format) for a WebGL2 backend (retrowser worker / headless Chromium capture); PVR textures, sprites, chunk models
+with motions, fog, cheap shadows; logos, title, menus, PenPen House, course map and a race are visible and were
+looked at (`docs/port/RENDER.md`). S4 HLE files + memory + timers done (2026-11-11): the boot runs the SDK's own pure code (heap,
 maths, camera) as recompiled guest code and HLEs the rest (gdFs on the disc, pads from a script, TMU timer and
 syChain on a 59.94 Hz frame loop, FPU round-to-zero modelled); with no renderer yet it goes through the logos,
 the title, the attract demo and, with scripted presses, character select into a race, identically on native
@@ -292,7 +295,7 @@ sources or libraries.
 | S2 Census | SDK API surface the game calls (Ninja/Kamui/sd/pd/bu/gdFs/sy/mw entry points: 224 distinct SDK targets called from game code), the container type map, Kamui list types (modifier volumes?), render-to-texture check, how triggers and VMU are used; refine the S1 region table (gdFs, bu, kd, SJ not yet separated; `unknown` and low rows) | done 2026-11-11: `docs/port/SDK.md`, `port/symbols/sdk_calls.tsv`, `regions_s2.tsv`, `tools/s2_apply.py` |
 | S3 SH-4 interpreter + recompiler scaffold | local tool: interpreter (oracle) and SH-4 → C translator; generated C gitignored (`port/gen/`, volume `penpen-build`) | done 2026-11-11: boots on wasm through sbInitSystem into the frame loop; `docs/port/RECOMP.md` |
 | S4 HLE: files + memory + timers | gdFs on the disc reader, syMalloc, sy timers/interrupt chains as a frame loop | done 2026-11-11: title, attract demo and (scripted pads) a race load; native = wasm; RECOMP.md 7 |
-| S5 HLE: Ninja + Kamui → WebGL2 | PVR textures (VQ, twiddled, mipmaps), chunk models, TA lists, translucency order | logos and title screen visible (looked at) |
+| S5 HLE: Ninja + Kamui → WebGL2 | PVR textures (VQ, twiddled, mipmaps), chunk models, TA lists, translucency order | done 2026-11-11: logos, title, menus, house, race visible (looked at); `docs/port/RENDER.md` |
 | S6 Input, VMU, rumble | pd (4 ports, triggers), bu on a VMU image, pdVib | menus by real input; a save survives reload |
 | S7 Audio | Manatee `sd` command HLE + an AICA mixer for MLT banks (ADPCM/PCM, MIDI sequences); CDDA tracks from the disc | music and effects |
 | S8 First race | a full race, 1 player, then 4-player split screen | race finishes |
@@ -331,6 +334,8 @@ sources or libraries.
 - **Reading disc code** (S4): `tools/ghidra.sh decomp ADDR` prints Ghidra pseudo-C of the game's or the SDK's
   functions in the terminal (read-only project); it is disc-derived like `port/gen/`: never committed, never
   pasted into docs (addresses, names, counts and behaviour descriptions only).
+- **Screenshots** (S5): rendered PNGs and draw-list dumps stay in `penpen-build:/build/shots`; `tools/s5.sh look`
+  copies single PNGs (magic checked) to a scratch directory outside the repo for viewing; never committed.
 - **Logs**: the boot logs opened files as directory index + 4-digit group + size, not by name; lines that may
   leave a container are filtered to our log vocabulary (`tools/s3.sh` `filt`).
 - No push, no remote until the user names one; no GitHub.

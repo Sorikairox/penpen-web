@@ -182,6 +182,12 @@ Plus `nj_MotionSetup/StepA/B/C/End` (motion evaluation without drawing), `nj_Sha
 parser for NJ chunk files: `NJCM`, `NJTL`, `NJBM`, `NJCA`, `NMDM`, `NSSM`, `POF0`; 18 sites), `njInit3D`,
 `njInitShape`, `nj_MemCopy4`, `nj_SetCallback`, `nj_SetColor3`, `nj_LightReset`.
 
+S5 findings (`docs/port/RENDER.md`): the game's `nj_Model*` calls pass an **NJS_CNK_OBJECT** (usually with
+BREAK), `nj_Motion*` (object, motion, frame in FR4), `nj_ShapeMotion*` (object, motion, shape, frame in FR4);
+light setters take floats in FR4–FR6 (L1: direction (0, 0, 1), intensity 1 / ambient 0.25, colour white);
+`njDrawSprite2D` pri in FR4, NJS_TEXANIM = 10 Sint16; `njClip2D(2, rect)` with rect = {tile min, tile max,
+pixel min, pixel max}; `njGenerateFogTable3` writes FOG_DENSITY; `njCnkModDrawModel` gets the shadow object.
+
 HLE: one renderer that walks NJS_OBJECT trees (basic and chunk models), applies the motion / shape-motion
 interpolation (frame float, keyframe types per motion flags), lights per family and emits WebGL draws per list
 type. The draw calls are where most of the S5 work is.
