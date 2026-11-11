@@ -79,6 +79,28 @@ Semantics from the SDK's own code: `docs/port/SDK.md` 2.3 and 2.4.
   on changes (the game calls Stop every frame, Start every frame of a pattern).
 - **VMU LCD**: `pdVmsLcdIsReady(A1)` = 1, the pictures are dropped (logged once).
 
+### 3.1 The clock (S8)
+
+The game reads the AICA's real-time clock (0xA0710000 = bits 31–16, 0xA0710004 = bits 15–0 of the seconds since
+1950-01-01 00:00 local time) through its copy of syRtc (0x8C061E1A → 0x8C06217C, three equal reads) for the VMU
+save's time stamp (`BUS_TIME`; S6 wrote 1950-01-01 because the register read 0). The module now answers these
+reads with **a start value + the frames' time** (59.94 Hz): the start value comes from
+`penpen_set_rtc(seconds)` (an export of ours), which **the glue calls once before `rtw_start` with the browser's
+local time**; the test hosts use a **fixed 2000-01-01 00:00:00** (`--rtc N` to change it), so runs stay
+deterministic. Checked: a save at frame ~700 is stamped 2000-01-01 00:00:11 by default and 2026-11-05 03:06:51
+with `--rtc 2425000000` (the game's own date conversion). Readers: the SDK's syRtc init (0x8C061DB8) installs a
+syChain V-blank handler (0x8C061DF0) that reads the clock every frame (4 register reads: 24 008 over 6 000 route
+frames) into syRtc's own cache (0x8C1BAC50/54); that cache and the clock are used only by syRtc's functions, and
+the only game call is the save's time stamp (0x8C0191F0 → 0x8C061E1A). So the clock changes no game logic; the
+RAM digests change by the cache words and the save's time stamp.
+
+**retrowser has no time import** (spec 4.9 lists none; `rtw_option` values are host-validated settings, not a
+clock). The glue route works for our module because it has glue; a spec addition would let glue-less modules
+do the same. Proposal (not made in retrowser): an optional import `rtw_time(ptr)` that writes the local
+wall-clock time as {i32 year, month 1–12, day, hour, minute, second, weekday 0–6, UTC offset in minutes} at
+`ptr` and returns 0, with the rule that a lockstep session (§5) gives every peer the session's start time and
+then advances it by frames, and that the e2e/test harness may pin it.
+
 ## 4. Build and check
 
 ```

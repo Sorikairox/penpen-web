@@ -138,6 +138,14 @@ static uint32_t heap_free(uint32_t *blocks) {
 #define TMU_HZ 781250u
 static uint32_t tmr_intra;
 static uint32_t tmr_at(uint32_t f) { return (uint32_t)(((uint64_t)f * TMU_HZ * 1001u) / 60000u); }
+/* ---- the RTC (S8): the start value is given once by the host (the browser's local clock through the glue,
+ * penpen_set_rtc) or the test mode's fixed default, 2000-01-01 00:00:00 (--rtc N); it then advances with the
+ * frames (59.94 Hz), so a run is a function of its inputs and the start value only. */
+uint32_t hle_rtc_base = 1577836800u; /* 2000-01-01 00:00:00 = 18 262 days after 1950-01-01 */
+uint32_t hle_rtc(void) { return hle_rtc_base + (uint32_t)(((uint64_t)frame * 1001u) / 60000u); }
+#ifdef __wasm__
+__attribute__((export_name("penpen_set_rtc"))) int penpen_set_rtc(int secs) { hle_rtc_base = (uint32_t)secs; return 0; }
+#endif
 uint32_t hle_tmu_count(void) {
   uint32_t base = tmr_at(frame), span = tmr_at(frame + 1) - base;
   if (tmr_intra + 1 < span) tmr_intra++;

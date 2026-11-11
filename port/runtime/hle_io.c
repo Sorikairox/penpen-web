@@ -297,9 +297,9 @@ static void h_buSaveFile(SH4 *c) {
     }
     int r = vmu_write(name, buf, (int)blocks, t);
     err = r == 0 ? 0 : BU_ERR_FULL;
-    rt_log("hle vmu save %u blocks flags %x: %s, %d free blocks, image generation %u (check %d)", blocks, flags,
+    rt_log("hle vmu save %u blocks flags %x: %s, %d free blocks, image generation %u (check %d), time %02x%02x-%02x-%02x %02x:%02x:%02x", blocks, flags,
            r == 0 ? "written" : r == -1 ? "not enough free blocks" : "directory full", vmu_free_blocks(),
-           vmu_generation, vmu_check());
+           vmu_generation, vmu_check(), t[0], t[1], t[2], t[3], t[4], t[5], t[6]);
   }
   bu_last_err = err;
   bu_complete(c, drive, BU_OP_SAVE, err);

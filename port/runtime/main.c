@@ -137,6 +137,7 @@ int main(int argc, char **argv) {
     else if (!strcmp(argv[i], "--audio")) audio_enabled = atoi(argv[++i]);
     else if (!strcmp(argv[i], "--audio-solo")) audio_solo = !strcmp(argv[++i], "cdda") ? 1 : !strcmp(argv[i], "sfx") ? 2 : 0;
     else if (!strcmp(argv[i], "--wav")) { wav = fopen(argv[++i], "wb+"); if (!wav) return 2; wav_header(); }
+    else if (!strcmp(argv[i], "--rtc")) hle_rtc_base = (uint32_t)strtoul(argv[++i], 0, 10);
     else if (!strcmp(argv[i], "--trace")) { char *e; hle_trace_lo = (int)strtol(argv[++i], &e, 10); hle_trace_hi = *e == '-' ? atoi(e + 1) : hle_trace_lo; }
     else if (!strcmp(argv[i], "--force-interp")) { extern uint32_t rt_force_interp; rt_force_interp = (uint32_t)strtoul(argv[++i], 0, 16); }
   }

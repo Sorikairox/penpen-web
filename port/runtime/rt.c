@@ -66,8 +66,15 @@ static int io_slot(uint32_t a) {
   return -1;
 }
 #define TMU_TCNT0 0xFFD8000Cu
+/* S8: the AICA's real-time clock, seconds since 1950-01-01 00:00 local time: 0x00710000 = bits 31-16,
+ * 0x00710004 = bits 15-0 (any area mirror; the game reads it through the G2 bus helper at 0xA0710000) */
+static uint32_t rtc_reads;
+#define RTC_HI 0x00710000u
+#define RTC_LO 0x00710004u
 static uint32_t io_read(uint32_t a) {
   if ((a & ~3u) == TMU_TCNT0) return ~hle_tmu_count(); /* the frame-driven timer (hle.c) */
+  if ((a & 0x1FFFFFFCu) == RTC_HI) { rtc_reads++; return hle_rtc() >> 16; }
+  if ((a & 0x1FFFFFFCu) == RTC_LO) { rtc_reads++; return hle_rtc() & 0xFFFFu; }
   int i = io_slot(a & ~3u);
   if (i < 0) return 0;
   io[i].nr++;
@@ -224,5 +231,5 @@ void rt_summary(void) {
   int shown = 0;
   for (int i = 0; i < IO_N && shown < 40; i++)
     if (io[i].nr | io[i].nw) { rt_log("io %08x reads %u writes %u", io[i].a, io[i].nr, io[i].nw); shown++; }
-  rt_log("io addresses %d%s", io_n, io_full ? " (table full)" : "");
+  rt_log("io addresses %d%s; rtc reads %u", io_n, io_full ? " (table full)" : "", rtc_reads);
 }

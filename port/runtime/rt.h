@@ -31,6 +31,8 @@ typedef void (*hle_fn)(SH4 *c);
 hle_fn hle_find(uint32_t a);  /* HLE function for a (counted), else 0 (guest code or unknown) */
 int hle_known(uint32_t a);    /* a has an HLE function (not counted) */
 uint32_t hle_tmu_count(void); /* the frame-driven TMU0 count (syTmrGetCount, TCNT0 reads) */
+uint32_t hle_rtc(void);       /* S8: the RTC, seconds since 1950-01-01 local: the start value + the frames' time */
+extern uint32_t hle_rtc_base;
 int hle_set_pad_script(const char *s);
 int hle_set_watch(const char *s);
 extern int hle_digest_every, hle_frame_log;
