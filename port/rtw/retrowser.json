@@ -1,0 +1,18 @@
+{
+  "$schema": "https://retrowser.app/spec/retrowser.schema.json",
+  "retrowser": 1,
+  "id": "penpen-triicelon",
+  "title": "Pen Pen TriIcelon (port, work in progress)",
+  "platform": "dreamcast",
+  "files": {
+    "wasm": { "path": "penpen.wasm", "sha256": "", "size": 0 },
+    "js": { "path": "penpen.js", "sha256": "", "size": 0, "factory": "createPenpen" }
+  },
+  "video": "webgl",
+  "hz": 60,
+  "rom": {
+    "sha1": ["05c789c1b426912509fd5af9e861c1d0cc8cbd17"]
+  },
+  "save": { "kind": "vmu", "size": 131072 },
+  "license": "MIT"
+}
