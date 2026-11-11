@@ -4,8 +4,9 @@
 # '-' = no input), extra runtime arguments ('-' = none). Each run must reach its frame limit.
 # boot: power-on, logos, title, the attract demo (mode 8, from 2230) and its 3600-frame time-out, the title again
 boot	8000	-	-
-# route (S4): title, TRICELON, PenPen House, RACE, character, course map, a 1P race on Easy Icelon from 1766
-route	6000	600:START,700:A,1100:START,1200:A,1500:A,1700:A,1760:A	-
+# route (S4): title, TRICELON, PenPen House, RACE, character, course map, a 1P race on Easy Icelon from 1766; S12: the
+# pause at 5850, then the soft reset on controller A at 5900 (A+B+X+Y held, Start): back to the title, unpaused
+route	6000	600:START,700:A,1100:START,1200:A,1500:A,1700:A,1760:A,5850:START,5890+40:A|B|X|Y,5900:START	-
 # explore (S12): the stick in the character select and in the race, the pause menu (Retry, Resume), pause again ->
 # PenPen House, DRESS UP, RESULTS, back (B) to the title, TIME TRIAL, its race from 5604
 explore	7000	600:START,700:A,1100:START,1200:A,1300:SR,1360:SL,1420:SR,1500:A,1700:A,1760:A,2400+120:A|SL,2560+120:A|SR,2700+40:SU,2760+40:SD,2900:START,2960:DOWN,3000:UP,3050:A,3200+8:START,3260:DOWN,3280:DOWN,3320:A,3600:DOWN,3640:A,3900:B,4000:DOWN,4040:DOWN,4080:A,4400:B,4500:B,4800:START,4850:DOWN,4900:A,5300:A,5500:A,5600:A,5700:A	-
@@ -18,3 +19,8 @@ vs4	4000	0@1:,0@2:,0@3:,600:START,650:DOWN,670:DOWN,700:A,1300:DOWN,1320:DOWN,13
 demo	3400	2600:START	-
 # reset (S12): the 1P race, then the soft reset (A+B+X+Y held, Start) on controller B at 2620: back to the title
 reset	3600	0@1:,600:START,700:A,1100:START,1200:A,1500:A,1700:A,1760:A,2600+30@1:A|B|X|Y,2620@1:START	-
+# inputs (S12, for mutants the other routes miss): during the logos and the title, the stick pushed exactly to the
+# d-pad threshold (64: not a direction) each way; partial soft-reset combos (one button missing) on controllers B
+# and A; controller B pulled out while it held A+B; controller B without analog axes, with only
+# the X axis, with only the Y axis; nothing may change the run
+inputs	1000	0@1:,300+20:HR,330+20:HL,360+20:HU,390+20:HD,450+12@1:B|X|Y,454@1:START,480+12@1:A|X|Y,484@1:START,510+12@1:A|B|Y,514@1:START,540+12@1:A|B|X,544@1:START,570+12@1:A|B|X|Y,600+8@1:A|B,608+20@1:OUT,640+10@1:A,650+20@1:NOAX,672+12@1:ONLYX|A,686+12@1:ONLYY|A,680+12:B|X|Y,684:START,720+12:A|X|Y,724:START,760+12:A|B|Y,764:START,800+12:A|B|X,804:START,840+12:A|B|X|Y	-

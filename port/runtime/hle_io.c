@@ -58,7 +58,16 @@ static const struct { const char *n; uint32_t bit; } pad_names[] = {
   {"LEFT", 1u << 6}, {"RIGHT", 1u << 7}, {"Z", 1u << 8}, {"Y", 1u << 9}, {"X", 1u << 10}, {"D", 1u << 11},
   {"RT", DGT_R}, {"LT", DGT_L}, /* the analog triggers pulled fully */
   {"SL", 1u << 20}, {"SR", 1u << 21}, {"SU", 1u << 22}, {"SD", 1u << 23}, /* the stick pushed fully */
+  /* S12 (mutation routes): the stick pushed exactly 64 (the game's d-pad threshold: not yet a direction); a
+   * controller without analog axes, or with only the X / only the Y axis; the port read as empty (the controller
+   * pulled out) */
+  {"HL", 1u << 24}, {"HR", 1u << 25}, {"HU", 1u << 26}, {"HD", 1u << 27}, {"NOAX", 1u << 28}, {"OUT", 1u << 29},
+  {"ONLYX", 1u << 30}, {"ONLYY", 1u << 31},
 };
+#define SCRIPT_NOAX (1u << 28)
+#define SCRIPT_OUT (1u << 29)
+#define SCRIPT_ONLYX (1u << 30)
+#define SCRIPT_ONLYY (1u << 31)
 /* "F[+N][@P]:BTN[|BTN...],...": hold the buttons on port P (0-3 = A-D, default A) during frames F..F+N-1 (N default
  * 4). A port other than A that the script names holds a controller for the whole run. */
 int hle_set_pad_script(const char *s) {
@@ -116,11 +125,12 @@ static void pads_update(void) {
     uint32_t base = PAD_BASE + (uint32_t)port * 6 * 0x40;
     uint32_t prev = pad_on[port], on = 0;
     int l = 0, r = 0, sx = 0, sy = 0;
+    uint32_t s = (port == 0 || ((script_ports >> port) & 1)) ? script_buttons(f, (uint32_t)port) : 0;
+    if (s & SCRIPT_OUT) present = 0;
     if (present) {
       on = host[port].buttons & 0x0FFFu;
       l = host[port].l; r = host[port].r; sx = host[port].sx; sy = host[port].sy;
       if (port == 0 || ((script_ports >> port) & 1)) {
-        uint32_t s = script_buttons(f, (uint32_t)port);
         on |= s & 0x0FFFu;
         if (s & DGT_R) r = 255;
         if (s & DGT_L) l = 255;
@@ -128,6 +138,10 @@ static void pads_update(void) {
         if (s & (1u << 21)) sx = 127;
         if (s & (1u << 22)) sy = 127;
         if (s & (1u << 23)) sy = -127;
+        if (s & (1u << 24)) sx = -64;
+        if (s & (1u << 25)) sx = 64;
+        if (s & (1u << 26)) sy = 64;
+        if (s & (1u << 27)) sy = -64;
       }
       if (trig_bit(&trig_state[port][0], r)) on |= DGT_R;
       if (trig_bit(&trig_state[port][1], l)) on |= DGT_L;
@@ -140,7 +154,8 @@ static void pads_update(void) {
       if (unit == 2) { unit_clear(p, id, INFO_VIB); continue; } /* a Jump Pack in slot 2 */
       uint32_t chg = prev ^ on;
       wr32(p + 0, id);
-      wr32(p + 0x04, PAD_STD_SUPPORT);
+      wr32(p + 0x04, PAD_STD_SUPPORT & ~((s & SCRIPT_NOAX) ? 0x000C0000u : (s & SCRIPT_ONLYX) ? 0x00080000u
+                                       : (s & SCRIPT_ONLYY) ? 0x00040000u : 0)); /* AX 0x40000, AY 0x80000 */
       wr32(p + 0x08, on);
       wr32(p + 0x0C, ~on);
       wr32(p + 0x10, on & chg);
