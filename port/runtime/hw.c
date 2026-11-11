@@ -7,6 +7,7 @@ SH4 *hw_cpu;
 int hw_ret_set;
 int hw_last_ret_set;      /* the RET flag of the last hand-written function that returned (difftest.c reads it) */
 int hw_call_arity = -1;   /* arguments of the call hw_call is making (-1: a call made by translated code) */
+int hw_call_fargs;        /* S13: float arguments (FR4...) of that call (FARGS) */
 static uint32_t hw_rew_target; /* the call a rewinding resumable function must repeat */
 
 /* the return address hand-written code gives the functions it calls: not code (as rt_guest_call's 0x8C000F00) */
@@ -33,6 +34,7 @@ uint32_t hw_call(gaddr fn, int n, uint32_t a0, uint32_t a1, uint32_t a2, uint32_
   hw_call_arity = n;
   rt_call(c, fn);
   hw_call_arity = -1;
+  hw_call_fargs = 0;
   if (rt_unw) { /* the frame is unwinding: the caller saves its site (HW_YIELDING) or stops */
     hw_rew_target = fn; /* deeper hand-written calls changed it: the caller's record holds this call */
     return 0;

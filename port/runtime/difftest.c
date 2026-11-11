@@ -42,7 +42,7 @@ int hwt_enabled, hwt_recording;
 static int hwt_budget = 160;   /* samples per function */
 static int hwt_spread = 50;    /* after the first calls: at most one sample per function every this many frames */
 static uint32_t hwt_only;      /* test only this function */
-extern int hw_last_ret_set, hw_call_arity;
+extern int hw_last_ret_set, hw_call_arity, hw_call_fargs;
 extern SH4 *hw_cpu;
 extern uint8_t *sh4_ram;
 
@@ -140,7 +140,7 @@ static uint32_t cur_frame;
 static int cur_sample, sample_ids; /* a sample may span frames (the call yields): its id travels in the unwind record */
 
 /* ---- one side's log ---- */
-typedef struct { uint32_t t, arity, a[6]; } call_ent;
+typedef struct { uint32_t t, arity, fargs, a[8]; } call_ent; /* a[4..7]: FR4-FR7 */
 #define CALLS_MAX 8192
 typedef struct { call_ent call[CALLS_MAX]; int n, diverged, io_reads; uint32_t io_hash, io_n; } side_log;
 static side_log log_a, log_b, *slog;
@@ -168,12 +168,12 @@ void hwt_io_write(uint32_t a, uint32_t v, int size) {
 }
 
 /* an HLE call in the sandbox: logged, then answered from the live record */
-static void sbx_hle(SH4 *c, uint32_t a, int arity) {
+static void sbx_hle(SH4 *c, uint32_t a, int arity, int fargs) {
   int k = slog->n++;
   if (k < CALLS_MAX) {
     call_ent *e = &slog->call[k];
-    e->t = a; e->arity = arity < 0 ? 4 : (uint32_t)arity;
-    e->a[0] = c->r[4]; e->a[1] = c->r[5]; e->a[2] = c->r[6]; e->a[3] = c->r[7]; e->a[4] = c->fr.u[4]; e->a[5] = c->fr.u[5];
+    e->t = a; e->arity = arity < 0 ? 4 : (uint32_t)arity; e->fargs = (uint32_t)fargs;
+    for (int i = 0; i < 4; i++) { e->a[i] = c->r[4 + i]; e->a[4 + i] = c->fr.u[4 + i]; }
   }
   uint32_t h = hsh(a ^ hsh((uint32_t)k + 0x1234u));
   if (k < rec_n && k < REC_MAX && rec[k].t == a) {
@@ -224,7 +224,7 @@ static int sbx_steps(SH4 *c, uint32_t ret, uint32_t sp, int64_t steps) {
     if (c->last != SH4_BR_RET) note_entry(t);
     if (hle_known(t)) {
       int last = (int)c->last;
-      sbx_hle(c, t, -1);
+      sbx_hle(c, t, -1, 0);
       if (last != SH4_BR_CALL && c->pc == ret && c->r[15] >= sp) return END_RET; /* a tail jump to the HLE */
     }
   }
@@ -234,9 +234,10 @@ static int sbx_steps(SH4 *c, uint32_t ret, uint32_t sp, int64_t steps) {
 
 /* rt_call inside the sandbox (side B: the hand-written function and the translated code it calls) */
 void hwt_sandbox_call(SH4 *c, uint32_t a) {
-  int arity = hw_call_arity;
+  int arity = hw_call_arity, fargs = hw_call_fargs;
   hw_call_arity = -1;
-  if (hle_known(a)) { sbx_hle(c, a, arity); return; }
+  hw_call_fargs = 0;
+  if (hle_known(a)) { sbx_hle(c, a, arity, fargs); return; }
   rt_fn f = rt_lookup(a);
   if (f) { f(c); return; }
   uint32_t ret = c->pr, sp = c->r[15];
@@ -353,7 +354,8 @@ void hwt_end(int sample) {
   if (a.pr != b.pr) { fail("pr %x/%x", a.pr, b.pr, 0); return; }
   if (a.gbr != b.gbr || a.fpscr != b.fpscr) { fail("gbr/fpscr %x/%x", a.gbr ^ b.gbr, a.fpscr ^ b.fpscr, 0); return; }
   for (int i = 12; i < 16; i++) if (a.fr.u[i] != b.fr.u[i]) { fail("fr%x %x/%x", (uint32_t)i, a.fr.u[i], b.fr.u[i]); return; }
-  if (ret && a.r[0] != b.r[0]) { fail("r0 %x/%x", a.r[0], b.r[0], 0); return; }
+  if ((ret & 1) && a.r[0] != b.r[0]) { fail("r0 %x/%x", a.r[0], b.r[0], 0); return; }
+  if ((ret & 2) && a.fr.u[0] != b.fr.u[0]) { fail("fr0 %x/%x", a.fr.u[0], b.fr.u[0], 0); return; } /* S13: RETF */
   /* the calls into the HLE, in order */
   if (log_a.n != log_b.n) { fail("hle calls %x/%x", (uint32_t)log_a.n, (uint32_t)log_b.n, 0); return; }
   for (int k = 0; k < log_a.n && k < CALLS_MAX; k++) {
@@ -368,6 +370,9 @@ void hwt_end(int sample) {
         fail("hle call to %x arg %x %x", x->t, i, x->a[i] ^ y->a[i]);
         return;
       }
+    /* S13: the float arguments hand-written code passed (FARGS: FR4 ...) */
+    for (uint32_t i = 0; i < y->fargs && i < 4; i++)
+      if (x->a[4 + i] != y->a[4 + i]) { fail("hle call to %x fr%x %x", x->t, 4 + i, x->a[4 + i] ^ y->a[4 + i]); return; }
   }
   if (log_a.io_n != log_b.io_n || log_a.io_hash != log_b.io_hash) { fail("hardware writes %x/%x", log_a.io_n, log_b.io_n, 0); return; }
   /* guest RAM, but the dead stack; a word pointing into the stack counts as one token */

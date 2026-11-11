@@ -24,6 +24,7 @@
 #include <stdint.h>
 #include <string.h>
 #include "../../port/recomp/rt_gen.h"
+#include "fpu.h" /* S13: f32, the game's float arithmetic */
 
 /* ---- guest memory ---- */
 typedef uint32_t gaddr; /* a guest address (main RAM is 0x8C000000-0x8CFFFFFF; 0 = NULL) */
@@ -34,6 +35,9 @@ static inline void *hw_ptr(gaddr a) { return sh4_ram + (a & 0x00FFFFFFu); }
 static inline gaddr hw_addr(const void *p) { return 0x8C000000u | (uint32_t)((const uint8_t *)p - sh4_ram); }
 /* a variable of the original program at a fixed guest address (its .data/.bss) */
 #define GUEST_VAR(type, addr) (*(type *)hw_ptr(addr))
+/* S13: a word / a float of guest RAM by address (fields of objects whose class is not declared yet) */
+#define U32_AT(a) (*(uint32_t *)hw_ptr(a))
+#define F32_AT(a) (*(f32 *)hw_ptr(a))
 /* hardware registers and other non-RAM areas: through the runtime's I/O model */
 static inline uint32_t hw_read32(gaddr a) { return rd32(a); }
 static inline void hw_write32(gaddr a, uint32_t v) { wr32(a, v); }
@@ -54,6 +58,16 @@ uint32_t hw_call(gaddr fn, int n, uint32_t a0, uint32_t a1, uint32_t a2, uint32_
 #define CALL2(fn, a, b) hw_call((fn), 2, (uint32_t)(a), (uint32_t)(b), 0, 0)
 #define CALL3(fn, a, b, c3) hw_call((fn), 3, (uint32_t)(a), (uint32_t)(b), (uint32_t)(c3), 0)
 #define CALL4(fn, a, b, c3, d) hw_call((fn), 4, (uint32_t)(a), (uint32_t)(b), (uint32_t)(c3), (uint32_t)(d))
+/* S13: float arguments go in FR4, FR5, ... (SHC's convention; integer and pointer arguments still fill r4-r7):
+ * FARGS1..FARGS4 before the CALLn (the difftest compares the FR arguments of HLE calls they declare); a float
+ * result is in FR0 after the call (hw_fret) */
+extern int hw_call_fargs;
+#define FARG_(i, v) (hw_cpu->fr.u[4 + (i)] = f32_bits(v))
+#define FARGS1(a) (FARG_(0, a), hw_call_fargs = 1)
+#define FARGS2(a, b) (FARG_(0, a), FARG_(1, b), hw_call_fargs = 2)
+#define FARGS3(a, b, c3) (FARG_(0, a), FARG_(1, b), FARG_(2, c3), hw_call_fargs = 3)
+#define FARGS4(a, b, c3, d) (FARG_(0, a), FARG_(1, b), FARG_(2, c3), FARG_(3, d), hw_call_fargs = 4)
+static inline f32 hw_fret(void) { return F32_BITS(hw_cpu->fr.u[0]); }
 /* a callee with more than 4 arguments: the 5th and later go on the guest stack (@r15, @(4,r15), ...), as SHC does */
 uint32_t hw_call_stack(gaddr fn, int n, const uint32_t *args);
 #define CALL5(fn, a, b, c3, d, e) \
@@ -82,7 +96,15 @@ extern int hw_ret_set; /* RET was used: the difftest compares r0 */
 #define ARG4 rd32(hw_e_.c->r[15])
 #define ARG5 rd32(hw_e_.c->r[15] + 4)
 #define ARG6 rd32(hw_e_.c->r[15] + 8)
-#define RET(v) do { uint32_t hw_r_ = (uint32_t)(v); if (!rt_unw) { hw_e_.c->r[0] = hw_r_; hw_ret_set = 1; } } while (0)
+#define RET(v) do { uint32_t hw_r_ = (uint32_t)(v); if (!rt_unw) { hw_e_.c->r[0] = hw_r_; hw_ret_set |= 1; } } while (0)
+/* S13: float arguments at entry (FR4, FR5, ...) and a float result (FR0: the difftest compares it) */
+#define FARG0 F32_BITS(hw_e_.c->fr.u[4])
+#define FARG1 F32_BITS(hw_e_.c->fr.u[5])
+#define FARG2 F32_BITS(hw_e_.c->fr.u[6])
+#define FARG3 F32_BITS(hw_e_.c->fr.u[7])
+#define FARG4 F32_BITS(hw_e_.c->fr.u[8])
+#define FARG5 F32_BITS(hw_e_.c->fr.u[9])
+#define RETF(v) do { f32 hw_f_ = (v); if (!rt_unw) { hw_e_.c->fr.u[0] = f32_bits(hw_f_); hw_ret_set |= 2; } } while (0)
 
 /* HW_EXPORT(8c0102c0, task_add_child(TASK(ARG0), TASK(ARG1))): the address in lower-case hex, without 0x, then the
  * statement that runs the readable function on the arguments. recomp.py --hand finds these lines. */

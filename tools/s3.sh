@@ -1,6 +1,10 @@
 #!/bin/sh
 # Pen Pen S3: SH-4 interpreter, recompiler scaffold, differential harness and boot runs, all in Docker.
 #   tools/s3.sh test            unit tests of the interpreter (our own vectors; no disc data)
+#   tools/s3.sh fncover ["r1 r2"]  S13: the game functions each route runs (rt cover lines; tools/fncover.py)
+#   tools/s3.sh dupes           S13: groups of identical game functions (rt dupe lines; tools/dupes.py)
+#   tools/s3.sh fputest [N]     S13: src/include/fpu.h against the interpreter (N random operands per operation)
+#   tools/s3.sh fpu-mull [N]    S13: Mull on fpu.h, test_fpu.c as the test program
 #   tools/s3.sh gen [args]      recompile 1ST_READ.BIN -> C in penpen-build:/build/gen (local-only scaffold);
 #                               S8: trimmed to the code that can run (--trim); NOTRIM=1 translates everything
 #   tools/s3.sh export          check /build/gen (our grammar only), copy it to port/gen/ (gitignored, local only)
@@ -41,6 +45,21 @@ CF="-O2 -std=gnu11 -Wall -Wno-unused-label -Wno-unused-function -fwrapv -fno-str
 case "${1:-}" in
   test)
     box $IMG sh -c "cd /tmp && gcc $CF -o t /src/port/sh4/tests/test_sh4.c /src/port/sh4/sh4_interp.c -lm && ./t" ;;
+  fncover)
+    # S13: the game functions each route runs (tools/fncover.py: the pure translation with gcc --coverage)
+    shift
+    box -v penpen-disc:/disc:ro -v penpen-build:/build:ro -e CF="$CF" $IMG python3 -I /src/tools/fncover.py /src/tools/routes.tsv "${1:-}" 2>&1 | filt ;;
+  dupes)
+    # S13: identical copies among the game's functions (tools/dupes.py; addresses only)
+    box -v penpen-work:/work:ro -v "$REPO/port/symbols":/symbols:ro $IMG python3 -I /src/tools/dupes.py /work/fs/1ST_READ.BIN /symbols/functions.tsv 2>&1 | filt ;;
+  fputest)
+    # S13: the hand-written C's float helpers (src/include/fpu.h) against the interpreter (no disc data)
+    shift
+    box $IMG sh -c "cd /tmp && gcc $CF -o t /src/port/sh4/tests/test_fpu.c /src/port/sh4/sh4_interp.c -lm && ./t $*" ;;
+  fpu-mull)
+    # S13: Mull on fpu.h with test_fpu.c as the test program (tools/mull_fpu.py)
+    shift
+    box ${MULL_IMAGE:-penpen-mull:1} python3 -I /src/tools/mull_fpu.py "$@" 2>&1 | filt ;;
   gen)
     shift
     box -v penpen-work:/work:ro -v penpen-build:/build -v "$REPO/port/symbols":/symbols:ro $IMG \
