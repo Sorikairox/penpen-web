@@ -64,16 +64,14 @@ static void h_njColorBlendingMode(SH4 *c) {
   R(0) = 0;
 }
 static void h_njTextureFilterMode(SH4 *c) { hle_logcall(c, ""); nj_filter = R(4) != 0; R(0) = 0; }
-/* njClip2D(mode, NJS_POINT2 *min, *max)? the game passes two point pointers: the user clip rectangle of
- * every list (split screen) */
+/* njClip2D(mode, rect): the game passes {tile min, tile max, pixel min, pixel max} as NJS_POINT2s (32-pixel
+ * tiles, inclusive: {0,0} {19,14} {0,0} {639,479} for the whole screen): the user clip of every list */
 static void h_njClip2D(SH4 *c) {
   hle_logcall(c, "");
-  float x0 = nj_f(R(5)), y0 = nj_f(R(5) + 4), x1 = nj_f(R(6)), y1 = nj_f(R(6) + 4);
-  static int shown;
-  if (shown < 4) { shown++; rt_log("render clip2d mode %d (%d, %d)-(%d, %d)", (int)R(4), (int)x0, (int)y0, (int)x1, (int)y1); }
+  float x0 = nj_f(R(5) + 16), y0 = nj_f(R(5) + 20), x1 = nj_f(R(5) + 24) + 1, y1 = nj_f(R(5) + 28) + 1;
   if (x1 > x0 && y1 > y0) {
     nj_clip[0] = (int16_t)(x0 < 0 ? 0 : x0); nj_clip[1] = (int16_t)(y0 < 0 ? 0 : y0);
-    nj_clip[2] = (int16_t)(x1 > RD_W ? RD_W : x1 + 1); nj_clip[3] = (int16_t)(y1 > RD_H_ ? RD_H_ : y1 + 1);
+    nj_clip[2] = (int16_t)(x1 > RD_W ? RD_W : x1); nj_clip[3] = (int16_t)(y1 > RD_H_ ? RD_H_ : y1);
   }
   R(0) = 0;
 }

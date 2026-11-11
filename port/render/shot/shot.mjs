@@ -67,7 +67,7 @@ function cmdInfo(n) {
         if (a >= 0 && b >= 0 && a + b <= 1) console.log(`shot probe cmd ${i} list ${C[8 * i]} tri ${(k - f) / 3} iw ${(a * P[0][2] + b * P[1][2] + (1 - a - b) * P[2][2]).toExponential(4)}`);
       }
     }
-    console.log(`shot cmd ${i} list ${C[8 * i]} tex ${C[8 * i + 3]} mode ${C[8 * i + 4].toString(16)} tris ${cnt / 3} box ${x0 | 0} ${y0 | 0} ${x1 | 0} ${y1 | 0} iw ${w0.toExponential(3)} ${w1.toExponential(3)}`);
+    console.log(`shot cmd ${i} list ${C[8 * i]} tex ${C[8 * i + 3]} mode ${C[8 * i + 4].toString(16)} clip ${C[8 * i + 5] & 0xFFFF},${C[8 * i + 5] >>> 16},${C[8 * i + 6] & 0xFFFF},${C[8 * i + 6] >>> 16} tris ${cnt / 3} box ${x0 | 0} ${y0 | 0} ${x1 | 0} ${y1 | 0} iw ${w0.toExponential(3)} ${w1.toExponential(3)}`);
   }
 }
 for (const n of names) {
