@@ -10,6 +10,7 @@
  * a deterministic function of the disc and the pad script. Semantics: docs/port/SDK.md 2, RECOMP.md 7. */
 #include "rt.h"
 #include "../render/nj.h"
+#include "hle_io.h"
 
 typedef struct { uint32_t a; const char *name, *lib; hle_fn fn; uint32_t calls, fcalls, first; } hle_ent;
 static void h_default(SH4 *c);
@@ -105,6 +106,8 @@ static const char *const guest[] = {
   /* S5: pure setters of the Ninja render state; the draw HLE reads their globals (render/nj.h) */
   "njSetTexture", "njControl3D", "njSetConstantAttr", "njSetConstantMaterial", "njInitTextureBuffer",
   "njGenerateFogTable3",
+  /* S6: builds the VMS file image (header, icons, CRC) from the game's description: pure code */
+  "buMakeBackupFileImage",
 };
 /* the heap's free list (SDK globals of syMalloc, for the per-frame log): rover -> circular list of
  * {next, size in 32-byte units} */
@@ -165,81 +168,7 @@ static void chain_fire(SH4 *c, uint32_t event) {
     if (chain[i].event == event) rt_guest_call(c, chain[i].fn, chain[i].arg, 0, 0, 0);
 }
 
-/* ---- pads: the PDS_PERIPHERAL structures of pdGetPeripheral, in the BIOS work area (no BIOS runs).
- * Layout: id 0, support 4, on 8, off 12, press 16, release 20, r 24, l 26, x1 28, y1 30, x2 32, y2 34,
- * name 36, extend 40, old 44, info 48 (pointer to {type, ...}: 1 = controller, 0 = nothing).
- * Port A (0) holds a standard controller (support 0x000F06FE: buttons B A Start U D L R Y X, analog
- * R/L triggers, analog X/Y); the others are empty. Updated once per V-blank from the pad script. */
-#define PAD_BASE (GUEST_SCRATCH + 0x000u)  /* 4 ports x 6 units x 0x40 */
-#define PAD_INFO (GUEST_SCRATCH + 0x600u)  /* 0x600: controller info, 0x640: empty info */
-#define PAD_STD_SUPPORT 0x000F06FEu
-static uint32_t pad_prev[4];
-typedef struct { uint32_t from, to, buttons; } pad_ev;
-#define NPAD 256
-static pad_ev pad_script[NPAD];
-static int npad;
-static const struct { const char *n; uint32_t bit; } pad_names[] = {
-  {"C", 1u << 0}, {"B", 1u << 1}, {"A", 1u << 2}, {"START", 1u << 3}, {"UP", 1u << 4}, {"DOWN", 1u << 5},
-  {"LEFT", 1u << 6}, {"RIGHT", 1u << 7}, {"Z", 1u << 8}, {"Y", 1u << 9}, {"X", 1u << 10}, {"D", 1u << 11},
-  {"LT", 1u << 16}, {"RT", 1u << 17}, /* analog triggers pulled fully (digital bits + r/l = 255) */
-};
-/* "F[+N]:BTN[|BTN...],...": hold the buttons on port A during frames F..F+N-1 (N default 4) */
-int hle_set_pad_script(const char *s) {
-  npad = 0;
-  while (*s && npad < NPAD) {
-    uint32_t f = 0, n = 4, b = 0;
-    while (*s >= '0' && *s <= '9') f = f * 10 + (uint32_t)(*s++ - '0');
-    if (*s == '+') { s++; n = 0; while (*s >= '0' && *s <= '9') n = n * 10 + (uint32_t)(*s++ - '0'); }
-    if (*s++ != ':') { rt_log("hle pad script: syntax error"); npad = 0; return -1; }
-    while (*s && *s != ',') {
-      char nm[8]; int k = 0;
-      while (*s && *s != '|' && *s != ',' && k < 7) nm[k++] = *s++;
-      nm[k] = 0;
-      if (*s == '|') s++;
-      int ok = 0;
-      for (unsigned j = 0; j < sizeof pad_names / sizeof pad_names[0]; j++)
-        if (!strcmp(nm, pad_names[j].n)) { b |= pad_names[j].bit; ok = 1; }
-      if (!ok && k) { rt_log("hle pad script: unknown button"); npad = 0; return -2; }
-    }
-    if (*s == ',') s++;
-    pad_script[npad].from = f; pad_script[npad].to = f + n; pad_script[npad].buttons = b; npad++;
-  }
-  rt_log("hle pad script %d events", npad);
-  return npad;
-}
-static uint32_t pad_buttons(uint32_t f) {
-  uint32_t b = 0;
-  for (int i = 0; i < npad; i++) if (f >= pad_script[i].from && f < pad_script[i].to) b |= pad_script[i].buttons;
-  return b;
-}
-static void pads_update(void) {
-  wr32(PAD_INFO, 1); wr32(PAD_INFO + 0x40, 0);
-  for (int port = 0; port < 4; port++) {
-    uint32_t on = port == 0 ? pad_buttons(frame) : 0, prev = pad_prev[port];
-    for (int unit = 0; unit < 6; unit++) {
-      uint32_t p = PAD_BASE + (uint32_t)(port * 6 + unit) * 0x40;
-      int present = port == 0 && unit == 0;
-      wr32(p + 0, (uint32_t)(port * 6 + unit));
-      wr32(p + 4, present ? PAD_STD_SUPPORT : 0);
-      wr32(p + 8, present ? on : 0);
-      wr32(p + 12, present ? ~on : 0);
-      wr32(p + 16, present ? on & ~prev : 0);
-      wr32(p + 20, present ? ~on & prev : 0);
-      wr16(p + 24, present && (on & (1u << 17)) ? 255 : 0);
-      wr16(p + 26, present && (on & (1u << 16)) ? 255 : 0);
-      for (uint32_t k = 28; k < 36; k += 2) wr16(p + k, 0); /* sticks centred */
-      wr32(p + 36, 0); wr32(p + 40, 0);
-      wr32(p + 44, present ? prev : 0);
-      wr32(p + 48, present ? PAD_INFO : PAD_INFO + 0x40);
-    }
-    pad_prev[port] = on;
-  }
-}
-static void h_pdGetPeripheral(SH4 *c) {
-  logcall(c, "");
-  uint32_t port = R(4);
-  R(0) = port < 24 ? PAD_BASE + port * 0x40 : 0;
-}
+/* ---- pads, VMU, Jump Pack: hle_io.c ---- */
 
 /* ---- gdFs on the disc reader. Handles are guest structures in the work area the game gives gdFsInit,
  * with the SDK's field layout (what the SDK's own gdFsTell and CRI read): +0 drive, +8 first LBA,
@@ -505,7 +434,7 @@ static void frame_log(void) {
   }
   *o = 0;
   rt_log("frame %u hle %u guest %u interp %u files %d heap %u/%u pad %x ram %s%s%s", frame, f_hle, f_guest,
-         rt_interp_calls() - f_interp0, gd_files_loaded, fr, blocks, pad_prev[0], d, nwatch ? " watch" : "", w);
+         rt_interp_calls() - f_interp0, gd_files_loaded, fr, blocks, io_pad_on(0), d, nwatch ? " watch" : "", w);
 }
 /* njWaitVSync is where a frame ends: the end-of-render half runs, then the HLE yields (rt_unw: rtw_frame
  * returns to the host, rt_gen.h); the next rtw_frame rewinds into this call, which runs the V-blank half with
@@ -530,7 +459,7 @@ static void vblank(SH4 *c) {
   /* V-blank: time, drive, pads, the V-blank chain, Ninja's V-sync function */
   tmr_intra = 0;
   gd_vblank();
-  pads_update();
+  io_vblank(c);
   chain_fire(c, 0x900);
   if (vsync_fn) rt_guest_call(c, vsync_fn, 0, 0, 0, 0);
   R(0) = 0;
@@ -545,12 +474,10 @@ static const struct { const char *name; hle_fn fn; } impl[] = {
   {"gdFs_Api34", h_gdFs_Api34}, {"gdFs_Api58", h_gdFs_Api58}, {"gdFsChangeDir", h_gdFsChangeDir},
   {"gdFsGetDrvStat", h_gdFsGetDrvStat}, {"gdFsDaPlay", h_gdFsDaPlay}, {"gdFsDaPause", h_gdFsDaPause},
   {"gdFsDaStop", h_gdFsDaStop}, {"gdFsDaRelease", h_gdFsDaRelease},
-  {"pdGetPeripheral", h_pdGetPeripheral},
   {"njSetVSyncFunction", h_njSetVSyncFunction}, {"njSetEORFunction", h_njSetEORFunction},
   {"njWaitVSync", h_njWaitVSync}, {"syTmrGetCount", h_syTmrGetCount},
   {"syChainAddHandler", h_syChainAddHandler}, {"syChainDeleteHandler", h_syChainDeleteHandler},
   {"syBtExit", h_syBtExit}, {"syCfgGetSoundMode", h_syCfgGetSoundMode},
-  {"pdInitPeripheral", h_true}, /* pads are refreshed by the frame loop */
 };
 
 void hle_init(SH4 *c) {
@@ -570,10 +497,10 @@ void hle_init(SH4 *c) {
         if (!rt_lookup(tab[j].a)) { rt_log("hle %s: no translated code, stays a stub", guest[i]); continue; }
         tab[j].fn = 0; ng++;
       }
-  /* S5: the Ninja drawing HLE (port/render) */
-  const nj_impl_t *lists[2] = {nj_impls, nj_model_impls};
-  const int counts[2] = {nj_nimpls, nj_model_nimpls};
-  for (int l = 0; l < 2; l++)
+  /* S5: the Ninja drawing HLE (port/render); S6: pads, VMU, Jump Pack (hle_io.c) */
+  const nj_impl_t *lists[3] = {nj_impls, nj_model_impls, io_impls};
+  const int counts[3] = {nj_nimpls, nj_model_nimpls, io_nimpls};
+  for (int l = 0; l < 3; l++)
     for (int i = 0; i < counts[l]; i++) {
       int hit = 0;
       for (int j = 0; j < NTAB; j++)
@@ -586,7 +513,7 @@ void hle_init(SH4 *c) {
   static const uint32_t vec[][2] = {{0x8C0000B0u, 0x8C000F10u}, {0x8C0000B4u, 0x8C000F18u}, {0x8C0000B8u, 0x8C000F20u},
                                     {0x8C0000BCu, 0x8C000F28u}, {0x8C0000C0u, 0x8C000F30u}, {0x8C0000E0u, 0x8C000F38u}};
   for (unsigned i = 0; i < sizeof vec / sizeof vec[0]; i++) wr32(vec[i][0], vec[i][1]);
-  pads_update();
+  io_init(c);
 }
 
 void hle_summary(void) {

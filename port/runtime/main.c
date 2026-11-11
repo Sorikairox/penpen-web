@@ -5,6 +5,8 @@
  * (hle.c: "F[+N]:BTN|BTN,..." on port A), --digest N (RAM digest every N frames, 0 = off),
  * --frame-log 0|1 (the per-frame line), --watch A,B,... (guest words shown on the frame line). */
 #include "rt.h"
+#include "hle_io.h"
+#include "vmu.h"
 
 #define ENTRY 0x8C010000u
 
@@ -61,6 +63,7 @@ static int started;
 EXPORT("rtw_frame") int rtw_frame(void) {
   SH4 *c = &cpu;
   c->budget = 200000000; /* the watchdog counts back edges per frame */
+  io_host_frame();
   if (!started) { started = 1; rt_log("boot calling the entry point"); }
   else rt_rew = 1;
   rt_call(c, ENTRY);
@@ -69,11 +72,33 @@ EXPORT("rtw_frame") int rtw_frame(void) {
   rt_stop("returned");
 }
 
+/* input (retrowser spec 4.5): Dreamcast Maple bits active-high, stick -127..127 up positive; triggers 0..255 */
+EXPORT("rtw_input") int rtw_input(int port, int buttons, int sx, int sy) { io_host_input(port, (uint32_t)buttons, sx, sy); return 0; }
+EXPORT("rtw_triggers") int rtw_triggers(int port, int l, int r) { io_host_triggers(port, l, r); return 0; }
+/* the VMU in A1 (save.kind vmu): the 128 KiB flash image; the generation changes on every write */
+EXPORT("rtw_save_ptr") int rtw_save_ptr(void) { return (int)(intptr_t)vmu_img; }
+EXPORT("rtw_save_size") int rtw_save_size(void) { return VMU_SIZE; }
+EXPORT("rtw_save_generation") int rtw_save_generation(void) { return (int)vmu_generation; }
+EXPORT("rtw_save_load") int rtw_save_load(int ptr, int size) {
+  (void)ptr;
+  rt_log("boot vmu image from the host: %d bytes, %s", size, vmu_formatted() ? "formatted" : vmu_blank() ? "blank" : "not formatted");
+  return 0;
+}
+
 #ifndef __wasm__
 #include <stdio.h>
 #include <stdlib.h>
 extern const char *disc_dir;
 int rtw_log(const char *p, int len) { fwrite(p, 1, (size_t)len, stdout); fputc('\n', stdout); fflush(stdout); return 0; }
+int rtw_rumble(int port, int on) { (void)port; (void)on; return 0; }
+/* --vmu FILE: the A1 image, read at start (if present) and written back whenever the game saved */
+static const char *vmu_path;
+static uint32_t vmu_saved_gen;
+static void vmu_store(void) {
+  if (!vmu_path || vmu_generation == vmu_saved_gen) return;
+  FILE *f = fopen(vmu_path, "wb");
+  if (f) { fwrite(vmu_img, 1, VMU_SIZE, f); fclose(f); vmu_saved_gen = vmu_generation; rt_log("boot vmu image written (generation %u)", vmu_generation); }
+}
 int main(int argc, char **argv) {
   hle_max_frames = 3; hle_verbose = 600; hle_digest_every = 1; hle_frame_log = 1; /* the S3/S4 test defaults */
   for (int i = 1; i < argc; i++) {
@@ -84,9 +109,15 @@ int main(int argc, char **argv) {
     else if (!strcmp(argv[i], "--watch")) { if (hle_set_watch(argv[++i]) < 0) return 2; }
     else if (!strcmp(argv[i], "--digest")) hle_digest_every = atoi(argv[++i]);
     else if (!strcmp(argv[i], "--frame-log")) hle_frame_log = atoi(argv[++i]);
+    else if (!strcmp(argv[i], "--vmu")) vmu_path = argv[++i];
   }
+  if (vmu_path) {
+    FILE *f = fopen(vmu_path, "rb");
+    if (f) { size_t n = fread(vmu_img, 1, VMU_SIZE, f); fclose(f); rtw_save_load(0, (int)n); }
+  }
+  atexit(vmu_store);
   rtw_start();
-  for (;;) rtw_frame();
+  for (;;) { rtw_frame(); vmu_store(); }
 }
 #else
 __attribute__((export_name("rt_set_frames"))) void rt_set_frames(int n) { hle_max_frames = n; }

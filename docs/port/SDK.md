@@ -82,39 +82,58 @@ The HLE replaces the whole stack with the disc reader (track 48 files).
 Game file loading: `0x8C012E40` (open, size, `syMalloc`, read, close: whole file to heap), `0x8C01311C` (the same
 into the fixed buffer at 0x8CE40000), `0x8C0120CA` (load a PVM file and give it to `njLoadTexturePvmMemory`).
 
-### 2.3 pd, pdLcd, pdVib, kd — S6
+### 2.3 pd, pdLcd, pdVib, kd — S6 (done: `port/runtime/hle_io.c`)
 
 `pdInitPeripheral(0, recvbuf, sendbuf)` (buffers 0xC020 bytes, the SDK sample sizes), `pdExitPeripheral`, and
-**`pdGetPeripheral(port)`** (5 sites) returning the per-port state. The game polls **4 ports**: a table at
-0x8C066934 holds 0, 6, 12, 18 (ports A0, B0, C0, D0). Fields it reads (offsets in the returned structure, our
-reading of the public layout: id 0, support 4, on 8, off 12, press 16, release 20, r 24, l 26, x1 28, y1 30, x2 32,
-y2 34, ..., info 48): **+4 support, +8 on (buttons held), +0x10 press (Start to skip the movie), +0x1C/+0x1E
-(stick X/Y, also thresholded into digital directions), +0x20/+0x22, +0x30 (device info: connected/type)**. No
-read of +0x18/+0x1A (the analog triggers r/l in that layout) was found at the five call sites; if the layout
-holds, the triggers are unused or read as digital bits. To confirm in S6 with the game's input code (open).
+**`pdGetPeripheral(port)`** (5 sites) returning the per-unit structure (port = 6 × connector + unit). The game polls
+**4 ports**: a table at 0x8C066934 holds 0, 6, 12, 18 (A0, B0, C0, D0).
 
-- **VMU LCD (pdLcd)**: `pdVmsLcdWrite(port, bitmap, 2)` and `pdVmsLcdIsReady(port)` on ports 1, 7, 13, 19
-  (slot 1 of A–D): the game shows a picture on every connected VMU. Port: optional host panel.
-- **Jump Pack (pdVib)**: `pdVibMxIsReady(port)`, `pdVibMxStart(port, param)`, `pdVibMxStop(port)`,
-  `pdVibMxSetStopTime(port, 20)`: 1 site each, used by the player object code → `rtw_rumble(port, on/off)`.
+**Confirmed in S6 from the SDK's own conversion code** (0x8C09EEF0, called per unit at V-blank by 0x8C09F12A; the
+SDK's structures are 0x34 bytes, 24 of them at 0x8C1C61BC): id 0, support 4, **on 8** (active-high when
+`pdInitPeripheral`'s first argument is 0, as here), off 0xC (= ~on), press 0x10 (= on & (old ^ on)), release 0x14
+(= off & (old ^ on)), **r 0x18, l 0x1A** (the Maple condition's bytes 2 and 3, 0..255), x1 0x1C, y1 0x1E, x2 0x20,
+y2 0x22 (raw − 128: right / down positive; x2/y2 only with support bits 0x100000/0x200000, so 0 on the standard pad),
+name 0x24, extend 0x28, old 0x2C (the previous on), info 0x30 (→ device functions word: 1 controller, 0x20 AR gun,
+0x40 keyboard, 0x80 light gun, ...). The analog triggers are also digital bits: **bit 16 = R, bit 17 = L**, pressed
+when the value reaches 192, released at 160 or below, kept in between (thresholds stored by `pdInitPeripheral` at
+0x8C1C6700/01). The game's readers: 0x8C01087C (per port: needs info & 1 and support bits 0x40000 + 0x80000 = analog
+X and Y, copies on, thresholds the stick at ±64 into Up/Down/Left/Right, keeps its own press/release), 0x8C010AAE
+(stick axis by index 0–3 = +0x1C/+0x1E/+0x20/+0x22; indices 4/5, the triggers, return nothing: **the game never reads
+the analog trigger values**), 0x8C010B4C (packs y1, x1, B, A into a word), 0x8C01DEF8 (Start press skips the movie).
+
+- **VMU LCD (pdLcd)**: `pdVmsLcdWrite(port, bitmap, 2)` after `pdVmsLcdIsReady(port)` on ports 1, 7, 13, 19
+  (slot 1 of A–D), every frame: the HLE says ready on A1 and drops the picture (logged once). Port: optional host panel.
+- **Jump Pack (pdVib)**: `pdVibMxIsReady(port)`, `pdVibMxSetStopTime(port, 20)` once per player at race start,
+  `pdVibMxStart(port, pattern)` each frame while a pattern runs, `pdVibMxStop(port)` every frame otherwise; port 2 =
+  A2 (slot 2 of controller A). HLE: a Jump Pack in slot 2 of every connected controller; start/stop → `rtw_rumble
+  (connector, on)` on changes.
 - **kd** (0x8C0DD130–0x8C0DE2B0) is the Maple bus driver shared by pd, bu, pdLcd and pdVib (frame build, DMA
   start, `tas.b` locks); the HLE does not need it.
 
-### 2.4 bu (VMU backup) — S6
+### 2.4 bu (VMU backup) — S6 (done: `port/runtime/hle_io.c`, `vmu.c`)
 
-| Function | HLE semantics |
+| Function | What the SDK does (read in its code) / the HLE |
 |---|---|
-| `buInit(15, 1, work, callback)` / `buExit` | drives A1–D1 (mask 15); completion callback |
-| `buSetCompleteCallback(fn)` / `buSetProgressCallback(fn)` (low) | async completion / progress hooks |
-| `buGetDiskInfo(drive, &info)`, `bu_GetBlocks(drive, kind)`, `bu_IsReady(drive)`, `bu_IsFormatted(drive)` | capacity, free/used blocks, connected, formatted (root block marker) |
-| `bu_FindFile(drive, name)` | look a file up before saving |
-| `buMakeBackupFileImage(dst, header)` | build a VMS file image: header (descriptions 16/32 bytes, icon count and speed, palette, icon bitmaps, eyecatch type) + CRC + data |
-| `buSaveFile(drive, name, image, blocks, &time, flags)` / `buLoadFile(drive, name, buf, 0, 0)` | write / read the save file; the game polls `buStat(drive)` and `buGetLastError(drive)` until done |
+| `buInit(15, 1, work, callback)` | sets up, then calls `callback()` at once (the game's sets the complete and progress callbacks); 0 |
+| `buSetCompleteCallback(fn)` / `buSetProgressCallback(fn)` | the game's 0x8C0198AC(drive, op, result) / 0x8C019928 |
+| complete callback | op **1** = mounted (result 0: the game marks the card present and calls `buGetDiskInfo`), 2 = removed, 0x12 (not used by the HLE), **0x0C** after a save, **0x0E** after a load (anything else: result kept, disk info refreshed). The HLE mounts A1 at the first V-blank after `buInit` |
+| `bu_IsReady(drive)` (via the wrapper 0x8C0A00F2) | 1 when the card is connected and mounted |
+| `bu_IsFormatted(drive)` (via 0x8C0A019C) | 0 when the root block starts with 16 × 0x55, else −253; −255 no card |
+| `buGetDiskInfo(drive, info)` | info: 0x00 the volume label (root 0x10, 32 bytes), u16 0x20 blocks (256), 0x22 user blocks (200), 0x24 and 0x26 free user blocks, 0x28 VMU-game area (128), 0x2A its free blocks from block 0, 0x2C (an internal count, 0), 0x2E icon; 0x30 the root time stamp as BUS_TIME |
+| `bu_GetBlocks(drive, kind)` | kind 0 free user blocks, 1 free VMU-game blocks |
+| `bu_FindFile(drive, name)` | 0 found, −251 not found, −253, −255 |
+| `buStat(drive)` / `buGetLastError(drive)` | −1 while busy, else 0 / the drive's last result; the HLE is never busy |
+| `buMakeBackupFileImage(dst, desc)` | **run as guest SDK code**: VMS header (descriptions from desc+0, +0x12, +0x34; icon count +0x4C ≤ 3, speed +0x4E, eyecatch type +0x54 and data +0x50, palette +0x44, bitmaps +0x48, data +0x58 / size +0x5C), CRC-16 (CCITT) at 0x46, padded to whole blocks; returns the block count |
+| `buSaveFile(drive, name, image, blocks, &BUS_TIME, flags)` / `buLoadFile(drive, name, buf, 0, 0)` | write / read the whole file (header included); 0 = request accepted. The HLE completes at once: result in `buGetLastError`, then the complete callback |
 
-The game saves **one file** (one name constant in game data at 0x8C06F368, one header at 0x8C1B822C, image built
-at 0x8C1B8290), with a time stamp from its RTC helper; flags 0x80000000. Load and save paths: game functions
-0x8C018E7C (load) and 0x8C018F7C (save). HLE: a VMS file system over the 128 KiB VMU image (retrowser
-`save.kind: vmu`), synchronous with immediate completion callbacks.
+Result codes: 0 ok, −1 busy, **−255 no card, −253 unformatted, −251 file not found**; after a save the game also
+tells −252 (its message 7; the HLE returns it when the card has too few free blocks), −249 and −191 (message 5)
+apart. Which message says what is not checked yet. The game saves **one
+file**, 12-character name constant at 0x8C06F368, 5 blocks (VMS header 0x80 + 3 icons + 896 data bytes), with a
+time stamp from its RTC helper (0x8C061E1A: 1950-01-01 here, the RTC register reads 0) and flags 0x80000000. Load
+0x8C018E7C: not ready → "no card" message; not found → it saves a new file (0x8C018F7C); found → copies the 896 data
+bytes. Save 0x8C018F7C: `bu_IsReady`, `bu_IsFormatted`, `bu_FindFile` (not found and < 5 free blocks → "no room"),
+`buMakeBackupFileImage`, `buSaveFile`, `buStat` loop, `buGetLastError`. The file system itself: `vmu.c` (RTW.md 3).
 
 ### 2.5 sd (Manatee) — S7
 

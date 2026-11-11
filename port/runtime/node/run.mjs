@@ -75,11 +75,36 @@ function glFrame(p, len) {
   fs.writeFileSync(name, out);
   console.log('shot frame ' + frame + ' cmds ' + ncmd + ' verts ' + nvert + ' textures ' + used.length + ' bytes ' + size);
 }
+// S6: --input SCRIPT gives port A's pad through rtw_input / rtw_triggers before each rtw_frame, as the retrowser
+// host does (same syntax as --pad: "F[+N]:BTN|BTN,..."); --vmu FILE is the A1 image (rtw_save_*), read at start
+// and written back whenever rtw_save_generation changes; rtw_rumble calls are logged.
+const BITS = { C: 1, B: 2, A: 4, START: 8, UP: 16, DOWN: 32, LEFT: 64, RIGHT: 128, Z: 256, Y: 512, X: 1024, D: 2048 };
+const inputScript = (strOpt('--input') || '').split(',').filter(Boolean).map((ev) => {
+  const m = ev.match(/^(\d+)(?:\+(\d+))?:(.*)$/);
+  if (!m) throw new Error('bad --input event');
+  return { from: +m[1], to: +m[1] + (m[2] ? +m[2] : 4), names: m[3].split('|').filter(Boolean) };
+});
+function hostPad(f) {
+  const p = { buttons: 0, sx: 0, sy: 0, l: 0, r: 0 };
+  for (const e of inputScript) {
+    if (f < e.from || f >= e.to) continue;
+    for (const n of e.names) {
+      if (n in BITS) p.buttons |= BITS[n];
+      else if (n === 'LT') p.l = 255; else if (n === 'RT') p.r = 255;
+      else if (n === 'SL') p.sx = -127; else if (n === 'SR') p.sx = 127; else if (n === 'SU') p.sy = 127; else if (n === 'SD') p.sy = -127;
+      else throw new Error('bad --input button');
+    }
+  }
+  return p;
+}
+const vmuPath = strOpt('--vmu');
+let rumbles = 0;
 const raw = Buffer.alloc(2352);
 const env = {
+  rtw_rumble(port, on) { rumbles++; if (rumbles <= 16) console.log('boot host rumble port ' + port + ' ' + (on ? 'on' : 'off')); return 0; },
   penpen_gl_frame: (p, len) => glFrame(p, len),
   emscripten_notify_memory_growth() {}, // -sALLOW_MEMORY_GROWTH (decoded textures): views are re-made per call
-  rtw_log(p, len) { process.stdout.write(Buffer.from(mem.buffer, p, len).toString('utf8') + '\n'); },
+  rtw_log(p, len) { process.stdout.write(Buffer.from(mem.buffer, p, len).toString('utf8') + '\n'); return 0; },
   rtw_disc_toc(p, max) {
     const v = new Int32Array(mem.buffer, p, Math.min(max, tracks.length) * 4);
     tracks.slice(0, max).forEach((t, i) => {
@@ -114,6 +139,7 @@ for (const im of WebAssembly.Module.imports(mod)) {
   }
 }
 const extra = WebAssembly.Module.imports(mod).filter((i) => !(i.module === 'env' && (i.name.startsWith('rtw_') || i.name === 'penpen_gl_frame' || i.name === 'emscripten_notify_memory_growth')));
+for (const i of WebAssembly.Module.imports(mod)) if (i.module === 'env' && !env[i.name]) console.log('boot import not provided by this host: env.' + i.name);
 console.log('boot wasm imports outside env.rtw_* and env.penpen_gl_frame: ' + extra.length);
 if (shotDir) fs.mkdirSync(shotDir, { recursive: true });
 const inst = await WebAssembly.instantiate(mod, imports);
@@ -131,10 +157,34 @@ inst.exports.rt_set_frame_log?.(opt('--frame-log', 1));
     if (inst.exports.rt_set_pad() < 0) { console.log('boot bad pad script'); process.exit(2); }
   }
 }
+const ex = inst.exports;
+let vmuGen = 0;
+function vmuStore() {
+  if (!vmuPath || ex.rtw_save_generation() === vmuGen) return;
+  vmuGen = ex.rtw_save_generation();
+  fs.writeFileSync(vmuPath, Buffer.from(new Uint8Array(mem.buffer, ex.rtw_save_ptr(), ex.rtw_save_size())));
+  console.log('boot host vmu image written (generation ' + vmuGen + ')');
+}
+if (vmuPath && fs.existsSync(vmuPath)) {
+  const img = fs.readFileSync(vmuPath);
+  const n = Math.min(img.length, ex.rtw_save_size());
+  new Uint8Array(mem.buffer, ex.rtw_save_ptr(), n).set(img.subarray(0, n));
+  ex.rtw_save_load(ex.rtw_save_ptr(), n);
+}
 const t0 = Date.now();
 try {
-  inst.exports.rtw_start();
-  for (;;) inst.exports.rtw_frame(); // S6: stepped, one frame per call, until the frame limit traps
+  ex.rtw_start();
+  vmuGen = ex.rtw_save_generation();
+  for (let f = 0; ; f++) { // S6: stepped, one frame per call, until the frame limit traps
+    if (inputScript.length) {
+      const p = hostPad(f);
+      ex.rtw_input(0, p.buttons, p.sx, p.sy);
+      ex.rtw_triggers(0, p.l, p.r);
+    }
+    ex.rtw_frame();
+    vmuStore();
+  }
 } catch (e) {
+  try { vmuStore(); } catch { /* memory gone */ }
   console.log('boot wasm stopped (' + (e instanceof WebAssembly.RuntimeError ? 'trap' : 'error') + ') after ' + (Date.now() - t0) + ' ms');
 }
