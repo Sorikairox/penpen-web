@@ -47,24 +47,27 @@ void io_host_frame(void) {
   host_seen = 0;
 }
 
-/* ---- the test mode's pad script (port A) ---- */
-typedef struct { uint32_t from, to, buttons; } pad_ev;
+/* ---- the test mode's pad script (port A; S12: any port, "F@P:...") ---- */
+typedef struct { uint32_t from, to, buttons, port; } pad_ev;
 #define NPAD 256
 static pad_ev pad_script[NPAD];
 static int npad;
+static uint32_t script_ports; /* S12: ports B-D the script uses hold a controller from the start */
 static const struct { const char *n; uint32_t bit; } pad_names[] = {
   {"C", 1u << 0}, {"B", 1u << 1}, {"A", 1u << 2}, {"START", 1u << 3}, {"UP", 1u << 4}, {"DOWN", 1u << 5},
   {"LEFT", 1u << 6}, {"RIGHT", 1u << 7}, {"Z", 1u << 8}, {"Y", 1u << 9}, {"X", 1u << 10}, {"D", 1u << 11},
   {"RT", DGT_R}, {"LT", DGT_L}, /* the analog triggers pulled fully */
   {"SL", 1u << 20}, {"SR", 1u << 21}, {"SU", 1u << 22}, {"SD", 1u << 23}, /* the stick pushed fully */
 };
-/* "F[+N]:BTN[|BTN...],...": hold the buttons on port A during frames F..F+N-1 (N default 4) */
+/* "F[+N][@P]:BTN[|BTN...],...": hold the buttons on port P (0-3 = A-D, default A) during frames F..F+N-1 (N default
+ * 4). A port other than A that the script names holds a controller for the whole run. */
 int hle_set_pad_script(const char *s) {
-  npad = 0;
+  npad = 0; script_ports = 0;
   while (*s && npad < NPAD) {
-    uint32_t f = 0, n = 4, b = 0;
+    uint32_t f = 0, n = 4, b = 0, port = 0;
     while (*s >= '0' && *s <= '9') f = f * 10 + (uint32_t)(*s++ - '0');
     if (*s == '+') { s++; n = 0; while (*s >= '0' && *s <= '9') n = n * 10 + (uint32_t)(*s++ - '0'); }
+    if (*s == '@') { s++; if (*s < '0' || *s > '3') { rt_log("hle pad script: bad port"); npad = 0; return -3; } port = (uint32_t)(*s++ - '0'); }
     if (*s++ != ':') { rt_log("hle pad script: syntax error"); npad = 0; return -1; }
     while (*s && *s != ',') {
       char nm[8]; int k = 0;
@@ -77,14 +80,16 @@ int hle_set_pad_script(const char *s) {
       if (!ok && k) { rt_log("hle pad script: unknown button"); npad = 0; return -2; }
     }
     if (*s == ',') s++;
-    pad_script[npad].from = f; pad_script[npad].to = f + n; pad_script[npad].buttons = b; npad++;
+    pad_script[npad].from = f; pad_script[npad].to = f + n; pad_script[npad].buttons = b; pad_script[npad].port = port; npad++;
+    if (port) script_ports |= 1u << port;
   }
   rt_log("hle pad script %d events", npad);
   return npad;
 }
-static uint32_t script_buttons(uint32_t f) {
+static uint32_t script_buttons(uint32_t f, uint32_t port) {
   uint32_t b = 0;
-  for (int i = 0; i < npad; i++) if (f >= pad_script[i].from && f < pad_script[i].to) b |= pad_script[i].buttons;
+  for (int i = 0; i < npad; i++)
+    if (pad_script[i].port == port && f >= pad_script[i].from && f < pad_script[i].to) b |= pad_script[i].buttons;
   return b;
 }
 
@@ -107,15 +112,15 @@ static void pads_update(void) {
   wr32(INFO_NONE, 0); wr32(INFO_PAD, 1); wr32(INFO_VMU, 0x0E); wr32(INFO_VIB, 0x100);
   uint32_t f = hle_frame();
   for (int port = 0; port < 4; port++) {
-    int present = (host_ports >> port) & 1;
+    int present = ((host_ports | script_ports) >> port) & 1;
     uint32_t base = PAD_BASE + (uint32_t)port * 6 * 0x40;
     uint32_t prev = pad_on[port], on = 0;
     int l = 0, r = 0, sx = 0, sy = 0;
     if (present) {
       on = host[port].buttons & 0x0FFFu;
       l = host[port].l; r = host[port].r; sx = host[port].sx; sy = host[port].sy;
-      if (port == 0) {
-        uint32_t s = script_buttons(f);
+      if (port == 0 || ((script_ports >> port) & 1)) {
+        uint32_t s = script_buttons(f, (uint32_t)port);
         on |= s & 0x0FFFu;
         if (s & DGT_R) r = 255;
         if (s & DGT_L) l = 255;

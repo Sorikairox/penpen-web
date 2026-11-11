@@ -25,6 +25,7 @@ void hwt_sandbox_call(SH4 *c, uint32_t a) { (void)c; (void)a; __builtin_trap(); 
 void hwt_sandbox_abort(int code, uint32_t at) { (void)code; (void)at; __builtin_trap(); }
 void hwt_before_hle(SH4 *c) { (void)c; }
 void hwt_record_hle(SH4 *c, uint32_t a) { (void)c; (void)a; }
+void hwt_hle_wrote(uint32_t addr, uint32_t len) { (void)addr; (void)len; }
 uint32_t hwt_io_read(uint32_t a) { (void)a; return 0; }
 void hwt_record_io(uint32_t a, uint32_t v) { (void)a; (void)v; }
 void hwt_io_write(uint32_t a, uint32_t v, int size) { (void)a; (void)v; (void)size; }
@@ -78,7 +79,7 @@ static hwt_stat *stat_of(uint32_t a) {
 /* args: the argument registers the HLE read (bits 4-7); stk..: the words it wrote into its caller's stack frames
  * (out-parameters such as gdFsGetFileSize's size), as offsets from r15 at the call: each sandbox side has its own
  * stack depth, and the code still translated keeps the same frame layout, so a side gets them at its own r15 */
-typedef struct { uint32_t t, r0, f0, f1, args, stk_first, stk_n; } hle_rec;
+typedef struct { uint32_t t, r0, f0, f1, args, stk_first, stk_n, mem_first, mem_n; } hle_rec;
 #define REC_MAX 200000
 static hle_rec *rec;
 static int rec_n, rec_depth;
@@ -88,8 +89,27 @@ static int rec_n, rec_depth;
 static uint32_t (*stk)[2]; /* offset from r15, value */
 static uint32_t stk_n, stk_r15;
 static uint8_t stk_before[STK_AREA_HI - STK_AREA_LO];
+/* S12: guest RAM an HLE call filled outside the stack (gdFsRead's sectors: the file a loader then works on). The HLE
+ * says what it wrote (hwt_hle_wrote); the bytes are kept and both sandbox sides get them when the call is replayed,
+ * so code that reads what it loaded (the container fix-ups) is tested on the real data. */
+typedef struct { uint32_t addr, len, pool; } mem_rec;
+#define MEMREC_MAX 8192
+#define MEMPOOL_MAX (12u << 20)
+static mem_rec *memrec;
+static uint8_t *mempool;
+static uint32_t memrec_n, mempool_n, mem_call_first, mem_lost;
+void hwt_hle_wrote(uint32_t addr, uint32_t len) {
+  if (!hwt_recording || rt_hle_depth != rec_depth + 1) return; /* only the sampled call's own HLE calls */
+  uint32_t off = addr & 0xFFFFFFu;
+  if (((addr >> 24) & 0x1Fu) != 0x0Cu) return; /* not main RAM (the sandboxes compare main RAM only) */
+  if (off + len > (16u << 20) || memrec_n >= MEMREC_MAX || mempool_n + len > MEMPOOL_MAX) { mem_lost++; return; }
+  memrec[memrec_n].addr = off; memrec[memrec_n].len = len; memrec[memrec_n].pool = mempool_n;
+  memcpy(mempool + mempool_n, sh4_ram + off, len);
+  mempool_n += len; memrec_n++;
+}
 void hwt_before_hle(SH4 *c) {
   if (rt_hle_depth != rec_depth) return;
+  mem_call_first = memrec_n;
   stk_r15 = c->r[15];
   memcpy(stk_before, sh4_ram + STK_AREA_LO, sizeof stk_before);
 }
@@ -100,6 +120,7 @@ void hwt_record_hle(SH4 *c, uint32_t a) {
     r->t = a; r->r0 = c->r[0]; r->f0 = c->fr.u[0]; r->f1 = c->fr.u[1];
     r->args = hle_arg_mask;
     r->stk_first = stk_n; r->stk_n = 0;
+    r->mem_first = mem_call_first; r->mem_n = memrec_n - mem_call_first;
     uint32_t live_lo = (stk_r15 & 0xFFFFFFu) > STK_AREA_LO ? (stk_r15 & 0xFFFFFCu) : STK_AREA_LO;
     if (memcmp(stk_before + (live_lo - STK_AREA_LO), sh4_ram + live_lo, STK_AREA_HI - live_lo))
       for (uint32_t o = live_lo; o < STK_AREA_HI; o += 4) {
@@ -159,6 +180,10 @@ static void sbx_hle(SH4 *c, uint32_t a, int arity) {
     c->r[0] = rec[k].r0; c->fr.u[0] = rec[k].f0; c->fr.u[1] = rec[k].f1;
     for (uint32_t i = 0; i < rec[k].stk_n; i++) /* its out-parameters in the caller's frame */
       wr32(c->r[15] + stk[rec[k].stk_first + i][0], stk[rec[k].stk_first + i][1]);
+    for (uint32_t i = 0; i < rec[k].mem_n; i++) { /* what it read into guest RAM (S12) */
+      const mem_rec *m = &memrec[rec[k].mem_first + i];
+      memcpy(sh4_ram + m->addr, mempool + m->pool, m->len);
+    }
   } else {
     slog->diverged = 1;
     c->r[0] = h; c->fr.u[0] = 0; c->fr.u[1] = 0;
@@ -244,6 +269,7 @@ int hwt_begin(SH4 *c, uint32_t addr) {
   rec_n = 0;
   stk_n = 0;
   iorec_n = 0;
+  memrec_n = mempool_n = mem_call_first = 0;
   rec_depth = rt_hle_depth;
   hwt_recording = 1;
   cur_sample = ++sample_ids;
@@ -403,6 +429,8 @@ int hwt_set(const char *opt) {
   rec = malloc(sizeof *rec * REC_MAX);
   iorec = malloc(sizeof *iorec * IOREC_MAX);
   stk = malloc(sizeof *stk * STK_MAX);
+  memrec = malloc(sizeof *memrec * MEMREC_MAX);
+  mempool = malloc(MEMPOOL_MAX);
   if (!buf_s || !buf_a || !buf_b || !rec || !iorec || !stk) return -1;
   hwt_enabled = 1;
   return 1;

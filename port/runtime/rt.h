@@ -60,6 +60,7 @@ void hwt_sandbox_call(SH4 *c, uint32_t a);
 __attribute__((noreturn)) void hwt_sandbox_abort(int code, uint32_t at);
 void hwt_before_hle(SH4 *c);
 void hwt_record_hle(SH4 *c, uint32_t a);
+void hwt_hle_wrote(uint32_t addr, uint32_t len); /* S12: an HLE call filled guest RAM (difftest replay) */
 uint32_t hwt_io_read(uint32_t a);
 void hwt_record_io(uint32_t a, uint32_t v);
 void hwt_io_write(uint32_t a, uint32_t v, int size);

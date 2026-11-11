@@ -287,6 +287,7 @@ static void gd_complete(int i) {
   uint32_t h = fh_addr(i), pos = fh_pos(i);
   if (read_sectors(fh[i].lba + pos, fh[i].req_n, fh[i].req_buf)) { fh_stat(i, ST_ERR); wr16(h + 0x52, 0xFFFF); }
   else {
+    hwt_hle_wrote(fh[i].req_buf, fh[i].req_n * 2048u); /* S12: the difftest replays the file data */
     wr32(h + 0x14, pos + fh[i].req_n);
     wr32(h + 0x18, fh[i].req_n * 2048);
     fh_stat(i, ST_COMPLETE);
