@@ -100,39 +100,6 @@ rt_fn rt_lookup(uint32_t a) {
   return 0;
 }
 
-static uint32_t n_calls, n_hle, n_interp_calls, n_interp_steps;
-uint32_t rt_interp_calls(void) { return n_interp_calls; }
-#define SEEN_N 64
-static uint32_t interp_seen[SEEN_N];
-static int interp_seen_n;
-
-/* run guest code in the interpreter until it returns to the caller's PR; calls and jumps to known
- * code (HLE or recompiled) go native. */
-static void interp_call(SH4 *c, uint32_t a) {
-  uint32_t ret = c->pr, sp = c->r[15];
-  int known = 0;
-  for (int i = 0; i < interp_seen_n; i++) known |= interp_seen[i] == a;
-  if (!known && interp_seen_n < SEEN_N) { interp_seen[interp_seen_n++] = a; rt_log("rt interp %08x", a); }
-  n_interp_calls++;
-  c->pc = a;
-  for (;;) {
-    int r = sh4_step(c);
-    n_interp_steps++;
-    if (r) {
-      rt_log("rt interp fault %d at %08x (entered at %08x, return address %08x, sp %08x)", r, c->fault, a, ret, sp);
-      rt_stop("interpreter fault");
-    }
-    if (c->last == SH4_BR_NONE) continue;
-    if (c->last == SH4_BR_RET && c->pc == ret && c->r[15] >= sp) return;
-    uint32_t t = RT_NORM(c->pc);
-    if (hle_known(t) || rt_lookup(t)) {
-      rt_call(c, t); /* native; returns with c->pc = where it returned to */
-      if (rt_unw) { rt_log("rt yield inside interpreted code entered at %08x", a); rt_stop("unwind through the interpreter"); }
-      if (c->last != SH4_BR_CALL && c->pc == ret) return; /* a tail jump came back to our caller */
-    }
-  }
-}
-
 /* ---- S6: resumable frames (rt_gen.h): the saved call sites, innermost first ---- */
 int rt_unw, rt_rew;
 uint32_t rt_rew_t;
@@ -159,13 +126,73 @@ void rt_rew_done(void) {
 }
 int rt_rw_depth(void) { return rw_depth_max; }
 
+static uint32_t n_calls, n_hle, n_interp_calls, n_interp_steps;
+uint32_t rt_interp_calls(void) { return n_interp_calls; }
+#define SEEN_N 64
+static uint32_t interp_seen[SEEN_N];
+static int interp_seen_n;
+
+/* run guest code in the interpreter until it returns to the caller's PR; calls and jumps to known
+ * code (HLE or recompiled) go native. */
+/* the interpreter is resumable too (S6): when a native call it made yields, it saves where it was (its
+ * caller's return address and stack, the call's target, the branch kind) as three sites tagged with the entry
+ * address; the rewind enters it again with the same entry, it pops them and repeats that native call. */
+#define RW_INTERP_T (-1)
+#define RW_INTERP_RET (-2)
+#define RW_INTERP_SP (-3)
+static uint32_t rw_pop_interp(uint32_t a, int tag) {
+  if (!rw_n || rw[rw_n - 1].fn != a || rw[rw_n - 1].site != tag) { rt_log("rt rewind: interpreter state of %08x missing", a); rt_stop("rewind"); }
+  rw_n--;
+  return rw[rw_n].t;
+}
+uint32_t rt_force_interp; /* test hook: run this function in the interpreter although it is translated */
+static void interp_call(SH4 *c, uint32_t a) {
+  uint32_t ret = c->pr, sp = c->r[15], t = 0;
+  int resume = 0;
+  if (rt_rew) {
+    t = rw_pop_interp(a, RW_INTERP_T);
+    ret = rw_pop_interp(a, RW_INTERP_RET);
+    sp = rw_pop_interp(a, RW_INTERP_SP);
+    resume = 1;
+  } else {
+    int known = 0;
+    for (int i = 0; i < interp_seen_n; i++) known |= interp_seen[i] == a;
+    if (!known && interp_seen_n < SEEN_N) { interp_seen[interp_seen_n++] = a; rt_log("rt interp %08x", a); }
+    n_interp_calls++;
+    c->pc = a;
+  }
+  for (;;) {
+    if (!resume) {
+      int r = sh4_step(c);
+      n_interp_steps++;
+      if (r) {
+        rt_log("rt interp fault %d at %08x (entered at %08x, return address %08x, sp %08x)", r, c->fault, a, ret, sp);
+        rt_stop("interpreter fault");
+      }
+      if (c->last == SH4_BR_NONE) continue;
+      if (c->last == SH4_BR_RET && c->pc == ret && c->r[15] >= sp) return;
+      t = RT_NORM(c->pc);
+      if (!((hle_known(t) || rt_lookup(t)) && t != rt_force_interp)) continue;
+    }
+    resume = 0;
+    int last = c->last;
+    rt_call(c, t); /* native; returns with c->pc = where it returned to */
+    if (rt_unw) {
+      rt_unw_save(a, RW_INTERP_SP, sp); rt_unw_save(a, RW_INTERP_RET, ret); rt_unw_save(a, RW_INTERP_T, t);
+      return;
+    }
+    c->last = last;
+    if (c->last != SH4_BR_CALL && c->pc == ret) return; /* a tail jump came back to our caller */
+  }
+}
+
 void rt_call(SH4 *c, uint32_t a) {
   uint32_t n = RT_NORM(a);
   hle_fn h;
   rt_fn f;
   n_calls++;
   if ((h = hle_find(n))) { n_hle++; h(c); c->pc = c->pr; return; }
-  if ((f = rt_lookup(n))) { f(c); return; }
+  if ((f = rt_lookup(n)) && n != rt_force_interp) { f(c); return; }
   interp_call(c, n);
 }
 

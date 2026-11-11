@@ -110,6 +110,7 @@ int main(int argc, char **argv) {
     else if (!strcmp(argv[i], "--digest")) hle_digest_every = atoi(argv[++i]);
     else if (!strcmp(argv[i], "--frame-log")) hle_frame_log = atoi(argv[++i]);
     else if (!strcmp(argv[i], "--vmu")) vmu_path = argv[++i];
+    else if (!strcmp(argv[i], "--force-interp")) { extern uint32_t rt_force_interp; rt_force_interp = (uint32_t)strtoul(argv[++i], 0, 16); }
   }
   if (vmu_path) {
     FILE *f = fopen(vmu_path, "rb");
