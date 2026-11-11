@@ -7,7 +7,7 @@ columns. This keeps any embedded data (strings, blobs) out of port/gen/. Usage: 
 import os, re, sys
 
 IDENT = re.compile(r'^(f_[0-9a-f]{8}|L_[0-9a-f]{8}|op_[A-Z0-9_]+|rt_[a-z_]+|CALL_[DI]|TAIL_D|BACK|RT_NORM)$')
-WORDS = {'void', 'uint32_t', 'const', 'int', 'if', 'else', 'goto', 'return', 'switch', 'case', 'default', 'break',
+WORDS = {'D_', 'void', 'uint32_t', 'const', 'int', 'if', 'else', 'goto', 'return', 'switch', 'case', 'default', 'break',
          'SH4', 'c', 't_', 'k_', 'pr', 'pc', 'r', 't', 'rt_fn_entry', 'pragma', 'once', 'include'}
 TOK = re.compile(r'\s*(0x[0-9a-f]+u?|[0-9]+u?|[A-Za-z_][A-Za-z0-9_]*|->|==|!=|[{}()\[\];:,=!&+*#.-])')
 INCLUDES = {'#include "rt_gen.h"', '#include "funcs.h"', '#pragma once'}

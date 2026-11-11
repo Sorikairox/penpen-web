@@ -216,14 +216,20 @@ class Gen:
         lab = set(labels)
         out = []
         self.affected = 0
+        self.need_switch = None
         w = out.append
         w('void %s(SH4 *c) {' % self.fname(start))
         w('  uint32_t t_;')
         w('  (void)t_;')
+        if indirect:
+            w('  t_ = 0x%08xu; goto D_;' % start)
 
         def jump(t, a):
             t = t & 0xFFFFFFFF
             if start <= t < end and t in lab:
+                if t <= a and indirect:
+                    # functions with a label switch: every cycle goes through D_ (reducible for wasm)
+                    return 'BACK(0x%08xu); t_ = 0x%08xu; goto D_;' % (a, t)
                 return ('BACK(0x%08xu); ' % a if t <= a else '') + 'goto L_%08x;' % t
             return self.tail(t)
 
@@ -310,6 +316,16 @@ class Gen:
                     w('  { t_ = c->pr; %s c->pc = t_; return; }' % slot(a + 2))
             else:  # RTE, TRAPA, SLEEP, LDTLB
                 w('  rt_unsupported(c, 0x%08xu); return;' % a)
+        if indirect:
+            self.need_switch = lab
+        if self.need_switch:
+            w('D_:')
+            w('  switch (RT_NORM(t_)) {')
+            for x in sorted(self.need_switch):
+                w('  case 0x%08xu: goto L_%08x;' % (x, x))
+            w('  default: break;')
+            w('  }')
+            w('  rt_call(c, t_); return;')
         w('}')
         return '\n'.join(out), len(labels), indirect
 
@@ -345,13 +361,16 @@ class Gen:
     def ijump(self, k, lab, a, start=0, end=0, local=None):
         s = ''
         if k is not None and local is not None and start <= norm(k) < end and norm(k) in local:
-            s = 'if (RT_NORM(t_) == 0x%08xu) { %sgoto L_%08x; } ' % (norm(k), 'BACK(0x%08xu); ' % a if norm(k) <= a else '', norm(k))
+            if norm(k) <= a and lab:
+                s = 'if (RT_NORM(t_) == 0x%08xu) { BACK(0x%08xu); goto D_; } ' % (norm(k), a)
+            else:
+                s = 'if (RT_NORM(t_) == 0x%08xu) { %sgoto L_%08x; } ' % (norm(k), 'BACK(0x%08xu); ' % a if norm(k) <= a else '', norm(k))
         elif k is not None and self.known(k) is not None:
             k = self.known(k)
             s = 'if (t_ == 0x%08xu) { TAIL_D(%s, 0x%08xu); return; } ' % (k, self.fname(k), k)
         if lab:
-            cases = ' '.join('case 0x%08xu: goto L_%08x;' % (x, x) for x in sorted(lab))
-            s += 'BACK(0x%08xu); switch (RT_NORM(t_)) { %s default: break; } ' % (a, cases)
+            self.need_switch = lab
+            return s + 'BACK(0x%08xu); goto D_;' % a  # the function's one shared label switch
         return s + 'rt_call(c, t_); return;'
 
 

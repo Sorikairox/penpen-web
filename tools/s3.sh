@@ -2,7 +2,7 @@
 # Pen Pen S3: SH-4 interpreter, recompiler scaffold, differential harness and boot runs, all in Docker.
 #   tools/s3.sh test            unit tests of the interpreter (our own vectors; no disc data)
 #   tools/s3.sh gen [args]      recompile 1ST_READ.BIN -> C in penpen-build:/build/gen (local-only scaffold)
-#   tools/s3.sh export          check /build/gen (our grammar only) and copy it to port/gen/ (committed)
+#   tools/s3.sh export          check /build/gen (our grammar only), copy it to port/gen/ (gitignored, local only)
 #   tools/s3.sh diff [args]     build + run the differential harness (interpreter vs recompiled C);
 #                               GEN=genall after `gen --ranges all --out /build/genall` tests the SDK too
 #   tools/s3.sh mutants         recompile with each mutant and count the functions that catch it
@@ -34,7 +34,7 @@ case "${1:-}" in
       sh -c "mkdir -p /build/gen && python3 -I /src/port/recomp/recomp.py --bin /work/fs/1ST_READ.BIN \
         --funcs /symbols/functions.tsv --sdk /symbols/sdk_calls.tsv --out /build/gen $*" 2>&1 | filt ;;
   export)
-    # copy the game translation (port/gen/, committed by the user's decision of S3) after a grammar check
+    # copy the game translation to port/gen/ (gitignored: never committed) after a grammar check
     box -v penpen-build:/build:ro $IMG python3 -I /src/port/recomp/check_gen.py /build/gen | filt
     T=$(mktemp -d); mkdir -p "$T/gen"
     $D run --rm --network none --read-only --cap-drop ALL --user 1000:1000 -v penpen-build:/build:ro $IMG \
