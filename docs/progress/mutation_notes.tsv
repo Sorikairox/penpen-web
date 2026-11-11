@@ -1,0 +1,209 @@
+# Mutation notes (tools/mutate.py report reads them; DECOMP.md 10): mutants that are not killed and why, by id.
+# class: equivalent = the program cannot behave differently (or not in this runtime: said so); unreachable = no route
+# reaches the changed behaviour (the reason names the input that would). id	class	reason
+f763d899fb	equivalent	file_init runs once at start-up, before anything writes g_exit_request: the store writes the 0 the .bss word already holds
+e9b5a0c1d1	equivalent	file_init runs once at start-up, before anything writes g_drive_status: the store writes the 0 the .bss word already holds
+f10057c0a9	equivalent	hw_stack_alloc counts in 4-byte units (bytes + 3 rounded down to 4): 15 allocates the same 16 bytes
+1f217a206a	equivalent	hw_stack_free counts in 4-byte units: 15 frees the same 16 bytes
+74dbeada7a	equivalent	the file size gdFsGetFileSize writes is never read (the original asks for it and drops it): written below r15 (dead stack) it changes nothing
+a40a6cb7e7	equivalent	the file size is never read; the guest's 32-bit store aligns the address down (wr32: & ~3), so +0xD writes the same +0xC slot
+1af59094fe	equivalent	the file size is never read; +0xB is aligned down to +0x8, an unused word of the function's own 16-byte frame
+b780a74f8b	equivalent	the file size is never read; written at +0 it is overwritten at once by gdFsGetFileSctSize's sector count, the only word read
+5b4fc27845	equivalent	hw_stack_alloc counts in 4-byte units: 3 allocates the same 4 bytes
+3904b5b96c	equivalent	hw_stack_free counts in 4-byte units: 3 frees the same 4 bytes
+b52e533ca1	unreachable	gdFsDaPlay(track, repeat, track) instead of (track, track, repeat): the last track and the repeat count only matter when the track ends; no route runs that long (the longest is 133 s) and no game_update sample fell on a track change (CDDA play stays translated for that reason)
+22758a2dea	equivalent	draw_view without view_finish: view_finish only calls view_after_draw (func_8C011F48), which is empty in this build
+dfbb85a864	equivalent	Game's draw method is empty: (void)0 and (void)1 are the same statement
+b213597dc7	equivalent	the catch-up cap: with >= 5 a count of 5 is set to 5, which it already is
+f06d187fee	equivalent	the catch-up cap: with > 4 a count of 5 is set to 5, which it already is; counts above 5 become 5 either way
+842fd710ce	unreachable	the catch-up cap at 6 instead of 5 differs only when 6 V-blanks pass between two frames: the runtime ends every frame on exactly one V-blank (a slow frame on the console would reach it)
+168563353c	equivalent	the value HW_YIELDING_RET returns while the frame unwinds is never used (RET does not set r0 during an unwind)
+5de061b2aa	equivalent	view_frame_begin (func_8C010DD6) is empty in this build
+52d33d290e	equivalent	view_frame_end (func_8C010DDA) is empty in this build
+36c09f0ce0	equivalent	in this runtime: the VMU LCD picture for port A1 is dropped by the HLE (no LCD panel; pdVmsLcdWrite reads no picture argument), so picture 1 instead of 0 is not observable
+8c628dabd5	equivalent	in this runtime: no VMU in B1 (the HLE plugs a VMU into A1 only), so pdVmsLcdIsReady says no and the picture is never written
+af13b48250	equivalent	in this runtime: no VMU in C1, so the picture is never written
+07a03b7ffa	equivalent	in this runtime: no VMU in D1, so the picture is never written
+d7a916ef61	equivalent	game_init runs once at start-up, before anything writes g_soft_reset: the store writes the 0 the .bss word already holds
+59575d62aa	equivalent	game_init runs once at start-up, before anything writes g_quit_request: the store writes the 0 the .bss word already holds
+8c81344191	equivalent	game_construct (game_reset -> tasktree_attach_root) has just set updates_per_frame to 1: the store writes the value already there
+11a8a41533	unreachable	the value of g_game when syMalloc(sizeof(Game)) fails at start-up: the HLE heap never fails there
+a2d448b08b	equivalent	the initial value of `scene` is dead: syMalloc's result replaces it before any read (a rewind restores the saved one)
+f7d69a6954	equivalent	the initial value of `starting` is dead: it is assigned before any read (a rewind restores the saved one)
+c88b6f4118	equivalent	views_reset only calls view_reset (func_8C011F4C), which is empty in this build
+52d66f55af	equivalent	the original reads the pause state for the sound update, which ignores it: removing the read changes nothing
+23eadf503e	equivalent	hw_call's argument count is only used by the difftest to compare the arguments of HLE callees; the mode start routines are guest code (they read their two registers whatever the count says)
+cb9fec0405	equivalent	the MODE_QUIT entry of the start-routine table is never used (game_update handles MODE_QUIT before indexing the table)
+ea76104d0b	equivalent	the constructor table is 12 bytes long (0x8C23D900-0x8C23D90C) and the loop steps by 8: < and <= stop after the same two entries
+9ee9a6fa8f	equivalent	pad_reset_all runs once at start-up, before any pad word is written: g_pad_last already holds 0 (.bss)
+150ff1c18c	equivalent	pad_reset_all runs once at start-up, before any pad word is written: g_pad_released already holds 0 (.bss)
+e9bf5af0ee	equivalent	pad_reset_all runs once at start-up, before any pad word is written: g_pad_pressed already holds 0 (.bss)
+3ff35855e7	equivalent	cd_play is always called with first track = last track (one track): swapping them passes the same values
+4877fcb77f	equivalent	the CONTAINER_DATA case does nothing (the offset is fixed before the switch): without the label the switch does nothing for type 7 either
+70f726315d	unreachable	no container loaded on the routes has an entry of type 2 (motion): with its case label gone such an entry would not be fixed
+0380611034	unreachable	no container loaded on the routes has an entry of type 4 (model trees)
+7599982e3a	unreachable	no container loaded on the routes has an entry of type 6 (texture lists)
+b7a148477a	unreachable	no container loaded on the routes has an entry of type 9 (action)
+978d8c36ff	unreachable	no container loaded on the routes has an entry of type 10 (actions)
+d362950609	unreachable	no container loaded on the routes has an entry of type 11 (action list)
+115508e6c1	unreachable	no container loaded on the routes has an entry of type 12 (motion pair)
+726fccb7fc	unreachable	no container loaded on the routes has an entry of type 13 (motion pairs)
+85357bbbb3	unreachable	no container loaded on the routes has an entry of type 17 (chunk action)
+f0aacf5400	unreachable	no container loaded on the routes has an entry of type 18 (chunk actions)
+e3ba646814	unreachable	the type check: with 0 every type but 0 passes; differs only for an entry of type 20 or more (none on the routes)
+61cacd5765	unreachable	the type check: with 21 type 20 passes too; differs only for an entry of type 20 (none on the routes)
+c29f9565d2	unreachable	reloc's > 1 differs from > 0 only for an offset of exactly 1; the files' offsets point at aligned structures (none is 1)
+643950f30d	unreachable	no mesh set loaded on the routes has an attribute array (the field is 0, which reloc leaves alone)
+5c6e374960	unreachable	no mesh set loaded on the routes has a normal array (the field is 0)
+57f09fd8bd	unreachable	no mesh set loaded on the routes has vertex colours (the field is 0)
+9a543c642d	unreachable	no mesh set loaded on the routes has UVs (the field is 0)
+e177e84529	equivalent	offsetof(NjModel, points) is 0: model - 0 is model + 0
+236d7f9324	unreachable	differs only for a model with more than one mesh set (i > 0): every basic model loaded on the routes has one
+508bb5800f	unreachable	differs only for a model with more than one mesh set (i > 0): every basic model loaded on the routes has one
+69fd33405c	equivalent	offsetof(NjMotion, mdata) is 0: motion - 0 is motion + 0
+1ebad8c099	equivalent	the flag array only needs 6 entries (at most 6 elements are counted before the 1-5 check): 17 or 16 entries behave the same
+b357a37298	equivalent	the flag array only needs 6 entries: 15 or 16 entries behave the same
+311c2abfbb	equivalent	the initializer's first flag is overwritten at once by the copy of the original's table
+06e10b1805	equivalent	in this program: the original's flag table at 0x8C08AD54 holds five zeros, the same as the initializer (checked in the run)
+19a3bd881d	equivalent	in this program: the table's first word is 0, the same as the initializer
+da708de082	equivalent	a sixth word copied (0, checked) lands in flag 5, which only a 6-element motion uses: such a motion is not fixed (1-5 only)
+d0b960a6ee	equivalent	in this program: the table's words are 0, the same as the initializer
+13c12c2172	equivalent	in this runtime: the HLE reports cable type 1, so the display mode, frame-buffer mode and frame-count mode are all 1: swapping two of them passes the same values
+ca5ce6b59c	equivalent	in this runtime: the HLE reports cable type 1, so the display mode, frame-buffer mode and frame-count mode are all 1: swapping two of them passes the same values
+4ad515bbba	equivalent	in this program: the words read (the original's flag table at 0x8C08AD54 and the word after it) are all 0, at any of these offsets
+acd8478817	equivalent	in this program: the flag table at 0x8C08AD54 and the word after it are 0, so a 5-byte stride reads zeros too
+8a1161982c	equivalent	in this program: the flag table's words are all 0: reading the first one five times gives the same flags
+e7885fc125	equivalent	in this program: every word of the flag table is 0, whichever is read (for i = 0 the division by zero gives 0 on the build host's aarch64; undefined in C)
+f963f4538a	equivalent	only bits 0-5 of the type can count as an element (1, 2, 4, 8, 0x10, 0x20): bit 12 never matches
+5cc75afb7a	equivalent	only bits 0-5 of the type can count as an element: bit 13 never matches
+eef15787eb	equivalent	only bits 0-5 of the type can count as an element: bit 12 never matches
+9d6c793c5b	unreachable	the vector element (bit 3) would no longer count: no motion loaded on the routes has it
+cd945a2829	unreachable	the vector element (bit 3) would no longer count: no motion loaded on the routes has it
+3726cce9a6	equivalent	the flags are only tested for non-zero: 2 marks a pointer key as 1 does
+d1e98b1ab4	unreachable	a one-element motion would be skipped: no motion loaded on the routes has one element
+dd1cb10bb8	unreachable	a one-element motion would be skipped: no motion loaded on the routes has one element
+0074dc26e6	equivalent	a motion with no element would go through the node loop with nothing to fix (stride 0, no element): the same as returning
+909a2459de	unreachable	a six-element motion would be fixed (the original skips it): no motion on the routes has six elements (and none has zero)
+8a1ae7bae2	unreachable	a five-element motion would be skipped: no motion loaded on the routes has five elements
+d6ae5e96c4	equivalent	offsetof(NjTexList, textures) is 0: texlist - 0 is texlist + 0
+caa5e674d0	unreachable	one more name would be fixed (the word after the list's last entry): it differs only if that word is a positive offset; in the files loaded on the routes it is not
+c449d30e2a	equivalent	offsetof(NjTexName, filename) is 0: - 0 is + 0
+12769832e0	equivalent	offsetof(NjCnkModel, vlist) is 0: model - 0 is model + 0
+20a280ac7d	unreachable	tests an unaligned neighbour word instead of the second motion's pointer: in every motion pair list loaded on the routes both are non-zero, so the test agrees; a list without a second motion would tell them apart
+fac7d919a5	unreachable	tests the first motion's pointer instead of the second's: in every motion pair list loaded on the routes both are non-zero; a list with only one of them would tell them apart
+e5e9790e60	unreachable	tests an unaligned neighbour word instead of the second motion's pointer: both non-zero in every list loaded on the routes
+5deaf55b41	unreachable	tests an unaligned neighbour word instead of the motion pointer: in every chunk action list loaded on the routes both are non-zero; an entry without a motion would tell them apart
+f2f34c936e	unreachable	tests an unaligned neighbour word instead of the motion pointer: both non-zero in every list loaded on the routes
+7282d5922a	unreachable	tests the tree pointer instead of the motion pointer: both non-zero in every chunk action list loaded on the routes
+d1015d18e1	unreachable	the type check would let type 20 through: no container on the routes has one
+456b0dbd0a	unreachable	the type check would let types 20 and 21 through: no container on the routes has one
+b2d7198498	unreachable	the type check would let type 20 through: no container on the routes has one
+54189964c4	unreachable	without the break a texture-list entry also goes to fix_objects with its `a` field as the count: every texture-list entry on the routes has a = 0 (nothing more is fixed); one with a > 0 would differ
+5104ec157b	unreachable	without the break a data entry (type 7) also goes through the pointer loop with its `a` field as the count: every data entry on the routes has a = 0; one with a > 0 would differ
+0f264c2e45	unreachable	without the break a chunk-tree entry (type 15) also goes to fix_cnk_objects with its `a` field as the count: every such entry on the routes has a = 0; one with a > 0 would differ
+8382f49f17	equivalent	the break of the switch's last case: the switch ends there anyway
+437caf94b7	unreachable	pad_clear runs for ports without a controller, whose words are already 0 (they never had one): a controller unplugged during a run (words non-zero, then cleared) would tell
+e0af4f1947	unreachable	as above: a controller unplugged during a run
+cd7512b37c	unreachable	as above: a controller unplugged during a run
+2cacd8feb6	unreachable	as above: a controller unplugged during a run
+78237ddbb3	unreachable	the clear of a port without a controller writes words that are already 0: a controller unplugged during a run would tell
+7876e9e62f	unreachable	the "not a usable device" branch (type bit 7) is never taken on the routes either way: a peripheral reporting bit 7 would tell
+2371e607ea	unreachable	support | AX is never 0, support & AX is not 0 for the HLE's controller (it has the X axis): a controller without one would tell
+18f97d4cb1	unreachable	(support & AX) != 1 is 1 whether the X axis is there (0x40000) or not: differs only for a controller without the X axis
+c5996929e7	unreachable	support | AY is never 0: differs only for a controller without the Y axis
+328d211b65	unreachable	(support & AY) != 1 is 1 whether the Y axis is there or not: differs only for a controller without the Y axis
+6cd6cf6da1	unreachable	differs only for a controller with exactly one analog axis (the HLE's has both)
+18a44352fe	unreachable	differs only for a controller with fewer than two analog axes (the HLE's has both)
+ed9df41b89	unreachable	differs only with the stick exactly at +64: the pad script pushes the stick fully (SR = +127) or leaves it centred; a script with partial stick values would tell
+e5c11cc864	unreachable	differs only with the stick exactly at -64 (the script's SL is -127)
+b7c50b1679	unreachable	differs only with the stick exactly at -64 vertically (the script's SU is fully up)
+781525c2be	unreachable	differs only with the stick exactly at +64 vertically (the script's SD is fully down)
+42f0c3077f	unreachable	pad_held answering 0 changes nothing on any route: the translated callers of func_8C010A52 never act on a held button at the moments the routes hold one; which caller and input would tell is not known yet (soft_reset_combo's own uses are killed by the reset route through port_held/other mutants)
+f6deb9cb36	unreachable	as 42f0c3077f: no route makes a translated caller of func_8C010A52 act on a held button
+3fd3969547	unreachable	the Pad pointer taken from the button mask reads a port number from low RAM (0): the same port 0 as every Pad on the routes; with held buttons ignored by the callers (42f0c3077f) nothing differs
+90ea134fc9	unreachable	the Pad pointer taken from the button mask reads port 0 from low RAM (the boot area holds 0 there): every caller of func_8C010A68 on the routes passes player one's Pad (port 0); a Pad of another port would tell
+1ec098b759	unreachable	B|C instead of B in the soft-reset combo: differs only when C is held instead of B (the reset route holds A+B+X+Y)
+8db46c63e2	unreachable	a soft-reset button mask with extra bits: differs only when the combo is incomplete in a way the extra bits cover (e.g. another button held instead of A, B, X or Y, or pressed instead of Start); the reset route holds the full combo and no route holds an incomplete one
+db4de2d556	unreachable	a soft-reset button mask with extra bits: differs only when the combo is incomplete in a way the extra bits cover (e.g. another button held instead of A, B, X or Y, or pressed instead of Start); the reset route holds the full combo and no route holds an incomplete one
+85f895da6b	unreachable	a soft-reset button mask with extra bits: differs only when the combo is incomplete in a way the extra bits cover (e.g. another button held instead of A, B, X or Y, or pressed instead of Start); the reset route holds the full combo and no route holds an incomplete one
+41181892f8	unreachable	a soft-reset button mask with extra bits: differs only when the combo is incomplete in a way the extra bits cover (e.g. another button held instead of A, B, X or Y, or pressed instead of Start); the reset route holds the full combo and no route holds an incomplete one
+df4970e9da	unreachable	a soft-reset button mask with extra bits: differs only when the combo is incomplete in a way the extra bits cover (e.g. another button held instead of A, B, X or Y, or pressed instead of Start); the reset route holds the full combo and no route holds an incomplete one
+c99bb646ab	unreachable	a soft-reset button mask with extra bits: differs only when the combo is incomplete in a way the extra bits cover (e.g. another button held instead of A, B, X or Y, or pressed instead of Start); the reset route holds the full combo and no route holds an incomplete one
+5224df7c54	unreachable	a soft-reset button mask with extra bits: differs only when the combo is incomplete in a way the extra bits cover (e.g. another button held instead of A, B, X or Y, or pressed instead of Start); the reset route holds the full combo and no route holds an incomplete one
+1a8275ef80	equivalent	the argument count only tells the difftest how many registers of an HLE callee to compare; the update method is guest code
+99c58c71f9	equivalent	the update method takes only `this` (r4); the second register is not read (0 or 1 made no difference on any route)
+b7ae5448bd	equivalent	the argument count only tells the difftest how many registers of an HLE callee to compare; the draw method is guest code
+5ebfd034f2	equivalent	the draw method takes only `this` (r4); the second register is not read
+a651f8b15b	equivalent	the argument count only tells the difftest how many registers of an HLE callee to compare; the destroy method is guest code
+cce29921e1	equivalent	task_init's only caller (game_construct) runs game_reset next, which sets the root task's stops_on_pause to 0: the 1 (or 2) is overwritten
+05dfc6de90	equivalent	task_init's only caller (game_construct) runs game_reset next, which sets stops_on_pause to 0
+9d3e81ec26	equivalent	task_init's only caller (game_construct) runs game_reset next, which sets stops_on_pause to 0 anyway
+ad646d4d08	equivalent	in this runtime: task_init's only caller builds the Game once at start-up in a fresh syMalloc block, which is still zero: the store writes the 0 already there
+64534429df	equivalent	in this runtime: the Game's block is fresh and zero at start-up: child is already 0
+76da118af2	equivalent	in this runtime: the Game's block is fresh and zero at start-up: next is already 0
+1a03df3b39	equivalent	in this runtime: the root task's parent is 0 and the fresh block is zero: the store writes the 0 already there
+9de68c0eef	equivalent	task_init's only caller runs game_reset next, whose tasktree_attach_root sets the root task's owner to the tree: the 0 (or 1) is overwritten
+016684f3c7	equivalent	the owner is set by tasktree_attach_root right after (game_reset)
+cde586401d	unreachable	the link (where this task's pointer lives) is only used to unlink a task that died: no task is switched off on the routes (see task_update_tree)
+d876b8d78c	unreachable	the link is only used to unlink a task that died: no task is switched off on the routes
+76e340d050	equivalent	as far as the routes show: the destroy methods test the flag only for non-zero (func_8C01B7EE does: tst), so 2 frees as 1 does; not proven for every scene's method
+308e28daa5	unreachable	game_update discards the pause state (the sound update ignores it); only a translated caller of func_8C019D0A would see the 0, and none runs on the routes
+be03f55242	equivalent	in this runtime: tasktree_attach_root runs once, on the Game built at start-up in a fresh zero block: paused is already 0
+48544d8871	equivalent	updates_per_frame set here at start-up is overwritten before any use: game_init stores 1, then game_frame stores the V-blank count every frame
+da459cbf3a	equivalent	updates_per_frame set here is overwritten by game_init and every game_frame before any use
+dfdfb785c1	equivalent	updates_per_frame set here is overwritten by game_init and every game_frame before any use
+d7562474bb	equivalent	the initial value of passes_left is dead: the loop assigns it first (a rewind restores the saved one)
+9be73e5e17	unreachable	the root's link (0 vs 1) is only used to unlink a dead task: the root never dies
+d92f1d297b	unreachable	the soft reset unpauses the tree; on the reset route the tree is not paused at that moment (0 already): a soft reset during the pause menu would tell
+d575fa79e3	equivalent	(void)view; is not a statement with an effect
+c32723d443	equivalent	(void)view; is not a statement with an effect
+17093f196c	equivalent	view_finish only calls view_after_draw, which is empty in this build
+dc4123f271	equivalent	views_reset's loop only calls view_reset, which is empty in this build: no number of iterations changes anything
+252b7957b1	equivalent	views_reset's loop only calls view_reset, which is empty: one more call changes nothing
+3bade7ce2a	equivalent	views_reset's loop only calls view_reset, which is empty: no call changes nothing
+d6833b4f6a	unreachable	game_reset ignores the returned tree; only a translated caller of func_8C010430 would see 0, and none runs on the routes
+7c75997202	equivalent	view_reset (func_8C011F4C) is empty in this build
+fee9a2f3fa	equivalent	the break of the switch's last case: the switch ends there anyway
+da01fb8d09	equivalent	in this runtime: game_reset runs once, on the Game built at start-up in a fresh syMalloc block that is still zero: pad.port is already 0
+7fd38a8a51	equivalent	in this runtime: game_reset runs once at start-up with first_mode = MODE_0 = 0, on a fresh zero block: next_mode is already 0
+d61877302a	equivalent	in this runtime: game_reset runs once, on a fresh zero block: unknown20 is already 0
+163c8a7ffc	unreachable	skips the store of 0 by mode 7's start routine: on every route the flag is already 0 when mode 7 starts (the survival shows it; which code clears it first is not traced); mode 7 entered with the flag at 1 would tell
+3f9a0ad7d0	unreachable	as 163c8a7ffc: the flag is already 0 whenever mode 7 starts on the routes
+84e2724a9d	equivalent	syMalloc (the SDK's own allocator, part of the program) allocates in 32-byte units: 0x39 bytes take the same 64-byte block as 0x38
+5e4b158278	equivalent	syMalloc allocates in 32-byte units: 0x37 bytes take the same 64-byte block as 0x38
+d152694be0	equivalent	syMalloc allocates in 32-byte units: 0x1C5 bytes take the same 480-byte block as 0x1C4
+fc5474c875	equivalent	syMalloc allocates in 32-byte units: 0x1C3 bytes take the same 480-byte block as 0x1C4
+994bdf4bb2	equivalent	syMalloc allocates in 32-byte units: 0x29 bytes take the same 64-byte block as 0x28
+8ba85a0521	equivalent	syMalloc allocates in 32-byte units: 0x27 bytes take the same 64-byte block as 0x28
+67c26bcaa4	equivalent	syMalloc allocates in 32-byte units: 0xA9 bytes take the same 192-byte block as 0xA8
+9cfd0e5641	equivalent	syMalloc allocates in 32-byte units: 0xA7 bytes take the same 192-byte block as 0xA8
+244fa6bcfd	equivalent	mode 0's scene constructor (func_8C01A3EE) takes one argument: what r5 holds (0 or 1) is not read
+f8b34697c6	equivalent	the argument count only tells the difftest how many registers of an HLE callee to compare; the constructor is guest code
+8a91575a22	equivalent	the argument count only matters for HLE callees; mode 3's constructor is guest code
+0884fb65a9	equivalent	mode 3's scene constructor (func_8C01DDE2) takes one argument: what r5 holds is not read
+653a89b3bd	equivalent	the argument count only matters for HLE callees; the title constructor is hand-written guest-side code and reads both registers
+b5f88e68bf	equivalent	the argument count only matters for HLE callees; the title constructor is guest code
+2a9a574323	equivalent	the title variant 2 instead of 1: the scene base constructor (func_8C01B23C) only tests the variant against 0 (twice: != 0, == 0), so 2 behaves as 1
+6422714748	equivalent	the title variant 2 instead of 1: func_8C01B23C only tests it against 0
+41899693cd	equivalent	the argument count only matters for HLE callees; mode 7's constructor is guest code
+188d437fc7	equivalent	the argument count only matters for HLE callees; the demo's constructor is guest code
+e986618c38	equivalent	syMalloc allocates in 32-byte units: 0xA9 bytes take the same 192-byte block as 0xA8
+6564e2846c	equivalent	syMalloc allocates in 32-byte units: 0xA7 bytes take the same 192-byte block as 0xA8
+895c81a99d	unreachable	the controller-A half of the soft reset: differs only when X+Y are held and Start pressed on controller A without A+B; no route does the combo on controller A (the reset route uses B)
+2bd9e29258	unreachable	evaluated only when A and B are held together on controller A: no route does that
+f95edaa06d	unreachable	evaluated only when A and B are held together on controller A: no route does that
+1efa1913f3	equivalent	Game's Pad is port 0 (game_reset): checking port 0 again in the loop repeats the first test, which was false
+a10c2bda31	unreachable	a fifth "port" reads past the arrays (held[4] = last[0], pressed[4] = released[0]): differs only when controller A held A+B+X+Y last frame and released Start now
+08ae919371	equivalent	the result is only tested for non-zero: 2 is true as 1 is
+4b1fa5fd26	equivalent	next_mode is never 13 (MODE_NONE is only ever stored into `mode`): < and <= agree for 0-12
+06672cc709	equivalent	after a soft reset `mode` is overwritten in the same update (mode != next_mode = TITLE whenever the reset does not leave the game), so the MODE_NONE store is not seen
+7c7c483ea4	unreachable	MODE_QUIT = 11 would make mode 11 quit and mode 10 start nothing: no route starts mode 10 or 11
+f0892731f8	unreachable	MODE_QUIT = 9 would make mode 9 quit: no route starts mode 9 or 10
+8f69b12c5d	equivalent	a 14th table entry (0) and next_mode < 14: next_mode is never 13, so no start routine changes
+cece97efd8	unreachable	MODE_COUNT = 12 drops mode 12 from the table and the range check: no route starts mode 12
+3b0ded5eaf	equivalent	observed: the word holds 1 at the end of frame 0 either way (later start-up code stores it too; not traced which) and the digest of frame 0 and every later one agrees
+09471844a3	unreachable	the TV display mode (cable type other than 1): the HLE reports cable type 1, so 0x38 is never used
+8bdbc28850	unreachable	the TV display mode: the HLE reports cable type 1
+ce14ad4674	unreachable	the TV display mode: the HLE reports cable type 1
+14fca45d1d	equivalent	observed: the frame-rate word holds 60.0 at the end of frame 0 either way (later start-up code stores it too; not traced which)
+5da3f8833d	equivalent	in this runtime: display mode, frame-buffer mode and frame-count mode are all 1 (cable type 1): the swap passes the same values

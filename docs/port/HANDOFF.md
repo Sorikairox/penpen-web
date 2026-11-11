@@ -2,6 +2,47 @@
 
 Newest session first. Read `docs/port/PLAN.md` (disc facts, survey, approach, phases, rules) before working.
 
+## S12 — 2026-11-11: mutation testing as a gate, five more routes, the file loader / container fix-ups / title destructor
+
+The user's instruction: "Don't forget mutation testing". All guest code ran in `--network none --read-only --cap-drop
+ALL --security-opt no-new-privileges` containers; `git log --all -- port/gen` stays empty; Ghidra pseudo-C and
+disassembly were read in the terminal only. Design and numbers: `docs/port/DECOMP.md` 5.1, 10, 11.
+
+1. **Mutation tooling** (DECOMP.md 10): `tools/mutate.py` (mutant generation from `src/`: rel / arith / logic /
+   const / negate / delete / return / args / argreg operators, stable ids; the report), `tools/mut_worker.py` (in the
+   sandbox: pre-linked base, references from the pure build, the unmutated control through every gate, gcov coverage
+   per route, then each mutant compiled, linked and run on the routes that execute its line, cheapest first, killed at
+   the first difftest FAIL / frame line / audio line / early stop / crash / stall), `tools/s3.sh mutate`,
+   `tools/s11.sh mutate | report`. Outputs `docs/progress/mutation.tsv` (per function), `mutation_survivors.tsv`,
+   `mutation_sessions.tsv`; hand classification in `mutation_notes.tsv` (by id) and `mutation_reach.tsv`.
+   **Stopped at the user's request** (switch to Mull) after 1 033 of 2 015 S12 mutants: too slow (a survivor runs all
+   seven routes); its partial results are history, not a score (DECOMP.md 10).
+2. **Routes** (`tools/routes.tsv`, used by `test`, `compare` and `mutate`): explore (stick, pause menu, PenPen House,
+   DRESS UP, RESULTS, TIME TRIAL), vs2 (two controllers, split mode 2), vs4 (four, split mode 3), demo (Start in the
+   attract demo), reset (soft reset from controller B in a race). The pad script takes a port (`F@P:...`, hle_io.c).
+3. **Fixes found on the way**: `tools/s3.sh` passed run arguments unquoted into `sh -c` (a pad script with `|` became
+   a pipe; S5-style screenshots of such scripts were wrong): quoted now; a failed build printed nothing: it says
+   `build FAILED` now; `filt` is `grep -a --line-buffered`. **The difftest did not replay HLE writes into guest RAM**
+   (file data read by gdFsRead): a loader's samples compared stale bytes. The HLE now reports them
+   (`hwt_hle_wrote`) and both sandbox sides get them (DECOMP.md 5.1). A mutation runner that reads `src/` live gave
+   wrong mutants while `src/` was being edited: it snapshots `src/` at its start now. Time-outs under load were false
+   kills (3 of the S11 baseline's re-checked "timeouts" survive): a run is killed only after 120 s without output.
+4. **Hand-written** (DECOMP.md 11): `src/core/file.{h,c}` (file_init, file_load, file_load_fixed, file_free + thunk,
+   cd_pause), `src/core/fixup.c` (reloc, container_load and the fix-ups of model trees, models, mesh sets, motions,
+   texture lists, chunk trees, motion / chunk-action lists), `src/game/title.c` (the title scene's constructor,
+   destructor body, virtual destroy). **69 of 4 010 game functions (1.72 %), 7 438 of 301 130 bytes (2.47 %)** (+22).
+
+Tests (before the Mull switch): difftest over 7 routes, 5 623 samples: **68 of 69 pass, 0 FAIL** (main: whole-run
+only); pure vs hand **identical frame lines on all 7 routes, native and wasm; native = wasm**; sh4 **257 / 0**; mixer
+**26 / 0**; harness **5 736 / 0 / 207**; `GEN=genhand tools/rtw.sh build` + check **OK**; screenshots from the hand
+build (title f500, house f900, race f3000, 4-player split f2600 of vs4) look right; **browser e2e passed** on the hand
+build (title, menu, house, select, course, race, audio, rumble, VMU save after reload; 24.6 game frames/s in the race
+while 8 mutation jobs loaded the machine).
+
+<<MULL>>
+
+Next: see DECOMP.md 12.
+
 ## S11 — 2026-11-11: hand-written C: method, tooling, first regions (game core, sound front end)
 
 Started before S9/S10 at the user's request ("hand written c with human readable code"); PLAN numbers this decomp

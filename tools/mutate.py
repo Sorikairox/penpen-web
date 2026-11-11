@@ -524,7 +524,8 @@ def read_notes(repo):
 
 
 def read_reach(repo):
-    """docs/progress/mutation_reach.tsv: owner function, line substring ('*' = any), the input that would reach it"""
+    """docs/progress/mutation_reach.tsv: owner function, line substring ('*' = any, 'L42' = line 42), the input that would
+    reach it"""
     rules = []
     p = os.path.join(repo, 'docs/progress/mutation_reach.tsv')
     if os.path.exists(p):
@@ -575,7 +576,8 @@ def main_report(argv):
             key = 'unreached'
             if not reason:
                 for owner, sub, why in reach:
-                    if owner == m['owner'] and (sub == '*' or sub in m['orig']):
+                    if owner == m['owner'] and (sub == '*' or sub in m['orig'] or
+                                                (re.fullmatch(r'L\d+', sub) and int(sub[1:]) == m['line'])):
                         reason = why
                         break
             if not reason:
