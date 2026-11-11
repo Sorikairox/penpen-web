@@ -304,7 +304,7 @@ sources or libraries.
 | S8 Fixes | title logo, shadows, lights/specular/shape blending/basic models/2D, MIDI sequences, DSP reverb, RTC, wasm trim | done 2026-11-11: node transforms fixed (the title logo shows), shadow bit per polygon, MIDI + reverb, RTC from the browser clock (fixed in tests), wasm 47 → 24.6 MB; HANDOFF S8 |
 | S9 First race | a full race, 1 player, then 4-player split screen | race finishes |
 | S10 retrowser `dreamcast` | the host work of section 6 (retrowser repo, separate approval), local host e2e | boots from a local retrowser host |
-| S11… Decomp | hand-written C replaces recompiled code region by region, each function differential-tested | shipped build has no recompiled code |
+| S11… Decomp | hand-written C replaces recompiled code region by region, each function differential-tested | shipped build has no recompiled code. **S11 started 2026-11-11, before S9/S10, at the user's request**: method + tooling (`docs/port/DECOMP.md`), the game core and the sound front end hand-written in `src/`; progress in `docs/progress/decomp.tsv` |
 | later | Sofdec intro (MPEG-1 + ADX decoder, or skip intro), VMU LCD, options | |
 
 ## 9. Rules (every session)
@@ -347,6 +347,9 @@ sources or libraries.
   host and headless Chromium in `--network none` containers of `penpen-rtw:1`, with the disc archive from
   `penpen-raw`; e2e PNGs stay in `/build/e2e` (`tools/rtw.sh look`). Never run it in the host's browser: the user
   decides when to try it (RTW.md 6).
+- **Hand-written C** (S11, `docs/port/DECOMP.md`): `src/` is committed; it is written from behaviour (Ghidra
+  pseudo-C and disassembly read in the terminal), never pasted translation; every export must pass the in-run
+  difftest (`tools/s11.sh test`) and the pure/hand whole-run comparison (`tools/s11.sh compare`).
 - **Disassembly** (S8): `tools/ghidra.sh asm ADDR:LEN` prints instructions in the terminal; same status as
   `decomp` (disc-derived: never committed, never pasted into docs).
 - **Audio** (S7): WAV captures (`tools/s7.sh capture`) are decoded disc audio: they stay in

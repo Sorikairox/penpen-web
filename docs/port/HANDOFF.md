@@ -2,6 +2,48 @@
 
 Newest session first. Read `docs/port/PLAN.md` (disc facts, survey, approach, phases, rules) before working.
 
+## S11 — 2026-11-11: hand-written C: method, tooling, first regions (game core, sound front end)
+
+Started before S9/S10 at the user's request ("hand written c with human readable code"); PLAN numbers this decomp
+phase S11. Design and numbers: `docs/port/DECOMP.md`. All guest code ran in `--network none --read-only --cap-drop
+ALL` containers; `git log --all -- port/gen` stays empty; Ghidra pseudo-C and disassembly were read in the terminal only.
+
+1. **Override by link-time selection**: `HW_EXPORT(<addr>, ...)` in `src/` defines `f_<addr>`; `recomp.py --hand src/`
+   leaves that function's body out of the translation (table.c flags it `hand`); `build.sh` compiles `src/` for such a
+   translation. Two translations side by side: `/build/gen` (pure reference) and `/build/genhand` (`tools/s11.sh gen`).
+2. **Hand-written C on the guest's terms** (`src/include/hw.h`, `port/runtime/hw.c`): structs with the original
+   layout (offset/size checks), `gaddr` fields, `hw_call` into guest code (SH-4 convention, checked return), stack
+   arguments, guest-stack locals for out-parameters. **Resumable** functions for the yielding chain (main, game_frame,
+   task updates, game_update, mode starts): `HW_RESUMABLE/HW_YIELDING/HW_RESUME_AT` keep C locals in the runtime's
+   unwind record; a non-resumable function that yields stops the run (never happened). `rt yield-chain` lists the
+   chain after a run.
+3. **In-run differential test** (`--hwtest`, `port/runtime/difftest.c`, `tools/s11.sh test`): sampled calls run live
+   with their HLE results, HLE argument use, HLE stack out-parameters and hardware reads recorded; then the original
+   (interpreter) and the hand-written code run from the same snapshot with those replayed; registers, HLE calls,
+   hardware writes and all RAM but the dead stack compared; samples follow yielding calls across frames; functions
+   reached only from hand-written callers count as tested inside passing samples. Found on the way: MACH/MACL are
+   caller-saved in this compiler; HLE calls made by translated code carry garbage in unused argument registers (hence
+   the HLE `R(i)` marks); HLE out-parameters on the stack (gdFsGetFileSize, syCfgGetSoundMode).
+4. **Whole-run comparison** (`tools/s11.sh compare`): frame lines with a RAM digest every frame, `--digest-nostack 1`:
+   the stack area is left out and stack pointers count as one token (an SDK variable holds a pointer to a translated
+   caller's stack struct at frames 427-428: 0x8C00F31C pure vs 0x8C00F390 hand, same data).
+5. **Region**: `src/core/{task,pad,view}`, `src/game/{main,game,sound}`: **47 game functions, 4 728 bytes (1.17 % /
+   1.57 % of the game region)** — main loop and start-up, V-sync / end-of-render callbacks, GD-ROM drive watch, the
+   task tree (Task, TaskVtbl, TaskTree: the C++ object system), Game (mode state machine, soft reset, demo time-out,
+   the start routines of modes 0, 2, 3, 7, 8), pad reading, views/split modes, the sound front end (one-shot/MIDI
+   request ports, CDDA music fades, start-up, banks, sound sets). Functions the runs never reach stay translated.
+
+Tests: difftest boot 8 000 frames 991 samples, route 6 000 frames 1 046 samples: **every export passes in at least one
+run, 0 failures** (main: never returns, covered by the whole-run comparison; the title's mode start had 1-3 samples with
+an HLE replay mismatch that still passed); mutants: 12 deliberate bugs, the difftest flags 4, the whole-run digest 1
+more, 7 lie on paths the runs never take (stick, pause/deactivation, demo Start, split screen). **Pure vs hand: route
+6 000 and boot 8 000 frame lines identical** natively and in wasm; native = wasm (hand build); sh4 **257 / 0**; mixer
+**26 / 0**; harness (pure translation) **5 943: 5 736 / 0 / 207**; `GEN=genhand tools/rtw.sh build` + `rtw.mjs check --disc` **OK** (the module in `/build/rtw` is now the hand build); screenshots from the hand build (title f500, PenPen House f900, race f3000 of the route) look right. Not run this session: the browser e2e.
+
+Next: the scenes the route shows (title 0x8C01B77A, menus, course select), the file loader (func_8C01311C) and the
+CDDA layer (func_8C012D38/5C/88); RZ/DN float helpers before any float code; routes that exercise more paths (pause,
+stick, split screen, other modes). S9 (first race) and S10 (retrowser dreamcast) remain as planned.
+
 ## S8 — 2026-11-11: fixes: title logo, shadows, lights, basic models, MIDI, DSP reverb, RTC, wasm trim
 
 All guest code ran in `--network none --read-only --cap-drop ALL` containers; PNGs, dumps, WAVs and RAM dumps
