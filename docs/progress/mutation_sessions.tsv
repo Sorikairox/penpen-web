@@ -1,3 +1,5 @@
 # session	mutants	stillborn	killed	equivalent	unreached	survived	score	reach_score	gates	note
 S11	1302	8	823	0	236	235	63.6	77.8	audio 26 crash 37 difftest 461 frame 193 stop 62 timeout 44	S12's first pipeline (tools/mut_worker.py, rebuild per mutant) on S11's src/ with S11's two routes (boot, route); 44 "timeout" kills were made under heavy load with a 3x time-out: 15 re-checked (11 real, 1 stop, 3 survive), 29 not re-checked: the score is an upper bound
 S12-partial	2015	-	-	-	-	-	-	-	-	PARTIAL, NOT A SCORE: the rebuild-per-mutant pipeline was stopped at the user's request (switch to Mull); 1033 of 2015 mutants run on the 7 routes (+774 S11 kills carried over by id); see DECOMP.md 10
+S12-mull1	773	0	645	0	50	78	83.4	89.2	crash 7 difftest 419 frame 152 stop 30 timeout 37	Mull 0.37.0 (LLVM 18), first run: 69 functions, the 7 routes, no notes yet, 6 workers, 1702 s
+S12	776	0	672	33	71	0	90.4	100.0	crash 7 difftest 425 frame 157 stop 44 timeout 39	Mull 0.37.0 (LLVM 18), final: 70 functions, 8 routes (inputs added, controller-A reset in route), 6 workers, 1577 s

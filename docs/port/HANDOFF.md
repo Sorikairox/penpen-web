@@ -2,7 +2,7 @@
 
 Newest session first. Read `docs/port/PLAN.md` (disc facts, survey, approach, phases, rules) before working.
 
-## S12 — 2026-11-11: mutation testing as a gate, five more routes, the file loader / container fix-ups / title destructor
+## S12 — 2026-11-11/12: mutation testing with Mull, six more routes, the file loader / container fix-ups / title destructor
 
 The user's instruction: "Don't forget mutation testing". All guest code ran in `--network none --read-only --cap-drop
 ALL --security-opt no-new-privileges` containers; `git log --all -- port/gen` stays empty; Ghidra pseudo-C and
@@ -39,7 +39,22 @@ build (title f500, house f900, race f3000, 4-player split f2600 of vs4) look rig
 build (title, menu, house, select, course, race, audio, rumble, VMU save after reload; 24.6 game frames/s in the race
 while 8 mutation jobs loaded the machine).
 
-<<MULL>>
+**Mull** (after the user stopped the first pipeline; this part of S12 ran with at most one background task and one
+container of 6 workers): `docker/mull` (image `penpen-mull:1`), `tools/mull_run.py` + `tools/mull_gate.py`,
+`tools/s3.sh mull`, `tools/s11.sh mutate | report`, `tools/mutate.py report-mull` (DECOMP.md 10).
+- **One build of all mutants: 3 s**; setup (references + coverage) 23 s; the control (all 8 routes, unloaded) 42 s
+  and gives the time-outs (3x + 30 s, stall 20 s); per mutant: killed 3.7 s mean (median 1 s), survivor 80 s, uncovered
+  0 s; **whole run 26 min** (1 577 s) for 776 mutants, against hours for half of the first pipeline's 2 015. A pilot of
+  14 mutants (`--sample 40`, 2 min) first; then a targeted run (`--only`, pad.c + game.c, 5.5 min) for new routes.
+- **Score: 776 mutants, 672 killed, 33 equivalent, 71 unreached, 0 survived: 90.4 % (reach score 100 %)**; first Mull
+  run 83.4 % (78 survived). Equivalent and unreached reasons per Mull id in `docs/progress/mutation_notes.tsv`.
+- **New input** (hle_io.c pad script: `HL/HR/HU/HD` stick at the threshold, `NOAX/ONLYX/ONLYY`, `OUT`): route
+  **inputs** (1 000 frames) and, in **route**, a pause then a soft reset from controller A at 5900. 8 routes now.
+- **cd_play** (func_8C012D38) hand-written: **70 of 4 010 game functions (1.75 %), 7 474 of 301 130 bytes (2.48 %)**.
+
+Tests (end of S12): difftest over 8 routes, 5 792 samples: **69 of 70 pass, 0 FAIL** (main: whole-run only); pure vs
+hand **identical frame lines on all 8 routes, native and wasm; native = wasm**; sh4 **257 / 0**; mixer **26 / 0**; harness **5 736 / 0 / 207**; `GEN=genhand tools/rtw.sh build` + check **OK**. Not run after the Mull switch: the browser e2e and screenshots (the
+runtime change is the test-only pad script tokens).
 
 Next: see DECOMP.md 12.
 

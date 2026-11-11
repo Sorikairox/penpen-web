@@ -10,13 +10,13 @@ only, PLAN 9), with types, structs, loops and comments.
 
 | | S11 | S12 |
 |---|---|---|
-| Game functions replaced (`docs/progress/decomp_functions.tsv`) | 47 (section 9) | 69 (+22) (section 11) |
-| Region | the game's core: main loop, start-up, callbacks, drive watch, task tree, Game modes, pads, views; the sound front end | + the GD-ROM file loader, the data-container fix-ups (Ninja models, motions, texture lists), CDDA pause, the title scene's constructor and destructor |
-| Routes (`tools/routes.tsv`) | boot 8 000, route 6 000 | + explore 7 000, vs2 4 000, vs4 4 000, demo 3 400, reset 3 600 (section 5.1) |
-| Differential test (`tools/s11.sh test`) | every export but main passes, 0 fail | 7 routes, 5 623 samples: **68 of 69 pass, 0 FAIL** (main: never returns, whole-run comparison only) |
-| Whole-run comparison (`tools/s11.sh compare`) | route + boot: every frame line identical, native and wasm | all 7 routes: every frame line identical (RAM digest every frame), native and wasm; native = wasm |
-| Mutation score (section 10) | 63.6 % (upper bound: see section 10) | pending: the Mull run (section 10) |
-| Functions / bytes | 47 of 4 010 (1.17 %), 4 728 of 301 130 bytes (1.57 %) | **69 of 4 010 (1.72 %), 7 438 of 301 130 bytes (2.47 %)** |
+| Game functions replaced (`docs/progress/decomp_functions.tsv`) | 47 (section 9) | 70 (+23) (section 11) |
+| Region | the game's core: main loop, start-up, callbacks, drive watch, task tree, Game modes, pads, views; the sound front end | + the GD-ROM file loader, the data-container fix-ups (Ninja models, motions, texture lists), CDDA pause and play, the title scene's constructor and destructor |
+| Routes (`tools/routes.tsv`) | boot 8 000, route 6 000 | + explore 7 000, vs2 4 000, vs4 4 000, demo 3 400, reset 3 600 (section 5.1), inputs 1 000 (section 10) |
+| Differential test (`tools/s11.sh test`) | every export but main passes, 0 fail | 8 routes, 5 792 samples: **69 of 70 pass, 0 FAIL** (main: never returns, whole-run comparison only) |
+| Whole-run comparison (`tools/s11.sh compare`) | route + boot: every frame line identical, native and wasm | all 8 routes: every frame line identical (RAM digest every frame), native and wasm; native = wasm |
+| Mutation score (section 10) | 63.6 % (upper bound: see section 10) | Mull: **90.4 %** (776 mutants: 672 killed, 33 equivalent, 71 unreached, 0 survived; reach score 100 %) |
+| Functions / bytes | 47 of 4 010 (1.17 %), 4 728 of 301 130 bytes (1.57 %) | **70 of 4 010 (1.75 %), 7 474 of 301 130 bytes (2.48 %)** |
 
 ## 2. How a hand-written function replaces the translated one (link-time selection)
 
@@ -217,44 +217,74 @@ file, plain/resumable/main).
   volume follows the drive: up while it reports PLAY); start-up (driver from the disc, 8 + 8 ports), bank download,
   sound-set switch (stereo/mono from the console's settings).
 
-## 10. Mutation testing (S12: `tools/mutate.py`, `tools/mut_worker.py`, `tools/s11.sh mutate`)
+## 10. Mutation testing (S12: Mull, `tools/mull_run.py`, `tools/mull_gate.py`, `tools/s11.sh mutate`)
 
 The user's rule for S12: mutation testing is a gate, not an experiment. A **mutant** is one small change at one place
 of `src/`; it is **killed** when a gate sees a difference. S11 had planted 12 mutants by hand (4 flagged by the
 difftest, 1 by the digest, 7 on paths no run took); S12 makes it systematic and re-runnable.
 
-**Generation** (`tools/mutate.py gen`, host side: it reads only `src/`). A small C lexer finds function bodies,
-`HW_EXPORT` adapters, macros and enumerators, and applies, one site at a time: `rel` (`<`→`<=`, `==`→`!=`, ...),
-`arith` (`+`↔`-`, `&`↔`|`, `<<`↔`>>`, `++`↔`--`, compound assignments, unary `~`/`-` removed), `logic` (`&&`↔`||`,
-`!` removed), `const` (n → n+1, n-1, 0 / 1), `negate` (the condition of if/while/for), `delete` (a one-line
-statement, `break`, `continue`, `return;`; inside `HW_YIELDING` the call becomes `(void)0`), `return` (`return E` →
-0 / 1, `RET(E)` → `RET(0)`), `args` (two neighbouring call arguments swapped; not a `CALLn` target), `argreg` (`ARGn`
-→ `ARGn±1` in the adapters: the register wiring). Not mutated: `hw.h` (the runtime interface), guest addresses
-(≥ 0x80000000), the `HW_EXPORT` address and the resumable macros' site numbers (a change only breaks the build), the
-zero padding of `hw_call`'s unused argument registers, and macros or enumerators that no function uses (they cannot
-change the program). Ids are a hash of (file, function, operator, original line, mutated line, occurrence): stable
-across sessions while the line does not change, so notes stay attached.
+**Mull** (S12, at the user's request; [mull-project/mull](https://github.com/mull-project/mull) 0.37.0, LLVM 18.1.3).
+Mull is a clang pass plugin: every mutant is compiled into **one** build, each guarded by a check of an environment
+variable named after it; `mull-runner` runs the test program once per mutant with that variable set. No rebuild per
+mutant. Mull and its matching clang live only in the image `penpen-mull:1` (`docker/mull/Dockerfile`: Ubuntu 24.04,
+clang-18 from Ubuntu, the two Mull `.deb` files from the GitHub release, SHA-256 printed at build; the network is used
+only by `docker build`); runs use the usual sandbox (`tools/s3.sh mull`: `--network none --read-only --cap-drop ALL
+--security-opt no-new-privileges`).
 
-**Running** (`tools/mut_worker.py`, only inside the sandbox of `tools/s3.sh mutate`: it runs the disc's code). Once:
-the hand build's objects without `src/` pre-linked; `src/` snapshotted (later edits do not touch a running job);
-reference frame and audio lines from the pure build for every route; the **control** (the unmutated hand build
-through every gate: it must pass, else nothing is reported); **coverage** (`src/` built with `--coverage`, every
-route run once with the difftest on: the lines each route executes). Then per mutant, 8 in parallel: compile (a
-failure = *stillborn*, dropped), link, and run the routes whose coverage includes the mutated line (all routes for a
-line that is not executable code: a macro, an enumerator), cheapest first, each run killed at the first difference:
-a difftest FAIL (`difftest`), a frame line (`frame`: the SDK call counts, files, heap, pads, and the RAM digest every
-16 frames), an audio line (`audio`: the mixer's digest), the run ending before its frame limit (`stop`, `crash`),
-or no output for 120 s / 10x the control's time (`timeout`). A mutant on a line no route runs is *uncovered* without
-running. Every line of output is our vocabulary (ids, verdicts, gate names, addresses, frame numbers).
+- **Build** (`tools/mull_run.py`): `src/` (only the hand-written C) compiled with `clang-18 -fpass-plugin=
+  /usr/lib/mull-ir-frontend-18 -g -grecord-command-line` and the build's flags (-O2 ...); `mull.yml` limits mutation
+  to `src/` and excludes `src/include/hw.h` (the runtime interface); linked with gcc against the hand build's other
+  objects (translation and runtime, unmutated, compiled by gcc in the emsdk image). The native build is used: native
+  and wasm are proven identical (section 6).
+- **Gates stay ours** (`tools/mull_gate.py`, Mull's `--test-program`): it reads which mutant Mull switched on, takes
+  the routes whose gcov coverage (computed once, `src/` built with `--coverage`, every route with the difftest on)
+  includes the mutant's line, cheapest first, and runs each with the difftest (`--hwtest 160`), the frame lines with
+  the RAM digest every 16 frames and the audio lines compared to the pure build's, the run's end, and stall
+  detection (no output for 60 s); exit 1 at the first failure = killed. A mutant on a line no route runs exits 0 at
+  once: Mull reports it survived, the report classes it **unreached** from the coverage. Mull's own baseline run (no
+  mutant) is our control: every route must pass, else Mull stops.
+- **Operators**: Mull's `cxx_all` group as it applies to this C: `cxx_all` plus `experimental` (`negate_mutator`, `cxx_remove_negation`): arithmetic and compound assignments, comparisons and boundaries, bitwise operators, ++/--, void calls removed, scalar calls replaced by 0 / 42, constants in assignments and initialisers changed (a constant's lowest bit flipped, anything else 42), conditions negated. 776 mutants on the 70 hand-written functions (Mull's junk detection drops those that would not compile); the report spells each operator out (`tools/mutate.py` MULL_OPS).
+- **Report** (`tools/mutate.py report-mull`, `tools/s11.sh report`): each Mull mutant (id
+  `mutator:file:line:col:line:col`) is mapped to the hand-written function whose body or `HW_EXPORT` adapter holds
+  the line; the classes and files are the same as before: `docs/progress/mutation.tsv` (per function),
+  `mutation_survivors.tsv`, `mutation_sessions.tsv`, notes by Mull id in `mutation_notes.tsv`, input-needed rules in
+  `mutation_reach.tsv`.
 
-**Classification** (`tools/mutate.py report`, `tools/s11.sh report`). Not killed = one of: **equivalent** (it cannot
-change what the program does, or not in this runtime: the reason is written down in
-`docs/progress/mutation_notes.tsv`, per id), **unreached** (coverage says no route runs the line, or the note says
-which input would reach the changed behaviour: `mutation_notes.tsv` / `mutation_reach.tsv`), **survived** (a test
-gap: a route that reaches it must be added, or the mutant explained). Mutants are never weakened to raise the score.
-**score** = killed / (mutants − stillborn − equivalent); **reach score** = killed / (the same − unreached).
-Outputs: `docs/progress/mutation.tsv` (per function), `mutation_survivors.tsv` (every mutant not killed, class and
-reason), `mutation_sessions.tsv` (one row per session).
+**Classification.** Not killed = one of: **equivalent** (it cannot change what the program does, or not in this
+runtime: the reason is written down, per id), **unreached** (coverage says no route runs the line, or the note says
+which input would reach the changed behaviour), **survived** (a test gap). Mutants are never weakened to raise the
+score. **score** = killed / (mutants − equivalent); **reach score** = killed / (the same − unreached).
+
+**S12 results (Mull, final run: 70 functions, 8 routes).** 776 mutants: **672 killed** (difftest 425, frame line
+157, early stop 44, stall 39, crash 7), **33 equivalent**, **71 unreached**, **0 survived**: **score 90.4 %**, reach
+score 100 % (every mutant a route reaches is killed or explained). Per file (score / reach score): file.c 97.8 / 100,
+fixup.c 84.5 / 100 (32 unreached: container types and data shapes no route loads), pad.c 98.4 / 100, task.c
+90.7 / 100, view.c 88.2 / 100, game.c 91.3 / 100, main.c 89.0 / 100, sound.c 92.1 / 100, title.c 100 / 100.
+The first Mull run (69 functions, the 7 S11/S12 routes) gave 773 mutants, 645 killed, 50 unreached, 78 survived:
+83.4 %. The 78 were then worked through: **19 killed by new input** (route `inputs` and the controller-A soft reset in
+`route`, below; 5 of the 50 unreached lines are now run and killed too, and cd_play's 3 mutants are new), **33
+equivalent** with the reason per id in `mutation_notes.tsv` (offsets of 0, dead initial values,
+empty hooks, values overwritten before use, the original's zero tables), the other 26 **unreached with the input that
+would reach them** (mesh sets with attribute pointers, models with two mesh sets, 1- or 5-element motions, a type-20
+container entry, two sound requests on one port in one frame, music track 0, MIDI sequence 0, a reset while the tree
+is paused). 45 of the unreached are lines no route runs (coverage), each with its reason from `mutation_reach.tsv`.
+
+**Routes added for survivors** (`tools/routes.tsv`, pad script tokens in `hle_io.c`): `HL/HR/HU/HD` push the stick
+exactly to 64 (the d-pad threshold: not a direction), `NOAX` / `ONLYX` / `ONLYY` make a controller without both analog
+axes, `OUT` reads a port as empty (pulled out). Route **inputs** (1 000 frames, 1.1 s): the four thresholds on A,
+partial soft-reset combos (one of A/B/X/Y/Start missing) on B then A, B pulled out while holding A+B, B without axes,
+with only X, with only Y. **route** now pauses the race at 5850 and soft-resets from controller A at 5900.
+
+**Timings** (MacBook, 10 cores, one container, 6 Mull workers; the control alone, unloaded: boot 8.3 s, explore 7.5,
+route 7.2, vs4 6.0, vs2 5.0, reset 4.1, demo 3.7, inputs 1.1 = 42 s): **build of all mutants 3 s** (one clang
+compile of `src/` with the plugin, one link), setup 23 s (pure references + gcov coverage of 8 routes), runner 1 549 s
+(**26 min**): killed mutants 3.7 s mean (median 1 s: most die in the first frames of the cheapest covering route),
+survivors 80 s mean (every covering route to its end: the cost of a survivor is the whole set of routes, ~2x the
+unloaded control under 6 workers), unreached 0 s. Total 1 577 s. The first pipeline (rebuild + link per mutant, 8
+jobs) had needed hours for 1 033 of 2 015 mutants. Pilot first (`--sample 40`: 14 mutants, 2 min) to check the gates
+and the timing. Time-outs: per route 3x the control + 30 s, a stall after 20 s without a frame line; every one of
+the 39 stall kills is a loop a mutant made endless (request retry loops, loop counters run backwards, the title's
+drive-status wait), not re-run one by one.
 
 **First pipeline (rebuild per mutant), results kept as history.** S11's code with S11's two routes (the S11
 row of `mutation_sessions.tsv`): 1 302 mutants, 823 killed, 236 unreached, 235 survived, 8 stillborn (63.6 %; an
@@ -274,8 +304,10 @@ pipeline's ids; they are the starting point for the Mull run's classification.
   every request), `file_load` (a whole file into a new `syMalloc` block of whole sectors; the SDK writes the size and
   the sector count into the caller's frame: those two words live on the guest stack, where the original keeps them),
   `file_load_fixed` (into the fixed area at 0x8CE40000: the sound driver), `file_free` (and its thunk), `cd_pause`.
-  Every SDK request is repeated until the drive takes it. Still translated (no route reaches them, so the difftest
-  could not test them): the directory change, the error callback, CDDA play / stop / release (the music's track
+  Every SDK request is repeated until the drive takes it. `cd_play` (func_8C012D38, S12 late: gdFsDaPlay
+  until the drive takes it; tested inside music_update's samples on the route and by its 3 Mull mutants). Still
+  translated (no route reaches them, so the difftest could not test them): the directory change, the error callback,
+  CDDA stop / release (the music's track
   change happens on frames the game_update samples never fell on). Note: S11's `sound.c` called func_8C012D5C
   `cdda_stop`; it is gdFsDaPause (`cd_pause`).
 - `src/core/fixup.c` — **data containers** (`container_load`, was func_8C012EBE): a file that starts with 16-byte
@@ -304,9 +336,10 @@ pipeline's ids; they are the starting point for the Mull run's classification.
    unplugged mid-run and a device without analog axes (the pad reader's special cases: needs hle_io options), the
    drive lid / no disc (an HLE switch), a run long enough for a CDDA track to end, containers with the types no route
    loads (other modes: 1, 4, 9, 11, 12 are never visited), more than one V-blank per frame (a slow-frame option).
-3. **Mutation run time**: about (see section 10) for the mutants on 10 cores; most of it is survivors running all
-   seven routes. Notes (equivalent / unreached) could skip known mutants in later runs; a shorter route subset for
-   the cheap first pass.
+3. **Mutation run time** (section 10): 26 min for 776 mutants with 6 workers; 75 % of it is the 59 mutants that
+   are not killed running every covering route to the end. Mutants already noted equivalent could be skipped in the
+   gate (exit 0 without running, still reported from the note) to save ~45 min of CPU; any new function should go
+   through `tools/s3.sh mull --only <its file>` first (5 min for pad.c + game.c).
 4. The race scene and the menus (house, course map) once floats are possible; the remaining translated pieces of the
    loader (directory change, error callback, CDDA play/stop/release) when a route reaches them.
 

@@ -19,6 +19,7 @@
 8c011f4c	4	view_reset	src/core/view.c	plain
 8c012cf4	16	reloc	src/core/fixup.c	plain
 8c012d04	20	file_init	src/core/file.c	plain
+8c012d38	36	cd_play	src/core/file.c	plain
 8c012d5c	22	cd_pause	src/core/file.c	plain
 8c012dc4	124	drive_watch	src/game/main.c	plain
 8c012e40	108	file_load	src/core/file.c	plain

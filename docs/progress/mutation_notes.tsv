@@ -207,3 +207,63 @@ cece97efd8	unreachable	MODE_COUNT = 12 drops mode 12 from the table and the rang
 ce14ad4674	unreachable	the TV display mode: the HLE reports cable type 1
 14fca45d1d	equivalent	observed: the frame-rate word holds 60.0 at the end of frame 0 either way (later start-up code stores it too; not traced which)
 5da3f8833d	equivalent	in this runtime: display mode, frame-buffer mode and frame-count mode are all 1 (cable type 1): the swap passes the same values
+# ---- S12, Mull ids (mutator:file:line:col:line:col; stable while the line and its columns do not change) ----
+cxx_add_to_sub:src/core/file.c:51:33:51:34	equivalent	the file size the SDK is asked for lands 12 bytes below the 16-byte frame instead of at +0xC: free stack below the stack pointer; nothing reads the size (the original asks for it and never uses it)
+cxx_add_to_sub:src/core/fixup.c:34:13:34:14	equivalent	offsetof(NjModel, points) is 0: model - 0 = model + 0
+cxx_add_to_sub:src/core/fixup.c:65:28:65:29	equivalent	offsetof(NjMotion, mdata) is 0: motion - 0 = motion + 0
+cxx_add_to_sub:src/core/fixup.c:99:15:99:16	equivalent	offsetof(NjTexList, textures) is 0
+cxx_add_to_sub:src/core/fixup.c:101:66:101:67	equivalent	offsetof(NjTexName, filename) is 0
+cxx_add_to_sub:src/core/fixup.c:109:13:109:14	equivalent	offsetof(NjCnkModel, vlist) is 0
+cxx_init_const:src/core/fixup.c:67:16:67:17	equivalent	the original's pointer-key table at 0x8C08AD54 holds five zeros (1ST_READ.BIN; nothing writes it) and pointer_keys starts all 0: copying from 1 (or not at all) leaves the same zeros
+cxx_lt_to_ge:src/core/fixup.c:67:21:67:22	equivalent	the copy loop no longer runs: the table at 0x8C08AD54 holds zeros and pointer_keys starts all 0
+cxx_lt_to_le:src/core/fixup.c:67:21:67:22	equivalent	copies a sixth word (0x8C08AD68, also 0 on the disc) into pointer_keys[5], which is read only for a sixth element (such motions return before)
+cxx_le_to_lt:src/core/fixup.c:70:25:70:27	equivalent	bit 12 (0x1000) is none of the element values (1, 2, 4, 8, 0x10, 0x20): scanning it or not counts the same
+cxx_lt_to_le:src/game/main.c:30:59:30:60	equivalent	the constructor table runs 0x8C23D900..0x8C23D90C in steps of 8 (entries D900, D908; next D910): its length, 12, is not a multiple of 8, so entry == end never happens
+cxx_remove_void_call:src/game/main.c:131:3:131:16	equivalent	view_finish only calls view_after_draw, which is empty in this build (func_8C011F48)
+cxx_remove_void_call:src/core/view.c:33:26:33:69	equivalent	view_after_draw is empty in this build (func_8C011F48)
+cxx_remove_void_call:src/game/main.c:148:5:148:23	equivalent	view_frame_begin is empty in this build (func_8C010DD6)
+cxx_remove_void_call:src/game/main.c:174:5:174:21	equivalent	view_frame_end is empty in this build (func_8C010DDA)
+cxx_lt_to_ge:src/core/view.c:38:29:38:30	equivalent	the loop only calls view_reset, empty in this build (func_8C011F4C)
+cxx_lt_to_le:src/core/view.c:38:29:38:30	equivalent	one more call of view_reset, empty in this build (it does not touch the view)
+cxx_remove_void_call:src/core/view.c:39:5:39:18	equivalent	view_reset is empty in this build (func_8C011F4C)
+cxx_remove_void_call:src/game/game.c:94:3:94:16	equivalent	views_reset only calls the empty view_reset
+cxx_gt_to_ge:src/game/main.c:140:25:140:26	equivalent	with exactly 5 V-blanks pending it stores 5: the same value
+cxx_remove_void_call:src/game/main.c:97:3:97:65	equivalent	game_construct -> game_reset -> tasktree_attach_root has just written 1, and game_frame writes the V-blank count there before tasktree_update reads it
+cxx_assign_const:src/core/task.c:126:27:126:28	equivalent	game_init writes 1 right after, and game_frame writes the V-blank count before tasktree_update reads it (tasktree_attach_root's only caller is game_reset)
+cxx_assign_const:src/core/task.c:27:24:27:25	equivalent	task_init's only caller, game_construct, calls game_reset next, which sets the root's stops_on_pause to 0 (the mutant's value)
+cxx_assign_const:src/core/task.c:31:15:31:16	equivalent	game_reset (called next by game_construct, task_init's only caller) sets the owner (tasktree_attach_root)
+cxx_init_const:src/core/task.c:133:25:133:26	equivalent	the initial value is never read: the for loop assigns passes_left first (on a resume the runtime restores the saved value)
+cxx_init_const:src/game/game.c:88:22:88:23	equivalent	the initial value is never read: starting is assigned (line 119) before it is used (on a resume the runtime restores the saved value)
+cxx_init_const:src/game/game.c:43:17:43:18	equivalent	the initial value is never read: scene is assigned by syMalloc (line 48) before it is used (on a resume the runtime restores the saved value)
+cxx_replace_scalar_call_nz:src/game/game.c:135:9:135:49	equivalent	task_is_paused has no side effect and its result is discarded (kept as the original's call)
+cxx_replace_scalar_call_zr:src/game/game.c:135:9:135:49	equivalent	task_is_paused has no side effect and its result is discarded (kept as the original's call)
+cxx_init_const:src/game/game.c:78:19:78:20	equivalent	Mull flips the constant's lowest bit: the scan starts at port 0, which is game->pad's port (always 0): the test above it again
+cxx_assign_const:src/game/game.c:104:18:104:19	equivalent	MODE_NONE (13) becomes 12: mode is only compared with next_mode (MODE_TITLE, 2) and then overwritten at line 116
+cxx_assign_const:src/game/sound.c:41:27:41:28	equivalent	sdMemBlkCreate writes the block handle into that word before anything reads it
+cxx_assign_const:src/game/sound.c:141:27:141:28	equivalent	sdMemBlkCreate writes the block handle into that word before anything reads it
+cxx_ge_to_gt:src/game/game.c:46:19:46:21	unreachable	mode 7 (reset_exits 0) is entered on the routes only from modes whose start already set reset_exits to 0 (the soft resets in the race go back to the title: had it been 1, the run would have ended); a race entered from a mode that leaves 1
+cxx_lt_to_le:src/game/game.c:118:35:118:36	unreachable	next_mode = 13 (MODE_NONE) while it differs from mode: no code requests it
+cxx_ge_to_gt:src/core/fixup.c:189:37:189:39	unreachable	a container entry of type 20 (no container loaded on the routes has one)
+cxx_replace_scalar_call_nz:src/core/fixup.c:25:3:25:50	unreachable	a mesh set whose attrs field is a pointer (0 in every mesh set loaded on the routes: reloc leaves 0)
+cxx_replace_scalar_call_zr:src/core/fixup.c:25:3:25:50	unreachable	a mesh set whose attrs field is a pointer (0 in every mesh set loaded on the routes: reloc leaves 0)
+cxx_replace_scalar_call_nz:src/core/fixup.c:26:3:26:52	unreachable	a mesh set with a normals pointer (0 in every mesh set loaded on the routes)
+cxx_replace_scalar_call_zr:src/core/fixup.c:26:3:26:52	unreachable	a mesh set with a normals pointer (0 in every mesh set loaded on the routes)
+cxx_replace_scalar_call_nz:src/core/fixup.c:27:3:27:58	unreachable	a mesh set with vertex colours (0 in every mesh set loaded on the routes)
+cxx_replace_scalar_call_zr:src/core/fixup.c:27:3:27:58	unreachable	a mesh set with vertex colours (0 in every mesh set loaded on the routes)
+cxx_replace_scalar_call_nz:src/core/fixup.c:28:3:28:55	unreachable	a mesh set with UVs (0 in every mesh set loaded on the routes)
+cxx_replace_scalar_call_zr:src/core/fixup.c:28:3:28:55	unreachable	a mesh set with UVs (0 in every mesh set loaded on the routes)
+cxx_add_to_sub:src/core/fixup.c:39:46:39:47	unreachable	a basic model with two or more mesh sets (every one loaded on the routes has one: i = 0)
+cxx_mul_to_div:src/core/fixup.c:39:57:39:58	unreachable	a basic model with two or more mesh sets (every one loaded on the routes has one: i = 0)
+cxx_lt_to_le:src/core/fixup.c:79:16:79:17	unreachable	a motion with exactly one element (none loaded on the routes)
+cxx_gt_to_ge:src/core/fixup.c:79:32:79:33	unreachable	a motion with five elements (none loaded on the routes)
+cxx_lt_to_le:src/core/fixup.c:100:26:100:27	unreachable	a texture list whose name array is followed by a positive word (after every list loaded on the routes the word is 0 or negative: relocating one more entry changes nothing)
+cxx_lt_to_le:src/game/sound.c:86:27:86:28	unreachable	a music request for track 0 (none on the routes)
+cxx_ge_to_gt:src/game/sound.c:119:34:119:36	unreachable	a request for MIDI sequence 0 (none on the routes)
+cxx_eq_to_ne:src/game/sound.c:172:16:172:18	unreachable	a second one-shot request on the same port in the same frame (none on the routes)
+cxx_gt_to_ge:src/game/sound.c:172:33:172:34	unreachable	a second one-shot request of equal priority on the same port in the same frame (none on the routes)
+cxx_eq_to_ne:src/game/sound.c:185:16:185:18	unreachable	a second request on the same one-shot port in the same frame (none on the routes)
+cxx_gt_to_ge:src/game/sound.c:185:33:185:34	unreachable	a second request of equal priority on the same one-shot port in the same frame (none on the routes)
+cxx_eq_to_ne:src/game/sound.c:196:16:196:18	unreachable	a second MIDI request on the same port in the same frame (none on the routes)
+cxx_gt_to_ge:src/game/sound.c:196:33:196:34	unreachable	a MIDI request with a non-zero priority (every one on the routes has priority 0)
+cxx_gt_to_le:src/game/sound.c:196:33:196:34	unreachable	a MIDI request with a non-zero priority (every one on the routes has priority 0)
+cxx_remove_void_call:src/game/game.c:97:5:97:39	unreachable	a soft reset while the task tree is paused: the root is paused only through func_8C010508 (translated), which no route calls; the route pauses the race at 5850 and resets at 5900 from its pause menu, which does not pause the tree (the mutant survives it)
