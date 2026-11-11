@@ -3,6 +3,7 @@
 #   tools/ghidra.sh import        fresh import + auto-analysis into volume penpen-ghidra (overwrites)
 #   tools/ghidra.sh post Script.java [args...]   run a script from tools/ghidra/ on the saved project
 #   tools/ghidra.sh decomp ADDR...   S4: pseudo-C of the functions containing ADDR (terminal only)
+#   tools/ghidra.sh decomp2 ADDR...  S13: the same, pool constants folded, FPSCR.SZ/PR = 0 (S13Decomp)
 #   tools/ghidra.sh asm ADDR:LEN...  S8: disassembly of those ranges (hex; terminal only)
 #   tools/ghidra.sh seed          second-pass function discovery (S1Seed) on the code ranges
 #   tools/ghidra.sh export        regions + names (S1Regions) and copy the two TSVs to port/symbols/ (validated)
@@ -41,6 +42,11 @@ case "${1:-}" in
     # pseudo-C of the functions containing the given addresses (disc-derived: terminal only, never commit)
     shift
     run sh -c "$H -process 1ST_READ.BIN -noanalysis -readOnly -scriptPath /scripts -postScript S4Decomp.java $*" \
+      | grep -E '^S4D ' | sed 's/^S4D /  /' ;;
+  decomp2)
+    # S13: as decomp, with the code range read-only (pool constants folded) and FPSCR.SZ/PR = 0 (S13Decomp.java)
+    shift
+    run sh -c "$H -process 1ST_READ.BIN -noanalysis -readOnly -scriptPath /scripts -postScript S13Decomp.java $*" \
       | grep -E '^S4D ' | sed 's/^S4D /  /' ;;
   asm)
     # S8: disassembly of ADDR:LEN ranges (hex; disc-derived: terminal only, never commit)

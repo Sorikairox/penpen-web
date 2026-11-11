@@ -96,6 +96,22 @@ EXPORT("rtw_save_load") int rtw_save_load(int ptr, int size) {
 #ifndef __wasm__
 #include <stdio.h>
 #include <stdlib.h>
+#include <signal.h>
+#include <execinfo.h>
+#include <unistd.h>
+/* S13: a host crash (a bug in hand-written C) prints the native call stack as "rt crash" lines (addresses in the
+ * binary: addr2line -f names the functions, f_<guest address> for the translated and hand-written ones) */
+int main(int argc, char **argv);
+static void crash_handler(int sig) {
+  void *bt[48];
+  int n = backtrace(bt, 48);
+  char line[64];
+  for (int i = 0; i < n; i++) {
+    int k = snprintf(line, sizeof line, "rt crash signal %d frame %d main%+ld\n", sig, i, (long)((char *)bt[i] - (char *)main));
+    if (write(1, line, (size_t)k) < 0) break;
+  }
+  _exit(128 + sig);
+}
 extern const char *disc_dir;
 int rtw_log(const char *p, int len) { fwrite(p, 1, (size_t)len, stdout); fputc('\n', stdout); fflush(stdout); return 0; }
 int rtw_rumble(int port, int on) { (void)port; (void)on; return 0; }
@@ -129,6 +145,8 @@ static void ram_dump_write(void) {
 }
 static void wav_close(void) { if (wav) { wav_drain(); wav_header(); fclose(wav); wav = 0; rt_log("boot wav written: %u frames", wav_frames); } }
 int main(int argc, char **argv) {
+  signal(SIGSEGV, crash_handler);
+  signal(SIGBUS, crash_handler);
   hle_max_frames = 3; hle_verbose = 600; hle_digest_every = 1; hle_frame_log = 1; /* the S3/S4 test defaults */
   for (int i = 1; i < argc; i++) {
     if (!strcmp(argv[i], "--disc")) disc_dir = argv[++i];

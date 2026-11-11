@@ -36,6 +36,8 @@ includePaths:
   - '/tmp/mull/src/%s'
 excludePaths:
   - '.*/include/hw\\.h'
+  - '.*/include/fpu\\.h'
+  - '.*/src/copies/.*'
 """
 
 

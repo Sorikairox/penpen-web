@@ -17,6 +17,12 @@
 #                                 its line; SESSION=S12 records the score; args: --workers N (8) --digest K (16: the
 #                                 RAM digest every 16 frames, every frame line compared) --budget B (160)
 #   tools/s11.sh report           the mutation report again (after editing docs/progress/mutation_notes.tsv)
+#   tools/s11.sh copies           S13: export the identical copies of hand-written functions (tools/copies.py ->
+#                                 src/copies/; run before gen when an export changes)
+#   tools/s11.sh status           S13: per export, the merged difftest verdict of the last test and its copy group
+#                                 (tools/hand_status.py): untested groups / single exports to reach or remove
+#   tools/s11.sh cover            S13: the game functions each route runs (tools/s3.sh fncover, the pure
+#                                 translation) -> docs/progress/fn_coverage.tsv
 # Logs (frame lines, test lines: our vocabulary only) go to port_work/s11 (gitignored).
 set -eu
 REPO=$(cd "$(dirname "$0")/.." && pwd)
@@ -76,5 +82,14 @@ case "${1:-}" in
     python3 -I "$REPO/tools/mutate.py" report-mull "$REPO" "$M/run.out" ${SESSION:-} ;;
   report)
     python3 -I "$REPO/tools/mutate.py" report-mull "$REPO" "$REPO/port_work/mull/run.out" ${SESSION:-} ;;
-  *) sed -n '2,24p' "$0"; exit 2 ;;
+  copies)
+    python3 -I "$REPO/tools/copies.py" "$REPO" | tail -1 ;;
+  status)
+    python3 -I "$REPO/tools/hand_status.py" "$REPO" "$LOGS" ;;
+  cover)
+    "$REPO/tools/s3.sh" fncover > "$LOGS/cover.out"
+    tail -1 "$LOGS/cover.out"
+    { printf '# S13 (tools/s11.sh cover): game and SDK functions of the pure translation that each route runs, with call counts\n# address\troute:calls ...\n'
+      grep '^rt cover 8c' "$LOGS/cover.out" | sed 's/^rt cover //; s/ /\t/'; } > "$REPO/docs/progress/fn_coverage.tsv" ;;
+  *) sed -n '2,30p' "$0"; exit 2 ;;
 esac
