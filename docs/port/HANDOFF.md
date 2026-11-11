@@ -2,6 +2,47 @@
 
 Newest session first. Read `docs/port/PLAN.md` (disc facts, survey, approach, phases, rules) before working.
 
+## S6 — 2026-11-11: input, VMU, rumble; the retrowser module runs end to end
+
+Design and details: `docs/port/RTW.md`; pd/bu semantics read in the SDK's code: `docs/port/SDK.md` 2.3/2.4. All guest
+code ran in `--network none --read-only --cap-drop ALL` containers; the module, e2e PNGs and VMU images stay in
+`penpen-build` (`/build/rtw`, `/build/e2e`, `/build/vmu`); `git log --all -- port/gen` stays empty.
+
+- **Stepped frames without Asyncify**: the recompiler makes its output resumable (every call a numbered site;
+  `rt_unw` saves sites on the way out of `njWaitVSync`, `rt_rew` rewinds into it; functions with sites and back
+  edges go through their label switch, so the wasm control flow stays reducible). `rtw_frame` = one frame; the
+  interpreter fallback is resumable too. **Same digests as S5** on the S4 route (native and wasm), same speed;
+  yield depth 12. The harness found one bug of the first version (a resume key colliding with a jump target).
+- **pd**: the SDK's own conversion confirmed: r/l at +0x18/+0x1A, **bit 16 = R, bit 17 = L** with 192/160 hysteresis
+  (the old pad script had them swapped), y1 = −sy; the game reads only on/press and the stick (never the analog
+  trigger values). 4 ports from `rtw_input` (the ports the host sends are connected), `rtw_triggers`.
+- **bu**: a VMU flash file system (`vmu.c`: root/FAT/directory, files from block 199 down) behind the SDK API with
+  the SDK's result codes and complete-callback operations; `buMakeBackupFileImage` runs as guest code (the VMS CRC
+  checks out with an independent CCITT computation). The S5 "frame 750 memory-card notice" is gone: the game
+  creates its 5-block save at the mode menu and loads it on the next boot. **pdVib** → `rtw_rumble` (Jump Pack
+  in slot 2: port 2 = A2); **pdLcd** pictures dropped.
+- **Module**: `port/rtw/glue.js` (factory `createPenpen`, `penpen_gl_frame` → `PenpenGL.frame` on the
+  OffscreenCanvas), `retrowser.json` (dreamcast, IP.BIN SHA-1, webgl, 60 Hz, vmu, MIT), `tools/rtw.sh
+  image|build|check|e2e|look`, image `penpen-rtw:1` (`docker/rtw-host`: retrowser main + Playwright Chromium).
+  **`rtw.mjs check --disc`: OK, 0 errors, 0 warnings**, leak scan clean (it covers the disc's first MiB per data
+  track; the wasm is translated code, 47 MB).
+- **End to end** (retrowser's local host + headless Chromium in one container; archive picked on the disc
+  screen): unpacked and running in 71 s; logo, title, menu, PenPen House, selection, course map, race start and
+  racing seen in screenshots; the host stored the VMU save and, **after a reload, the game loaded it**;
+  `navigator.vibrate` called on rumble; **58.8 game frames/s** in the race (SwiftShader).
+- Found by the e2e: 0x8C016EC0, a gap function that waits in `njWaitVSync`, ran in the interpreter → new entry
+  (harness **8 068: 7 687 pass / 0 fail / 381 untested**); retrowser's off-the-record test context cannot hold a
+  1.2 GB disc in OPFS → our e2e uses a persistent profile (no host change needed). **No retrowser change.**
+- Tests: sh4 **257 / 0**; mutants caught; native = wasm and `--pad` = `--input` (the host path) digests over 4 000
+  frames; VMU native save → reload → load.
+- Known: the save's time stamp is 1950-01-01 (the RTC register reads 0); the title funnel (S5); the 0x2C field of
+  the disk info and messages 5/7 unverified; the persistent-storage notice of the headless host (dismissed).
+
+Next: S7 audio (Manatee `sd` HLE + AICA mixer, CDDA from `rtw_disc_read` audio sectors, `rtw_audio_*` exports);
+a one-command local launcher so the user can try the module in their own browser (RTW.md 6); an RTC (a real clock
+in the browser, fixed in test mode); more `rt interp` finds as play goes further (now harmless, but slower);
+renderer follow-ups from S5.
+
 ## S5 — 2026-11-11: HLE Ninja + Kamui → draw list → WebGL2; logos, title, menus, house, race visible
 
 Design and details: `docs/port/RENDER.md`. All guest code ran in `--network none --read-only --cap-drop ALL`

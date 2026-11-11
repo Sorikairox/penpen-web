@@ -296,7 +296,7 @@ sources or libraries.
 | S3 SH-4 interpreter + recompiler scaffold | local tool: interpreter (oracle) and SH-4 → C translator; generated C gitignored (`port/gen/`, volume `penpen-build`) | done 2026-11-11: boots on wasm through sbInitSystem into the frame loop; `docs/port/RECOMP.md` |
 | S4 HLE: files + memory + timers | gdFs on the disc reader, syMalloc, sy timers/interrupt chains as a frame loop | done 2026-11-11: title, attract demo and (scripted pads) a race load; native = wasm; RECOMP.md 7 |
 | S5 HLE: Ninja + Kamui → WebGL2 | PVR textures (VQ, twiddled, mipmaps), chunk models, TA lists, translucency order | done 2026-11-11: logos, title, menus, house, race visible (looked at); `docs/port/RENDER.md` |
-| S6 Input, VMU, rumble | pd (4 ports, triggers), bu on a VMU image, pdVib | menus by real input; a save survives reload |
+| S6 Input, VMU, rumble + retrowser module | pd (4 ports, triggers), bu on a VMU image, pdVib; the module (stepped `rtw_frame`, WebGL glue, manifest) | done 2026-11-11: resumable frames; menus to a race by keyboard in the containerised retrowser host + headless Chromium; the VMU save survives a reload; rumble; `docs/port/RTW.md` |
 | S7 Audio | Manatee `sd` command HLE + an AICA mixer for MLT banks (ADPCM/PCM, MIDI sequences); CDDA tracks from the disc | music and effects |
 | S8 First race | a full race, 1 player, then 4-player split screen | race finishes |
 | S9 retrowser `dreamcast` | the host work of section 6 (retrowser repo, separate approval), local host e2e | boots from a local retrowser host |
@@ -338,6 +338,11 @@ sources or libraries.
   copies single PNGs (magic checked) to a scratch directory outside the repo for viewing; never committed.
 - **Logs**: the boot logs opened files as directory index + 4-digit group + size, not by name; lines that may
   leave a container are filtered to our log vocabulary (`tools/s3.sh` `filt`).
+- **The retrowser module** (S6): `tools/rtw.sh build` assembles it in `penpen-build:/build/rtw` only (the wasm is
+  translated game code: never committed, never published); the check and the end-to-end test run the retrowser
+  host and headless Chromium in `--network none` containers of `penpen-rtw:1`, with the disc archive from
+  `penpen-raw`; e2e PNGs stay in `/build/e2e` (`tools/rtw.sh look`). Never run it in the host's browser: the user
+  decides when to try it (RTW.md 6).
 - No push, no remote until the user names one; no GitHub.
 - End each session with a `docs/port/HANDOFF.md` entry and a `docs/progress/sessions.tsv` row.
 

@@ -261,3 +261,12 @@ course 58xx/5300/54xx, characters 52xx; CDDA 11 at 1 854, race music CDDA 12 at 
 frames. 42 files opened, 0 interpreter-fallback calls; 150 SDK functions used (39 of them as guest code), 9.5 M SDK calls, 0.95 M of them HLE. Speed: about 300 frames/s
 native and in node (wasm 45 MB: the whole image is translated now; S5+ can translate only what the guest SDK
 functions reach).
+
+## 8. S6: resumable frames
+
+The generated C is resumable so the retrowser host can step it (`rtw_frame`): every call statement is a site
+`R_n`; after a call `RT_UNW(n)` saves (function, n, target) and returns when `rt_unw` is set; on entry with
+`rt_rew` set the function pops its site and jumps back into that call. Functions with sites and back edges are
+emitted in loop mode (entry and back edges through `D_`), keeping the control flow reducible; the resume switch
+is separate from the label switch. The interpreter fallback saves and restores its own state the same way. The
+harness builds the same C with `rt_unw` always 0. Design, checks and numbers: `docs/port/RTW.md` 2.
