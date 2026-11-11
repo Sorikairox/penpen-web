@@ -28,6 +28,9 @@
 #define NJG_SCREEN 0x8C1EF2A4u /* dist, w, h, cx, cy */
 #define NJG_NEARFAR 0x8C1EF2D0u
 
+/* this SDK's njTranslate, njRotateXYZ/ZXY and njScale do nothing when the matrix argument is NULL (unlike the
+ * documented "NULL = current matrix"): pass the current matrix itself */
+#define CUR_M rd32(NJG_CURMATRIX)
 static void gcall(SH4 *c, uint32_t fn, uint32_t a0, uint32_t a1, uint32_t a2, uint32_t a3, float f0, float f1, float f2) {
   SH4 save = *c;
   c->r[4] = a0; c->r[5] = a1; c->r[6] = a2; c->r[7] = a3;
@@ -187,6 +190,8 @@ static void strip_chunk(uint32_t a, uint32_t t, uint32_t sflags) {
   if (mat.tflags & 0x40) s.mode |= RD_M_FLIPV;
   if (!mat.filter) s.mode &= ~RD_M_FILTER;
   int cull = (sflags & 0x10) ? 0 : 1; /* drop clockwise-on-screen triangles (y down) */
+  if (hle_tracing()) rt_log("hle trace strip %08x type %u flags %x strips %u ctrl3d %x dif %08x amb %08x spe %08x blend %u/%u tex %u tflags %x",
+                            a, t, sflags, ns, rd32(NJG_CTRL3D), diffuse(), mat.amb, mat.spe, mat.src, mat.dst, mat.texid, mat.tflags);
   uint32_t q = a + 6;
   for (uint32_t i = 0; i < ns; i++) {
     int16_t len = (int16_t)rd16(q); q += 2;
@@ -253,6 +258,8 @@ static void draw_model(uint32_t m) {
   if (!sh4_is_ram(m)) return;
   self_check(cpu_now, m);
   load_matrix();
+  if (hle_tracing()) rt_log("hle trace model %08x at %d %d %d det %d/1000", m, (int)M[12], (int)M[13], (int)M[14],
+                            (int)(1000 * (M[0] * (M[5] * M[10] - M[6] * M[9]) - M[1] * (M[4] * M[10] - M[6] * M[8]) + M[2] * (M[4] * M[9] - M[5] * M[8]))));
   uint32_t vl = rd32(m), pl = rd32(m + 4);
   if (sh4_is_ram(vl)) vlist(vl);
   if (sh4_is_ram(pl)) plist(pl, 0);
@@ -333,10 +340,13 @@ static void draw_object(SH4 *c, uint32_t o, anim_t *an, int depth) {
       if (mdata_get(an->shape, (int)node, 0x10, &keys, &nb)) sv = ptrkey(keys, nb, nbf, an->frame);
       if (mdata_get(an->shape, (int)node, 0x20, &keys, &nb)) sn = ptrkey(keys, nb, nbf, an->frame);
     }
+    if (hle_tracing()) rt_log("hle trace node %08x ev %x model %08x pos %d %d %d ang %x %x %x scl %d %d %d /1000 shape %08x %08x",
+                              o, ev, model, (int)(pos[0] * 1000), (int)(pos[1] * 1000), (int)(pos[2] * 1000), ang[0], ang[1], ang[2],
+                              (int)(scl[0] * 1000), (int)(scl[1] * 1000), (int)(scl[2] * 1000), sv, sn);
     gcall(c, G_PUSH, 0, 0, 0, 0, 0, 0, 0);
-    if (!(ev & EV_UNIT_POS)) gcall(c, G_TRANSLATE, 0, 0, 0, 0, pos[0], pos[1], pos[2]);
-    if (!(ev & EV_UNIT_ANG)) gcall(c, (ev & EV_ZXY) ? G_ROTZXY : G_ROTXYZ, 0, (uint32_t)ang[0], (uint32_t)ang[1], (uint32_t)ang[2], 0, 0, 0);
-    if (!(ev & EV_UNIT_SCL)) gcall(c, G_SCALE, 0, 0, 0, 0, scl[0], scl[1], scl[2]);
+    if (!(ev & EV_UNIT_POS)) gcall(c, G_TRANSLATE, CUR_M, 0, 0, 0, pos[0], pos[1], pos[2]);
+    if (!(ev & EV_UNIT_ANG)) gcall(c, (ev & EV_ZXY) ? G_ROTZXY : G_ROTXYZ, CUR_M, (uint32_t)ang[0], (uint32_t)ang[1], (uint32_t)ang[2], 0, 0, 0);
+    if (!(ev & EV_UNIT_SCL)) gcall(c, G_SCALE, CUR_M, 0, 0, 0, scl[0], scl[1], scl[2]);
     shape_vert = sh4_is_ram(sv) ? sv : 0; shape_norm = sh4_is_ram(sn) ? sn : 0;
     if (!(ev & EV_HIDE) && model) draw_model(model);
     shape_vert = shape_norm = 0;
@@ -431,9 +441,9 @@ static void h_njCnkModDrawModel(SH4 *c) {
   uint32_t ev = obj ? rd32(m) : 7u;
   if (obj) {
     gcall(c, G_PUSH, 0, 0, 0, 0, 0, 0, 0);
-    if (!(ev & EV_UNIT_POS)) gcall(c, G_TRANSLATE, 0, 0, 0, 0, nj_f(m + 8), nj_f(m + 12), nj_f(m + 16));
-    if (!(ev & EV_UNIT_ANG)) gcall(c, (ev & EV_ZXY) ? G_ROTZXY : G_ROTXYZ, 0, rd32(m + 20), rd32(m + 24), rd32(m + 28), 0, 0, 0);
-    if (!(ev & EV_UNIT_SCL)) gcall(c, G_SCALE, 0, 0, 0, 0, nj_f(m + 32), nj_f(m + 36), nj_f(m + 40));
+    if (!(ev & EV_UNIT_POS)) gcall(c, G_TRANSLATE, CUR_M, 0, 0, 0, nj_f(m + 8), nj_f(m + 12), nj_f(m + 16));
+    if (!(ev & EV_UNIT_ANG)) gcall(c, (ev & EV_ZXY) ? G_ROTZXY : G_ROTXYZ, CUR_M, rd32(m + 20), rd32(m + 24), rd32(m + 28), 0, 0, 0);
+    if (!(ev & EV_UNIT_SCL)) gcall(c, G_SCALE, CUR_M, 0, 0, 0, nj_f(m + 32), nj_f(m + 36), nj_f(m + 40));
     m = rd32(m + 4);
   }
   if (sh4_is_ram(m)) {

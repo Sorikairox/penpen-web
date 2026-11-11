@@ -41,6 +41,8 @@ void hle_ring_dump(void);
 uint32_t hle_frame(void);
 extern int hle_max_frames;
 extern int hle_verbose;
+extern int hle_trace_lo, hle_trace_hi;
+int hle_tracing(void);
 
 /* guest helpers */
 extern SH4 *rt_cpu;

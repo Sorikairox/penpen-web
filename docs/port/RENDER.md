@@ -103,7 +103,11 @@ load time because the game reads the PVM into the texture buffer area and overwr
   motion, shape, frame in FR4). All families (L1–L4) use one implementation for now.
 - **Node transforms by the SDK's own matrix code** (guest calls: njPushMatrix, njTranslate, njRotateXYZ /
   njRotateZXY, njScale, njPopMatrix on the current matrix whose pointer is at 0x8C1EF2B8): the HLE reads the
-  resulting 4×4 (row vectors, translation in elements 12–14).
+  resulting 4×4 (row vectors, translation in elements 12–14). **This SDK's njTranslate / njRotateXYZ /
+  njRotateZXY / njScale return at once when the matrix argument is NULL** (not "NULL = current matrix"): the
+  HLE passes the current matrix pointer itself. S5 passed NULL, so every node transform of a model tree was
+  lost (S8 fix: the title's ice tube sat 544 units too close and unscaled, in front of the logo; the
+  characters' limbs were all at their root).
 - **Conventions, checked at run time** (`render check` line: our transform = the SDK's njCalcPoint): view space
   **+z forward, y down the screen**; screen = cx + dist·x/z, cy + dist·y/z with njSetScreen's {dist, w, h, cx,
   cy} at 0x8C1EF2A4 (554.3, 320, 240 here; 60° horizontal); near plane at 0x8C1EF2D0 (1.0; far 10000).
@@ -159,10 +163,6 @@ house 1104, course map 1563, race 1762).
 
 Known wrong or missing (to do):
 
-- **Title**: the ice funnel is in front of the logo at many pixels in our geometry (a PROBE shows funnel
-  triangles at z ≈ 626 over the logo at z ≈ 698), so the logo is hidden when the first layer's alpha reaches
-  1.0 (frame ~900). Real hardware surely shows the logo: suspect the motion evaluation (UNIT flags vs keys,
-  angle order) or the funnel's depth/sort mode; not resolved.
 - Shadows darken every opaque polygon inside the volume (the lower half of the player too); the PVR only
   shades polygons flagged for it.
 - Translucency is sorted per triangle (no per-pixel autosort); no punch-through list is used by the game.

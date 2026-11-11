@@ -35,8 +35,10 @@ int hle_max_frames = 0x7FFFFFFF; /* defaults for the retrowser module; the test 
 int hle_verbose = 0;
 int hle_digest_every = 0;
 int hle_frame_log = 0;
+int hle_trace_lo = -1, hle_trace_hi = -1; /* --trace F0[-F1]: every SDK call of those frames logged (debugging) */
 int audio_enabled = 1; /* S7: the sd HLE, CDDA and the mixer; --audio 0 = the S6 stubs */
 static uint32_t seq, frame;
+int hle_tracing(void) { return (int)frame >= hle_trace_lo && (int)frame <= hle_trace_hi; }
 static uint32_t f_hle, f_guest; /* calls in the current frame */
 
 static hle_ent *lookup(uint32_t a) {
@@ -61,6 +63,7 @@ hle_fn hle_find(uint32_t a) {
   if (e->fn) { cur = e; return e->fn; }
   first_seen(e);
   e->calls++; e->fcalls++; f_guest++;
+  if (hle_tracing()) rt_log("hle trace guest %s", e->name);
   return 0;
 }
 int hle_known(uint32_t a) { hle_ent *e = lookup(a); return e && e->fn; }
@@ -82,6 +85,8 @@ static void logcall(SH4 *c, const char *extra) {
   seq++;
   { int i = (int)((seq - 1) % RING); ring[i].seq = seq; ring[i].pr = c->pr; ring[i].name = cur->name;
     for (int k = 0; k < 4; k++) ring[i].a[k] = R(4 + k); }
+  if (hle_tracing())
+    rt_log("hle trace %s(%x, %x, %x, %x) fr4 %d/1000%s from %08x", cur->name, R(4), R(5), R(6), R(7), (int)(c->fr.f[4] * 1000), extra, c->pr);
   /* the first calls of each function in full, then only counts */
   if (seq <= (uint32_t)hle_verbose && cur->calls <= 8)
     rt_log("hle %u %s(%x, %x, %x, %x)%s from %08x", seq, cur->name, R(4), R(5), R(6), R(7), extra, c->pr);
