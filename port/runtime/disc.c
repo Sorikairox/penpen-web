@@ -84,3 +84,10 @@ static int walk(const char *name, uint32_t *lba, uint32_t *size, int *index) {
 int disc_find(const char *name, uint32_t *lba, uint32_t *size) { return walk(name, lba, size, 0); }
 int disc_find_ex(const char *name, uint32_t *lba, uint32_t *size, int *index) { return walk(name, lba, size, index); }
 int disc_file_count(void) { return walk(0, 0, 0, 0); }
+
+/* S7: a track of the TOC by number (CDDA): first LBA (INDEX 01), sectors, flags (bit 0 data); -1 if absent */
+int disc_track(int num, uint32_t *lba, uint32_t *count, int *flags) {
+  for (int i = 0; i < ntoc; i++)
+    if (toc[i][0] == num) { *lba = (uint32_t)toc[i][1]; *count = (uint32_t)toc[i][2]; *flags = toc[i][3]; return 0; }
+  return -1;
+}

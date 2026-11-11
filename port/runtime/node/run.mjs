@@ -2,6 +2,7 @@
 // gives the wasm module env.rtw_disc_toc / rtw_disc_read over a Redump .cue + .bin set (same LBA model
 // as port/runtime/disc_native.c and retrowser spec 4.10) and env.rtw_log, then calls rtw_start.
 // Usage: node run.mjs penpen.wasm DISC_DIR [--frames N] [--verbose N] [--pad SCRIPT] [--digest N] [--frame-log 0|1]
+//          [--audio 0|1] [--wav FILE]
 //          [--shots F1,F2,... --shot-dir DIR]
 // S5: env.penpen_gl_frame(ptr, len) receives each frame's draw list (port/render/rd.c). This host has no GL: it
 // keeps the uploaded textures and, for the frames listed in --shots, writes a self-contained dump DIR/fNNNNN.ppdl
@@ -149,6 +150,7 @@ inst.exports.rt_set_frames?.(opt('--frames', 3));
 inst.exports.rt_set_verbose?.(opt('--verbose', 600));
 inst.exports.rt_set_digest?.(opt('--digest', 1));
 inst.exports.rt_set_frame_log?.(opt('--frame-log', 1));
+inst.exports.rt_set_audio?.(opt('--audio', 1));
 {
   const i = rest.indexOf('--pad');
   if (i >= 0) {
@@ -171,6 +173,25 @@ if (vmuPath && fs.existsSync(vmuPath)) {
   new Uint8Array(mem.buffer, ex.rtw_save_ptr(), n).set(img.subarray(0, n));
   ex.rtw_save_load(ex.rtw_save_ptr(), n);
 }
+// S7: --wav FILE: drain rtw_audio_* after every frame as the host does and write a 44.1 kHz stereo WAV
+const wavPath = strOpt('--wav');
+const wavParts = [];
+let wavFrames = 0;
+function drainAudio() {
+  const n = ex.rtw_audio_drain?.() ?? 0;
+  if (!wavPath || n <= 0) return;
+  wavParts.push(Buffer.from(new Uint8Array(mem.buffer, ex.rtw_audio_buffer(), n * 4)));
+  wavFrames += n;
+}
+function wavWrite() {
+  if (!wavPath) return;
+  const rate = ex.rtw_audio_rate?.() ?? 0, h = Buffer.alloc(44);
+  h.write('RIFF', 0); h.writeUInt32LE(36 + wavFrames * 4, 4); h.write('WAVEfmt ', 8); h.writeUInt32LE(16, 16);
+  h.writeUInt16LE(1, 20); h.writeUInt16LE(2, 22); h.writeUInt32LE(rate, 24); h.writeUInt32LE(rate * 4, 28);
+  h.writeUInt16LE(4, 32); h.writeUInt16LE(16, 34); h.write('data', 36); h.writeUInt32LE(wavFrames * 4, 40);
+  fs.writeFileSync(wavPath, Buffer.concat([h, ...wavParts]));
+  console.log('boot wav written: ' + wavFrames + ' frames at ' + rate + ' Hz');
+}
 const t0 = Date.now();
 try {
   ex.rtw_start();
@@ -183,8 +204,10 @@ try {
     }
     ex.rtw_frame();
     vmuStore();
+    drainAudio();
   }
 } catch (e) {
-  try { vmuStore(); } catch { /* memory gone */ }
+  try { vmuStore(); drainAudio(); } catch { /* memory gone */ }
+  wavWrite();
   console.log('boot wasm stopped (' + (e instanceof WebAssembly.RuntimeError ? 'trap' : 'error') + ') after ' + (Date.now() - t0) + ' ms');
 }

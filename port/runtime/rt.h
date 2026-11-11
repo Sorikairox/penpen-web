@@ -24,6 +24,7 @@ int disc_read_lba(uint32_t lba, uint32_t n, void *dst); /* 2048-byte sectors of 
 int disc_find(const char *name, uint32_t *lba, uint32_t *size);
 int disc_find_ex(const char *name, uint32_t *lba, uint32_t *size, int *index);
 int disc_file_count(void);
+int disc_track(int num, uint32_t *lba, uint32_t *count, int *flags); /* S7: CDDA tracks */
 
 /* HLE (hle.c) */
 typedef void (*hle_fn)(SH4 *c);

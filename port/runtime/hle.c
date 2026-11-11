@@ -11,6 +11,7 @@
 #include "rt.h"
 #include "../render/nj.h"
 #include "hle_io.h"
+#include "../audio/audio.h"
 
 typedef struct { uint32_t a; const char *name, *lib; hle_fn fn; uint32_t calls, fcalls, first; } hle_ent;
 static void h_default(SH4 *c);
@@ -34,6 +35,7 @@ int hle_max_frames = 0x7FFFFFFF; /* defaults for the retrowser module; the test 
 int hle_verbose = 0;
 int hle_digest_every = 0;
 int hle_frame_log = 0;
+int audio_enabled = 1; /* S7: the sd HLE, CDDA and the mixer; --audio 0 = the S6 stubs */
 static uint32_t seq, frame;
 static uint32_t f_hle, f_guest; /* calls in the current frame */
 
@@ -332,7 +334,7 @@ static void h_gdFs_Api58(SH4 *c) {
   if (gd_work) { wr16(GD_SYS + 0x50, ST_BUSY); gd_sys_busy_until = (int)frame + 1; }
   R(0) = 0;
 }
-static void h_gdFsGetDrvStat(SH4 *c) { logcall(c, ""); R(0) = cdda_playing ? 3 : 1; }
+static void h_gdFsGetDrvStat(SH4 *c) { logcall(c, ""); R(0) = (audio_enabled ? cdda_is_playing() : cdda_playing) ? 3 : 1; }
 static void h_gdFsChangeDir(SH4 *c) {
   logcall(c, "");
   char name[8];
@@ -345,16 +347,36 @@ static void gd_vblank(void) {
   for (int i = 0; i < (int)gd_max; i++) if (fh[i].open && fh[i].pending) gd_complete(i);
   if (gd_work && (int)frame >= gd_sys_busy_until && rd16(GD_SYS + 0x50) == ST_BUSY) wr16(GD_SYS + 0x50, ST_COMPLETE);
 }
-/* CDDA (S7 plays it): drive state and a log line */
+/* CDDA: gdFsDaPlay(first track, last track, repeat 0..14 / 15 = for ever) etc. (S7: played by port/audio/cdda.c;
+ * with --audio 0 only the S6 drive state: "playing" from a play until a pause or stop) */
 static void h_gdFsDaPlay(SH4 *c) {
   logcall(c, "");
   cdda_playing = 1;
+  if (audio_enabled) cdda_play((int)R(4), (int)R(5), (int)R(6));
   rt_log("hle cdda play %d %d repeat %d at frame %u", (int)R(4), (int)R(5), (int)R(6), frame);
   R(0) = 0;
 }
-static void h_gdFsDaPause(SH4 *c) { logcall(c, ""); if (cdda_playing) rt_log("hle cdda pause at frame %u", frame); cdda_playing = 0; R(0) = 0; }
-static void h_gdFsDaStop(SH4 *c) { logcall(c, ""); if (cdda_playing) rt_log("hle cdda stop at frame %u", frame); cdda_playing = 0; R(0) = 0; }
-static void h_gdFsDaRelease(SH4 *c) { logcall(c, ""); rt_log("hle cdda release (resume) at frame %u", frame); cdda_playing = 1; R(0) = 0; }
+static void h_gdFsDaPause(SH4 *c) {
+  logcall(c, "");
+  if (audio_enabled ? cdda_is_playing() : cdda_playing) rt_log("hle cdda pause at frame %u", frame);
+  cdda_playing = 0;
+  if (audio_enabled) cdda_pause();
+  R(0) = 0;
+}
+static void h_gdFsDaStop(SH4 *c) {
+  logcall(c, "");
+  if (audio_enabled ? cdda_is_playing() : cdda_playing) rt_log("hle cdda stop at frame %u", frame);
+  cdda_playing = 0;
+  if (audio_enabled) cdda_stop();
+  R(0) = 0;
+}
+static void h_gdFsDaRelease(SH4 *c) {
+  logcall(c, "");
+  rt_log("hle cdda release (resume) at frame %u", frame);
+  cdda_playing = 1;
+  if (audio_enabled) cdda_release();
+  R(0) = 0;
+}
 
 /* ---- V-sync, callbacks, the frame loop ---- */
 static uint32_t vsync_fn, eor_fn;
@@ -435,6 +457,9 @@ static void frame_log(void) {
   *o = 0;
   rt_log("frame %u hle %u guest %u interp %u files %d heap %u/%u pad %x ram %s%s%s", frame, f_hle, f_guest,
          rt_interp_calls() - f_interp0, gd_files_loaded, fr, blocks, io_pad_on(0), d, nwatch ? " watch" : "", w);
+  if (audio_enabled && d[0] != '-')
+    rt_log("audio frame %u samples %u digest %08x peak %d voices %d cdda %d", frame, audio_frames_made(), audio_digest(),
+           audio_peak(), aica_voices(), cdda_track());
 }
 /* njWaitVSync is where a frame ends: the end-of-render half runs, then the HLE yields (rt_unw: rtw_frame
  * returns to the host, rt_gen.h); the next rtw_frame rewinds into this call, which runs the V-blank half with
@@ -447,6 +472,7 @@ static void h_njWaitVSync(SH4 *c) {
   if (eor_fn) rt_guest_call(c, eor_fn, 0, 0, 0, 0);
   chain_fire(c, 0x920);
   nj_frame_end();
+  if (audio_enabled) audio_frame();
   frame_log();
   for (int i = 0; i < NTAB; i++) tab[i].fcalls = 0;
   f_hle = f_guest = 0; f_interp0 = rt_interp_calls();
@@ -498,9 +524,9 @@ void hle_init(SH4 *c) {
         tab[j].fn = 0; ng++;
       }
   /* S5: the Ninja drawing HLE (port/render); S6: pads, VMU, Jump Pack (hle_io.c) */
-  const nj_impl_t *lists[3] = {nj_impls, nj_model_impls, io_impls};
-  const int counts[3] = {nj_nimpls, nj_model_nimpls, io_nimpls};
-  for (int l = 0; l < 3; l++)
+  const nj_impl_t *lists[4] = {nj_impls, nj_model_impls, io_impls, sd_impls};
+  const int counts[4] = {nj_nimpls, nj_model_nimpls, io_nimpls, sd_nimpls};
+  for (int l = 0; l < (audio_enabled ? 4 : 3); l++)
     for (int i = 0; i < counts[l]; i++) {
       int hit = 0;
       for (int j = 0; j < NTAB; j++)

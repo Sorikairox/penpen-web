@@ -3,10 +3,12 @@
  * and call the entry point; the recompiled code then runs until the frame limit, a stop or a fault.
  * Options (native argv / wasm exports): --frames N, --verbose N (first HLE calls logged), --pad SCRIPT
  * (hle.c: "F[+N]:BTN|BTN,..." on port A), --digest N (RAM digest every N frames, 0 = off),
- * --frame-log 0|1 (the per-frame line), --watch A,B,... (guest words shown on the frame line). */
+ * --frame-log 0|1 (the per-frame line), --watch A,B,... (guest words shown on the frame line); S7: --audio 0|1 (the
+ * sd HLE + CDDA + mixer, default on), --audio-solo cdda|sfx (hear one source), --wav FILE (native: every drained sample into a 44.1 kHz stereo WAV). */
 #include "rt.h"
 #include "hle_io.h"
 #include "vmu.h"
+#include "../audio/audio.h"
 
 #define ENTRY 0x8C010000u
 
@@ -99,6 +101,27 @@ static void vmu_store(void) {
   FILE *f = fopen(vmu_path, "wb");
   if (f) { fwrite(vmu_img, 1, VMU_SIZE, f); fclose(f); vmu_saved_gen = vmu_generation; rt_log("boot vmu image written (generation %u)", vmu_generation); }
 }
+/* --wav FILE: what the host would drain after each frame, as a WAV (the header is rewritten at exit) */
+static FILE *wav;
+static uint32_t wav_frames;
+static void wav_header(void) {
+  uint8_t h[44];
+  uint32_t data = wav_frames * 4, v[] = {0x46464952u, 36 + data, 0x45564157u, 0x20746D66u, 16, 0x00020001u, AUDIO_RATE,
+                                          AUDIO_RATE * 4, 0x00100004u, 0x61746164u, data};
+  for (int i = 0; i < 11; i++) for (int k = 0; k < 4; k++) h[4 * i + k] = (uint8_t)(v[i] >> (8 * k));
+  fseek(wav, 0, SEEK_SET); fwrite(h, 1, 44, wav); fseek(wav, 0, SEEK_END);
+}
+static void wav_drain(void) {
+  int n = rtw_audio_drain();
+  if (wav && n > 0) { fwrite(audio_out(), 4, (size_t)n, wav); wav_frames += (uint32_t)n; }
+}
+/* --ram-dump FILE: guest main RAM at exit (to locate what a change touched; the file stays in the volume) */
+static const char *ram_dump;
+static void ram_dump_write(void) {
+  FILE *f = ram_dump ? fopen(ram_dump, "wb") : 0;
+  if (f) { fwrite(sh4_ram, 1, 16u << 20, f); fclose(f); }
+}
+static void wav_close(void) { if (wav) { wav_drain(); wav_header(); fclose(wav); wav = 0; rt_log("boot wav written: %u frames", wav_frames); } }
 int main(int argc, char **argv) {
   hle_max_frames = 3; hle_verbose = 600; hle_digest_every = 1; hle_frame_log = 1; /* the S3/S4 test defaults */
   for (int i = 1; i < argc; i++) {
@@ -110,6 +133,10 @@ int main(int argc, char **argv) {
     else if (!strcmp(argv[i], "--digest")) hle_digest_every = atoi(argv[++i]);
     else if (!strcmp(argv[i], "--frame-log")) hle_frame_log = atoi(argv[++i]);
     else if (!strcmp(argv[i], "--vmu")) vmu_path = argv[++i];
+    else if (!strcmp(argv[i], "--ram-dump")) ram_dump = argv[++i];
+    else if (!strcmp(argv[i], "--audio")) audio_enabled = atoi(argv[++i]);
+    else if (!strcmp(argv[i], "--audio-solo")) audio_solo = !strcmp(argv[++i], "cdda") ? 1 : !strcmp(argv[i], "sfx") ? 2 : 0;
+    else if (!strcmp(argv[i], "--wav")) { wav = fopen(argv[++i], "wb+"); if (!wav) return 2; wav_header(); }
     else if (!strcmp(argv[i], "--force-interp")) { extern uint32_t rt_force_interp; rt_force_interp = (uint32_t)strtoul(argv[++i], 0, 16); }
   }
   if (vmu_path) {
@@ -117,14 +144,17 @@ int main(int argc, char **argv) {
     if (f) { size_t n = fread(vmu_img, 1, VMU_SIZE, f); fclose(f); rtw_save_load(0, (int)n); }
   }
   atexit(vmu_store);
+  atexit(wav_close);
+  atexit(ram_dump_write);
   rtw_start();
-  for (;;) { rtw_frame(); vmu_store(); }
+  for (;;) { rtw_frame(); vmu_store(); wav_drain(); }
 }
 #else
 __attribute__((export_name("rt_set_frames"))) void rt_set_frames(int n) { hle_max_frames = n; }
 __attribute__((export_name("rt_set_verbose"))) void rt_set_verbose(int n) { hle_verbose = n; }
 __attribute__((export_name("rt_set_digest"))) void rt_set_digest(int n) { hle_digest_every = n; }
 __attribute__((export_name("rt_set_frame_log"))) void rt_set_frame_log(int n) { hle_frame_log = n; }
+__attribute__((export_name("rt_set_audio"))) void rt_set_audio(int n) { audio_enabled = n; }
 /* the host writes a NUL-terminated pad script into rt_arg_buf, then calls rt_set_pad */
 static char arg_buf[4096];
 __attribute__((export_name("rt_arg_buf"))) char *rt_arg_buf(void) { return arg_buf; }
