@@ -23,13 +23,26 @@ __attribute__((noreturn)) void rt_unsupported(SH4 *c, uint32_t a);
 void rt_badret(SH4 *c, uint32_t want, uint32_t at);
 void rt_budget(SH4 *c, uint32_t at);
 
-#define CALL_I(t, ret, at) do { rt_call(c, (t)); if (c->pc != (ret)) rt_badret(c, (ret), (at)); } while (0)
+/* S6: resumable frames. The host steps the game one frame per rtw_frame call, but the game runs its own loop
+ * and waits in njWaitVSync. There the HLE sets rt_unw: every translated function on the way out saves its
+ * call site (R_n, the call target in t_) and returns, down to rtw_frame. The next rtw_frame sets rt_rew and
+ * calls the entry again: each function pops its site and jumps straight back into that call, down to the
+ * HLE, which clears rt_rew and returns into the game as if nothing happened. Registers live in the SH4
+ * struct and the guest stack in guest RAM, so the call chain is all there is to rebuild (no C locals live
+ * across a call). The harness (RT_DIFF) never unwinds. */
+extern int rt_unw, rt_rew;
+extern uint32_t rt_rew_t;               /* the target of the call being resumed */
+void rt_unw_save(uint32_t fn, int site, uint32_t t);
+int rt_rew_pop(SH4 *c, uint32_t fn);    /* the site to resume in function fn (checked) */
+#define RT_UNW(n) if (rt_unw) { rt_unw_save(F_, (n), t_); return; }
+#define CALL_I(t, ret, at, n) do { rt_call(c, (t)); RT_UNW(n) if (c->pc != (ret)) rt_badret(c, (ret), (at)); } while (0)
+#define TAIL_I(t, n) do { rt_call(c, (t)); RT_UNW(n) } while (0)
 #ifdef RT_DIFF
-#define CALL_D(fn, k, ret, at) CALL_I(k, ret, at)
-#define TAIL_D(fn, k) rt_call(c, (k))
+#define CALL_D(fn, k, ret, at, n) CALL_I(k, ret, at, n)
+#define TAIL_D(fn, k, n) TAIL_I(k, n)
 #else
-#define CALL_D(fn, k, ret, at) do { fn(c); if (c->pc != (ret)) rt_badret(c, (ret), (at)); } while (0)
-#define TAIL_D(fn, k) fn(c)
+#define CALL_D(fn, k, ret, at, n) do { fn(c); RT_UNW(n) if (c->pc != (ret)) rt_badret(c, (ret), (at)); } while (0)
+#define TAIL_D(fn, k, n) do { fn(c); RT_UNW(n) } while (0)
 #endif
 /* every backward branch: the harness's step budget, the runtime's watchdog for polling loops */
 #define BACK(at) do { if (--c->budget < 0) rt_budget(c, (at)); } while (0)

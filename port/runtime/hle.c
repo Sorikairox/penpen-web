@@ -29,10 +29,10 @@ static hle_ent tab[] = { /* sorted by address */
 };
 #define NTAB ((int)(sizeof tab / sizeof tab[0]))
 static hle_ent *cur;
-int hle_max_frames = 3;
-int hle_verbose = 600;
-int hle_digest_every = 1;
-int hle_frame_log = 1;
+int hle_max_frames = 0x7FFFFFFF; /* defaults for the retrowser module; the test hosts set their own */
+int hle_verbose = 0;
+int hle_digest_every = 0;
+int hle_frame_log = 0;
 static uint32_t seq, frame;
 static uint32_t f_hle, f_guest; /* calls in the current frame */
 
@@ -507,7 +507,12 @@ static void frame_log(void) {
   rt_log("frame %u hle %u guest %u interp %u files %d heap %u/%u pad %x ram %s%s%s", frame, f_hle, f_guest,
          rt_interp_calls() - f_interp0, gd_files_loaded, fr, blocks, pad_prev[0], d, nwatch ? " watch" : "", w);
 }
+/* njWaitVSync is where a frame ends: the end-of-render half runs, then the HLE yields (rt_unw: rtw_frame
+ * returns to the host, rt_gen.h); the next rtw_frame rewinds into this call, which runs the V-blank half with
+ * the input the host gave in between, and returns to the game. */
+static void vblank(SH4 *c);
 static void h_njWaitVSync(SH4 *c) {
+  if (rt_rew) { rt_rew_done(); vblank(c); R(0) = 0; return; }
   logcall(c, "");
   /* end of render: the EOR callback, then the type-2 chain */
   if (eor_fn) rt_guest_call(c, eor_fn, 0, 0, 0, 0);
@@ -518,6 +523,9 @@ static void h_njWaitVSync(SH4 *c) {
   f_hle = f_guest = 0; f_interp0 = rt_interp_calls();
   frame++;
   if (frame >= (uint32_t)hle_max_frames) rt_stop("frame limit");
+  rt_unw = 1;
+}
+static void vblank(SH4 *c) {
   nj_frame_begin(frame);
   /* V-blank: time, drive, pads, the V-blank chain, Ninja's V-sync function */
   tmr_intra = 0;

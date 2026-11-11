@@ -126,10 +126,37 @@ static void interp_call(SH4 *c, uint32_t a) {
     uint32_t t = RT_NORM(c->pc);
     if (hle_known(t) || rt_lookup(t)) {
       rt_call(c, t); /* native; returns with c->pc = where it returned to */
+      if (rt_unw) { rt_log("rt yield inside interpreted code entered at %08x", a); rt_stop("unwind through the interpreter"); }
       if (c->last != SH4_BR_CALL && c->pc == ret) return; /* a tail jump came back to our caller */
     }
   }
 }
+
+/* ---- S6: resumable frames (rt_gen.h): the saved call sites, innermost first ---- */
+int rt_unw, rt_rew;
+uint32_t rt_rew_t;
+#define RW_MAX 512
+static struct { uint32_t fn, t; int site; } rw[RW_MAX];
+static int rw_n, rw_depth_max;
+void rt_unw_save(uint32_t fn, int site, uint32_t t) {
+  if (rw_n >= RW_MAX) rt_stop("unwind: call chain too deep");
+  rw[rw_n].fn = fn; rw[rw_n].site = site; rw[rw_n].t = t; rw_n++;
+  if (rw_n > rw_depth_max) rw_depth_max = rw_n;
+}
+int rt_rew_pop(SH4 *c, uint32_t fn) {
+  (void)c;
+  if (!rw_n) { rt_log("rt rewind: no saved site for %08x", fn); rt_stop("rewind"); }
+  rw_n--;
+  if (rw[rw_n].fn != fn) { rt_log("rt rewind: entered %08x, saved site belongs to %08x", fn, rw[rw_n].fn); rt_stop("rewind"); }
+  rt_rew_t = rw[rw_n].t;
+  return rw[rw_n].site;
+}
+/* the HLE that yielded is reached again: the chain is rebuilt */
+void rt_rew_done(void) {
+  if (rw_n) { rt_log("rt rewind: %d sites left at the yield", rw_n); rt_stop("rewind"); }
+  rt_rew = 0;
+}
+int rt_rw_depth(void) { return rw_depth_max; }
 
 void rt_call(SH4 *c, uint32_t a) {
   uint32_t n = RT_NORM(a);
@@ -146,6 +173,7 @@ void rt_guest_call(SH4 *c, uint32_t fn, uint32_t a0, uint32_t a1, uint32_t a2, u
   c->r[4] = a0; c->r[5] = a1; c->r[6] = a2; c->r[7] = a3;
   c->pr = 0x8C000F00u; /* returned-to address of an HLE-made call: never executed */
   rt_call(c, fn);
+  if (rt_unw) { rt_log("rt yield inside a call the HLE made to %08x", fn); rt_stop("unwind through an HLE call"); }
   uint32_t r0 = c->r[0];
   *c = save;
   c->r[0] = r0;
@@ -164,7 +192,7 @@ void rt_budget(SH4 *c, uint32_t at) {
 }
 
 void rt_summary(void) {
-  rt_log("rt calls %u hle %u interp-calls %u interp-steps %u", n_calls, n_hle, n_interp_calls, n_interp_steps);
+  rt_log("rt calls %u hle %u interp-calls %u interp-steps %u yield-depth %d", n_calls, n_hle, n_interp_calls, n_interp_steps, rw_depth_max);
   int shown = 0;
   for (int i = 0; i < IO_N && shown < 40; i++)
     if (io[i].nr | io[i].nw) { rt_log("io %08x reads %u writes %u", io[i].a, io[i].nr, io[i].nw); shown++; }

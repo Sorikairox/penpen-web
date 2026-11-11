@@ -134,6 +134,7 @@ inst.exports.rt_set_frame_log?.(opt('--frame-log', 1));
 const t0 = Date.now();
 try {
   inst.exports.rtw_start();
+  for (;;) inst.exports.rtw_frame(); // S6: stepped, one frame per call, until the frame limit traps
 } catch (e) {
   console.log('boot wasm stopped (' + (e instanceof WebAssembly.RuntimeError ? 'trap' : 'error') + ') after ' + (Date.now() - t0) + ' ms');
 }

@@ -12,7 +12,7 @@
 #endif
 RTW_IMPORT("rtw_disc_toc") int rtw_disc_toc(void *entries, int max);
 RTW_IMPORT("rtw_disc_read") int rtw_disc_read(int track, int lba, int count, void *dst);
-RTW_IMPORT("rtw_log") void rtw_log(const char *p, int len);
+RTW_IMPORT("rtw_log") int rtw_log(const char *p, int len);
 
 /* logging (no stdio in the wasm build): %d %u %x %08x %s %c */
 void rt_log(const char *fmt, ...);
@@ -44,6 +44,8 @@ extern int hle_verbose;
 extern SH4 *rt_cpu;
 void rt_guest_call(SH4 *c, uint32_t fn, uint32_t a0, uint32_t a1, uint32_t a2, uint32_t a3);
 void rt_summary(void);
+void rt_rew_done(void);   /* the yielding HLE was reached again by the rewind */
+int rt_rw_depth(void);    /* deepest call chain saved so far */
 #define GUEST_SCRATCH 0x8C001000u /* the BIOS work area (no BIOS runs): HLE structures */
 
 #endif

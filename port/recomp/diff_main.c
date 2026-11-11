@@ -110,6 +110,11 @@ void rt_illegal_slot(SH4 *c, uint32_t a) { (void)c; jb_addr = a; longjmp(jb, END
 void rt_unsupported(SH4 *c, uint32_t a) { (void)c; jb_addr = a; longjmp(jb, END_UNSUP); }
 void rt_badret(SH4 *c, uint32_t want, uint32_t at) { (void)c; (void)want; jb_addr = at; longjmp(jb, END_BADRET); }
 void rt_budget(SH4 *c, uint32_t at) { (void)c; jb_addr = at; longjmp(jb, END_BUDGET); }
+/* S6 resumable frames: the harness never unwinds (rt_unw stays 0) */
+int rt_unw, rt_rew;
+uint32_t rt_rew_t;
+void rt_unw_save(uint32_t fn, int site, uint32_t t) { (void)fn; (void)site; (void)t; }
+int rt_rew_pop(SH4 *c, uint32_t fn) { (void)c; (void)fn; return -1; }
 
 /* ---- random state ---- */
 static uint64_t rs;

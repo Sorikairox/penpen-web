@@ -213,30 +213,61 @@ class Gen:
         self.mutant = mutant
         self.affected = 0
         self.via_rt = set(via_rt)     # translated, but always called through rt_call (HLE may take them)
+        self.loopy = False
+        self.sw = set()
+        self.sites = 0
+        self.backedge = False
 
     def fname(self, a):
         return 'f_%08x' % a
 
     def emit_func(self, start, end):
+        """One C function. Resumable (S6): every call is a numbered site R_n; when the callee returns with
+        rt_unw set (the frame loop is unwinding to the host) the site is saved and the function returns; when
+        it is entered with rt_rew set it pops its site and continues at that call (rt_gen.h). A function with
+        sites and back edges is emitted in loop mode: its entry and every back edge go through the label
+        switch D_, so the resume entries never make the control flow irreducible (clang's wasm backend)."""
+        code = self._emit(start, end, False)
+        if self.sites and self.backedge and not code[2]:
+            code = self._emit(start, end, True)
+        return code
+
+    def resume(self, nsites):
+        return '  if (rt_rew) switch (rt_rew_pop(c, F_)) {%s default: break; }' % ''.join(
+            ' case %d: t_ = rt_rew_t; goto R_%d;' % (n, n) for n in range(nsites))
+
+    def site(self):
+        self.sites += 1
+        return self.sites - 1
+
+    def _emit(self, start, end, loop):
         img = self.img
         seen, slots, indirect = analyse(img, start, end)
         labels = sorted(seen)  # slot-only addresses are not in seen; a slot reached directly is
         lab = set(labels)
+        loopy = indirect or loop
         out = []
         self.affected = 0
         self.need_switch = None
+        self.sites = 0
+        self.backedge = False
+        self.loopy = loopy
+        self.sw = set(lab) if indirect else {start}
         w = out.append
         w('void %s(SH4 *c) {' % self.fname(start))
-        w('  uint32_t t_;')
-        w('  (void)t_;')
-        if indirect:
-            w('  t_ = 0x%08xu; goto D_;' % start)
+        w('  const uint32_t F_ = 0x%08xu;' % start)
+        w('  uint32_t t_ = 0;')
+        w('  (void)t_; (void)F_;')
+        w(None)  # the entry (filled in below, once the sites are known)
 
         def jump(t, a):
             t = t & 0xFFFFFFFF
             if start <= t < end and t in lab:
-                if t <= a and indirect:
+                if t <= a:
+                    self.backedge = True
+                if t <= a and loopy:
                     # functions with a label switch: every cycle goes through D_ (reducible for wasm)
+                    self.sw.add(t)
                     return 'BACK(0x%08xu); t_ = 0x%08xu; goto D_;' % (a, t)
                 return ('BACK(0x%08xu); ' % a if t <= a else '') + 'goto L_%08x;' % t
             return self.tail(t)
@@ -324,16 +355,23 @@ class Gen:
                     w('  { t_ = c->pr; %s c->pc = t_; return; }' % slot(a + 2))
             else:  # RTE, TRAPA, SLEEP, LDTLB
                 w('  rt_unsupported(c, 0x%08xu); return;' % a)
-        if indirect:
-            self.need_switch = lab
-        if self.need_switch:
+        if loopy:
+            dflt = self.site()
+            nsites = self.sites
             w('D_:')
+            # resuming: only on entry (rt_rew is cleared at the yield, before any back edge comes here again)
+            w(self.resume(nsites))
             w('  switch (RT_NORM(t_)) {')
-            for x in sorted(self.need_switch):
+            for x in sorted(self.sw):
                 w('  case 0x%08xu: goto L_%08x;' % (x, x))
             w('  default: break;')
             w('  }')
-            w('  rt_call(c, t_); return;')
+            w('  R_%d: TAIL_I(t_, %d); return;' % (dflt, dflt))
+            out[out.index(None)] = '  t_ = F_; goto D_;'
+        elif self.sites:
+            out[out.index(None)] = self.resume(self.sites)
+        else:
+            out.remove(None)
         w('}')
         return '\n'.join(out), len(labels), indirect
 
@@ -349,37 +387,45 @@ class Gen:
 
     def tail(self, t):
         k = self.known(t)
+        n = self.site()
         if k is not None:
-            return 'TAIL_D(%s, 0x%08xu); return;' % (self.fname(k), k)
-        return 'rt_call(c, 0x%08xu); return;' % (t & 0xFFFFFFFF)
+            return 'R_%d: TAIL_D(%s, 0x%08xu, %d); return;' % (n, self.fname(k), k, n)
+        return 'R_%d: TAIL_I(0x%08xu, %d); return;' % (n, t & 0xFFFFFFFF, n)
 
     def call_direct(self, t, ret, a):
         k = self.known(t)
+        n = self.site()
         if k is not None:
-            return 'CALL_D(%s, 0x%08xu, 0x%08xu, 0x%08xu);' % (self.fname(k), k, ret, a)
-        return 'CALL_I(0x%08xu, 0x%08xu, 0x%08xu);' % (t & 0xFFFFFFFF, ret, a)
+            return 'R_%d: CALL_D(%s, 0x%08xu, 0x%08xu, 0x%08xu, %d);' % (n, self.fname(k), k, ret, a, n)
+        return 'R_%d: CALL_I(0x%08xu, 0x%08xu, 0x%08xu, %d);' % (n, t & 0xFFFFFFFF, ret, a, n)
 
     def call_ind(self, k, ret, a):
         if k is not None and self.known(k) is not None:
             k = self.known(k)
-            return 'if (t_ == 0x%08xu) CALL_D(%s, 0x%08xu, 0x%08xu, 0x%08xu); else CALL_I(t_, 0x%08xu, 0x%08xu);' % (
-                k, self.fname(k), k, ret, a, ret, a)
-        return 'CALL_I(t_, 0x%08xu, 0x%08xu);' % (ret, a)
+            n, m = self.site(), self.site()
+            return ('if (t_ == 0x%08xu) { R_%d: CALL_D(%s, 0x%08xu, 0x%08xu, 0x%08xu, %d); } '
+                    'else { R_%d: CALL_I(t_, 0x%08xu, 0x%08xu, %d); }') % (k, n, self.fname(k), k, ret, a, n, m, ret, a, m)
+        n = self.site()
+        return 'R_%d: CALL_I(t_, 0x%08xu, 0x%08xu, %d);' % (n, ret, a, n)
 
     def ijump(self, k, lab, a, start=0, end=0, local=None):
         s = ''
         if k is not None and local is not None and start <= norm(k) < end and norm(k) in local:
-            if norm(k) <= a and lab:
+            if norm(k) <= a:
+                self.backedge = True
+            if norm(k) <= a and self.loopy:
+                self.sw.add(norm(k))
                 s = 'if (RT_NORM(t_) == 0x%08xu) { BACK(0x%08xu); goto D_; } ' % (norm(k), a)
             else:
                 s = 'if (RT_NORM(t_) == 0x%08xu) { %sgoto L_%08x; } ' % (norm(k), 'BACK(0x%08xu); ' % a if norm(k) <= a else '', norm(k))
         elif k is not None and self.known(k) is not None:
             k = self.known(k)
-            s = 'if (t_ == 0x%08xu) { TAIL_D(%s, 0x%08xu); return; } ' % (k, self.fname(k), k)
+            n = self.site()
+            s = 'if (t_ == 0x%08xu) { R_%d: TAIL_D(%s, 0x%08xu, %d); return; } ' % (k, n, self.fname(k), k, n)
         if lab:
-            self.need_switch = lab
             return s + 'BACK(0x%08xu); goto D_;' % a  # the function's one shared label switch
-        return s + 'rt_call(c, t_); return;'
+        n = self.site()
+        return s + 'R_%d: TAIL_I(t_, %d); return;' % (n, n)
 
 
 def main():

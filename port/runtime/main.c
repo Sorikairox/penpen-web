@@ -26,9 +26,13 @@ static int load_file(const char *name, uint32_t at) {
 }
 
 #ifdef __wasm__
-__attribute__((export_name("rtw_start")))
+#define EXPORT(n) __attribute__((export_name(n)))
+#else
+#define EXPORT(n)
 #endif
-void rtw_start(void) {
+
+/* rtw_start: load the program from the disc and set the CPU up; the game runs in rtw_frame. */
+EXPORT("rtw_start") int rtw_start(void) {
   SH4 *c = &cpu;
   rt_cpu = c;
   sh4_init_tables();
@@ -48,9 +52,19 @@ void rtw_start(void) {
   c->vbr = 0x8C00F400u;
   c->fpscr = 0x00040001u;
   c->pr = 0x8C000F00u;
-  c->budget = 200000000;
-  rt_log("boot calling the entry point");
+  return 0;
+}
+
+/* rtw_frame: run the game until its next njWaitVSync (S6, rt_gen.h): the first call enters the program,
+ * the next ones rewind into the njWaitVSync where the previous frame stopped. */
+static int started;
+EXPORT("rtw_frame") int rtw_frame(void) {
+  SH4 *c = &cpu;
+  c->budget = 200000000; /* the watchdog counts back edges per frame */
+  if (!started) { started = 1; rt_log("boot calling the entry point"); }
+  else rt_rew = 1;
   rt_call(c, ENTRY);
+  if (rt_unw) { rt_unw = 0; return 0; }
   rt_log("boot the entry point returned to %08x", c->pc);
   rt_stop("returned");
 }
@@ -59,8 +73,9 @@ void rtw_start(void) {
 #include <stdio.h>
 #include <stdlib.h>
 extern const char *disc_dir;
-void rtw_log(const char *p, int len) { fwrite(p, 1, (size_t)len, stdout); fputc('\n', stdout); fflush(stdout); }
+int rtw_log(const char *p, int len) { fwrite(p, 1, (size_t)len, stdout); fputc('\n', stdout); fflush(stdout); return 0; }
 int main(int argc, char **argv) {
+  hle_max_frames = 3; hle_verbose = 600; hle_digest_every = 1; hle_frame_log = 1; /* the S3/S4 test defaults */
   for (int i = 1; i < argc; i++) {
     if (!strcmp(argv[i], "--disc")) disc_dir = argv[++i];
     else if (!strcmp(argv[i], "--frames")) hle_max_frames = atoi(argv[++i]);
@@ -71,7 +86,7 @@ int main(int argc, char **argv) {
     else if (!strcmp(argv[i], "--frame-log")) hle_frame_log = atoi(argv[++i]);
   }
   rtw_start();
-  return 0;
+  for (;;) rtw_frame();
 }
 #else
 __attribute__((export_name("rt_set_frames"))) void rt_set_frames(int n) { hle_max_frames = n; }
