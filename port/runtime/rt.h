@@ -37,6 +37,7 @@ uint32_t rt_interp_calls(void);
 void hle_init(SH4 *c);
 void hle_summary(void);
 void hle_ring_dump(void);
+uint32_t hle_frame(void);
 extern int hle_max_frames;
 extern int hle_verbose;
 

@@ -42,7 +42,8 @@ void rt_stop(const char *why) {
   rt_log("boot stop: %s", why);
   hle_ring_dump();
   rt_summary();
-  hle_summary();
+  if (hle_verbose || hle_frame_log) hle_summary(); /* the test hosts; a browser host keeps only its last lines */
+  rt_log("boot stopped at frame %u: %s", hle_frame(), why);
 #ifdef __wasm__
   __builtin_trap();
 #else

@@ -56,3 +56,4 @@
 8c06262e	SHC word-copy helper 8c0625fe: entry by word count (run time)
 8c062632	SHC word-copy helper 8c0625fe: entry by word count (run time)
 8c062636	SHC word-copy helper 8c0625fe: entry by word count (run time)
+8c016ec0	gap after 8c016e98, entered during a race (S6 rt interp in the browser e2e; it waits in njWaitVSync)
