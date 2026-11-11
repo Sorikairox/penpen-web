@@ -434,6 +434,13 @@ public class S1Regions extends GhidraScript {
             String ev = e < gameEnd ? fixedEvid(e) : evid.getOrDefault(e, "-");
             if (e >= gameEnd && rowLabel.containsKey(e)) reg = rowLabel.get(e);
             String nm = f.getName();
+            // a Ghidra thunk shows its target's name: make the row's name unique
+            if (f.isThunk()) {
+                Function t = f.getThunkedFunction(true);
+                String tn = t == null ? "unknown" : t.getName();
+                if (tn.startsWith("FUN_")) tn = tn.substring(4);
+                nm = "j_" + tn + "_" + String.format("%08x", e);
+            }
             if (!nm.matches("[A-Za-z0-9_]+")) nm = String.format("FUN_%08x", e);
             w.println(String.format("%08x\t%d\t%d\t%s\t%s\t%s\t%s", e, extentEnd(f) - e, f.getBody().getNumAddresses(), nm, reg,
                 nconf.getOrDefault(e, f.getSymbol().getSource() == SourceType.USER_DEFINED && e == 0x8C010000L ? "high" : "-"), ev));

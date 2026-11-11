@@ -36,7 +36,8 @@ used only to build the image. Nothing from the disc reached the host except addr
 - Files: `docker/ghidra/Dockerfile`, `tools/ghidra.sh` (`import | seed | export | all | post Script.java`),
   `tools/ghidra/*.java` (S1Setup, S1Seed, S1Regions, S1Strings [writes strrefs.tsv in the volume only], S1Coverage,
   diagnostics S1Probe/S1Gaps/S1List/S1Mnem/S1DataMap/S1HwHist/S1Unref/S1XCalls/S1Stats), `port/symbols/functions.tsv`
-  (address, extent, instruction bytes, name, region, name confidence, evidence), `port/symbols/regions.tsv`.
+  (address, extent, instruction bytes, name, region, name confidence, evidence; 342 Ghidra thunks are named
+  `j_<target>_<address>`), `port/symbols/regions.tsv`.
   `tools/ghidra.sh all` reproduces everything in ~75 s.
 
 Next (S2 census): the 224 SDK entry points the game calls, named by behaviour/API docs; refine regions (gdFs via the
