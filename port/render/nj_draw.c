@@ -11,6 +11,7 @@
  *     format if &4, u16 dims if &2, u32 global index if &1}; the textures (GBIX + PVRT chunks) follow
  *     the header. */
 #include <stdlib.h>
+#include <math.h>
 #include "nj.h"
 #include "pvr.h"
 
@@ -242,6 +243,65 @@ static void h_njDrawSprite2D(SH4 *c) {
   R(0) = 0;
 }
 
+/* njDrawPolygon(NJS_POLYGON_VTX *v, Int n, Int trans) (S8): {x, y, z, ARGB} per vertex, one strip; the SDK
+ * copies z into the vertex's 1/w field as it is; trans = translucent list (else opaque); no texture */
+static uint32_t n_poly2d;
+static void h_njDrawPolygon(SH4 *c) {
+  hle_logcall(c, "");
+  uint32_t p = R(4), n = R(5) > 1024 ? 1024 : R(5);
+  int tr = R(6) != 0;
+  rd_vtx v[1024];
+  for (uint32_t i = 0; i < n; i++, p += 16) {
+    v[i].x = nj_f(p); v[i].y = nj_f(p + 4); v[i].iw = nj_f(p + 8); v[i].u = v[i].v = 0; v[i].col = rd32(p + 12); v[i].ofs = 0;
+  }
+  rd_state s;
+  nj_state(&s, tr ? RD_TR : RD_OP, 0, tr);
+  rd_strip(&s, v, (int)n, 0);
+  n_poly2d++;
+  R(0) = 0;
+}
+/* njDrawTriangle2D / njDrawLine2D(NJS_POINT2COL *p, Int n, Float pri (FR4), Uint32 attr) (S8):
+ * NJS_POINT2COL {NJS_POINT2 *p; NJS_COLOR *col; NJS_TEX *tex; Uint32 num}; attr bits read in the SDK's code:
+ * 1 fan, 2 connected (strip / polyline), 0x40 translucent, 0x80000000 textured (not modelled: no texture
+ * number in the arguments; drawn untextured), 0x20 picks another vertex emitter (not identified). The
+ * colour array is taken per vertex (one colour when it is shorter is not known). Not called on any route
+ * so far (S8 counts over 6 000 frames of the boot and of the S4 route). */
+static void prim2d(SH4 *c, int lines) {
+  uint32_t pc = R(4), n = R(5), attr = R(6);
+  float pri = c->fr.f[4], iw = -pri >= 1.0f ? 1.0f / -pri : 1.0f;
+  uint32_t pts = rd32(pc), cols = rd32(pc + 4), num = rd32(pc + 12);
+  if (!sh4_is_ram(pts)) return;
+  int tr = (attr & 0x40) != 0;
+  rd_state s;
+  nj_state(&s, tr ? RD_TR : RD_OP, 0, tr);
+  uint32_t nv = (attr & 3) ? n + (lines ? 1 : 2) : n * (lines ? 2 : 3);
+  if (num && nv > num) nv = num;
+  if (nv > 4096) nv = 4096;
+  static rd_vtx v[4096];
+  for (uint32_t i = 0; i < nv; i++) {
+    v[i].x = nj_f(pts + i * 8); v[i].y = nj_f(pts + i * 8 + 4); v[i].iw = iw; v[i].u = v[i].v = 0;
+    v[i].col = sh4_is_ram(cols) ? rd32(cols + i * 4) : 0xFFFFFFFFu; v[i].ofs = 0;
+  }
+  if (lines) { /* a 1-pixel wide quad per segment */
+    uint32_t segs = (attr & 2) ? (nv ? nv - 1 : 0) : nv / 2;
+    for (uint32_t k = 0; k < segs; k++) {
+      const rd_vtx *a = &v[(attr & 2) ? k : 2 * k], *b = &v[(attr & 2) ? k + 1 : 2 * k + 1];
+      float dx = b->x - a->x, dy = b->y - a->y, l = sqrtf(dx * dx + dy * dy);
+      if (l < 1e-6f) continue;
+      float nx = -dy / l * 0.5f, ny = dx / l * 0.5f;
+      rd_vtx q[4] = {*a, *a, *b, *b};
+      q[0].x += nx; q[0].y += ny; q[1].x -= nx; q[1].y -= ny; q[2].x += nx; q[2].y += ny; q[3].x -= nx; q[3].y -= ny;
+      rd_strip(&s, q, 4, 0);
+    }
+    return;
+  }
+  if (attr & 1) { for (uint32_t i = 1; i + 1 < nv; i++) { rd_vtx t[3] = {v[0], v[i], v[i + 1]}; rd_tris(&s, t, 3); } }
+  else if (attr & 2) rd_strip(&s, v, (int)nv, 0);
+  else rd_tris(&s, v, (int)(nv / 3 * 3));
+}
+static void h_njDrawTriangle2D(SH4 *c) { hle_logcall(c, ""); prim2d(c, 0); n_poly2d++; R(0) = 0; }
+static void h_njDrawLine2D(SH4 *c) { hle_logcall(c, ""); prim2d(c, 1); n_poly2d++; R(0) = 0; }
+
 const nj_impl_t nj_impls[] = {
   {"njSetBackColor", h_njSetBackColor}, {"njSetBorderColor", h_njSetBorderColor},
   {"njColorBlendingMode", h_njColorBlendingMode}, {"njTextureFilterMode", h_njTextureFilterMode},
@@ -249,5 +309,6 @@ const nj_impl_t nj_impls[] = {
   {"njFogEnable", h_njFogEnable}, {"njFogDisable", h_njFogDisable},
   {"njInitTexture", h_njInitTexture}, {"njLoadTexturePvmMemory", h_njLoadTexturePvmMemory},
   {"njReleaseTexture", h_njReleaseTexture}, {"njDrawSprite2D", h_njDrawSprite2D},
+  {"njDrawPolygon", h_njDrawPolygon}, {"njDrawTriangle2D", h_njDrawTriangle2D}, {"njDrawLine2D", h_njDrawLine2D},
 };
 const int nj_nimpls = (int)(sizeof nj_impls / sizeof nj_impls[0]);

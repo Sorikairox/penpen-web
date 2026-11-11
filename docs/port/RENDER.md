@@ -121,14 +121,33 @@ load time because the game reads the PVM into the texture buffer area and overwr
   negative length = reversed), volumes 56–58.
 - Strip flags: 0x01 ignore light, 0x08 use alpha (translucent list, the material's blend factors), 0x10
   double sided (no culling), 0x40 environment map (UV from the view-space normal, the material's texture).
-- Colour: strip colours, else vertex colours, else **easy light**: diffuse × (ambient + max(0, −n·L) ·
-  intensity) × light colour, with `nj_LightL1Dir/Intensity/Color` (FR4–FR6). `njControl3D` bit 0x10
+- Colour: strip colours, else vertex colours, else the **family's light** (S8): L1/L3/L4 one directional
+  light each: diffuse × (ambient + max(0, −n·L) · intensity) × light colour (`nj_LightLnDir/Intensity/Color`,
+  FR4–FR6); L2 four lights (`Dir` = light 0, `DirN/ColorN/IntensityN(i)`, ambient colour `L2Color`, taken by
+  `L2Update`): diffuse × (ambient + Σ max(0, −n·Lᵢ) · intensityᵢ · colourᵢ). Values seen (set every frame):
+  L1/L3/L4 (0, .45, .89), 1, ambient .4; L2 light 0 (0, −.71, −.71) white, lights 1–3 zero, ambient .4.
+  **Specular** (L2/L3/L4, not the L1 "easy" family; strip flag 0x02 ignores it): the material's specular
+  colour × (n·h)^e, e = the specular alpha byte, h = half vector of light and eye, into the offset colour
+  (mode bit 19). The title tube (L3, specular 0x0BFFFFFF) shows highlight rings. `njControl3D` bit 0x10
   (constant material): the constant material replaces the diffuse colour, alpha included (the title's two ice
   layers cross-fade this way).
 - Motions: NJS_MOTION {mdata, nbFrame, type, inp_fn}; per node n = popcount(type) pointers then n counts;
   pos/ang/scl keys {frame, 3 values} linear (angles as Sint32 differences), wrap from the last key to the first
   over nbFrame; a channel with keys overrides the UNIT flag. Shape motions: VERT/NORM keys {frame, pointer},
-  **nearest key** (no blending yet).
+  **linear blend of the two keys around the frame** per point / normal (S8; normals renormalised).
+- **Basic models** (S8): the game's `nj_ObjectB` (0x8C0C30A8, one site, once per character in races and the
+  attract demo) takes a basic **NJS_MODEL** {points, normals, nbPoint, meshsets, mats, nbMeshset/nbMat,
+  center, r}, not an object (the SDK saves the polygon context, checks nbPoint against the vertex buffer,
+  draws, restores). Meshsets (24 bytes: type<<14 | material, nbMesh, meshes, attrs, normals, vertex colours,
+  UVs per corner; triangles, quads in strip order, N-gons and strips with a count, 0x8000 = reversed),
+  materials (20 bytes: diffuse, specular, exponent, attr_texId, attrflags with blend factors in bits 31–26,
+  ignore light 0x02000000, double side 0x00800000, environment 0x00400000, texture 0x00200000, alpha
+  0x00100000, ignore specular 0x00080000, flips/clamps 0x40000–0x8000, filter 13–14). It is the slide trail
+  behind each character (32 quads, vertex colours fading out, texture 202, alpha). Lit with the L1 light.
+- 2D (S8, nj_draw.c): `njDrawPolygon(vtx {x, y, z, ARGB}, n, trans)` = one strip, z used as 1/w as the SDK
+  does; `njDrawTriangle2D/njDrawLine2D(NJS_POINT2COL, n, pri, attr)` with the attr bits read in the SDK (1
+  fan, 2 connected, 0x40 translucent; 0x80000000 texture and 0x20 not modelled), lines as 1-pixel quads.
+  None of them, nor `njPrint`, is called in 6 000 frames of the boot or of the S4 route.
 - `njDrawSprite3D(sprite, n, attr)`: the sprite quad in the model xy plane through the current matrix.
 - Cheap shadow: `njCnkModDrawModel(object)` (the shadow object) → its model's volume chunks into the opaque
   modifier volume list; `njSetCheapShadowMode(160)` intensity. **Only polygons with the PCW shadow bit are
@@ -172,11 +191,10 @@ house 1104, course map 1563, race 1762).
 Known wrong or missing (to do):
 
 - Translucency is sorted per triangle (no per-pixel autosort); no punch-through list is used by the game.
-- Light families L2/L3/L4 setters are still stubs (L1 values are used for every family); no specular / offset
-  colour; flat shading, ignore-ambient flags ignored.
-- Shape motions take the nearest key (no vertex blending); spline motions (inp_fn) are interpolated linearly.
-- `nj_ObjectB` / `nj_ModelB` (basic NJS_MODEL, used by the attract demo's course) not drawn; `njDrawPolygon`,
-  `njDrawTriangle2D`, `njDrawLine2D`, `njPrint` not implemented (not met on the route).
+- Flat shading and ignore-ambient strip flags ignored; the L2 IntensityN second value (100 on the route) is
+  not used; the specular model is our reading (no SDK constant checked).
+- Spline motions (inp_fn) are interpolated linearly.
+- `nj_ModelB` (1 site, never called on the routes), the B-family motions and `njPrint` not implemented.
 - Palettised textures not decoded; `njLoadTexture` (GBIX/PVRT from a file) not implemented (1 site).
 - `njCalcScreen`'s guest result did not match the formula in the self-check (its arguments are not
   (point, sx*, sy*)); the projection is validated by the pictures instead.

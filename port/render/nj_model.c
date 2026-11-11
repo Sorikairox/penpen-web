@@ -41,10 +41,32 @@ static void gcall(SH4 *c, uint32_t fn, uint32_t a0, uint32_t a1, uint32_t a2, ui
 }
 
 /* ---- lights (per family; one shared set for now: RENDER.md 5) ---- */
-static float l_dir[3] = {0, 0, 1}, l_dif = 1.0f, l_amb = 0.25f, l_col[3] = {1, 1, 1};
-static void h_lightdir(SH4 *c) { hle_logcall(c, ""); l_dir[0] = c->fr.f[4]; l_dir[1] = c->fr.f[5]; l_dir[2] = c->fr.f[6]; R(0) = 0; }
-static void h_lightint(SH4 *c) { hle_logcall(c, ""); l_dif = c->fr.f[4]; l_amb = c->fr.f[5]; R(0) = 0; }
-static void h_lightcol(SH4 *c) { hle_logcall(c, ""); l_col[0] = c->fr.f[4]; l_col[1] = c->fr.f[5]; l_col[2] = c->fr.f[6]; R(0) = 0; }
+/* Families (docs/port/SDK.md 2.6): L1, L3, L4 = one directional light each, set by Dir (FR4-6, view space,
+ * the direction the light travels), Intensity (FR4 diffuse, FR5 ambient) and Color (FR4-6); L2 = up to four
+ * directional lights (Dir = light 0, DirN/ColorN/IntensityN(i) with the index in R4) plus an ambient colour
+ * (L2Color), taken by L2Update. The game sets them all once per frame (S8 trace: L1/L3/L4 (0, .45, .89),
+ * diffuse 1, ambient .4; L2 light 0 (0, -.71, -.71) white, lights 1-3 zero vectors, ambient .4 grey). The B
+ * family (basic models) has no setter of its own: it uses the L1 values. */
+typedef struct { float dir[3], dif, amb, col[3]; } light1_t;
+static light1_t fam[4] = {{{0, 0, 1}, 1, .25f, {1, 1, 1}}, {{0, 0, 1}, 1, .25f, {1, 1, 1}}, {{0, 0, 1}, 1, .25f, {1, 1, 1}}, {{0, 0, 1}, 1, .25f, {1, 1, 1}}};
+typedef struct { float dir[3], col[3], dif; } lightn_t;
+static lightn_t l2[4] = {{{0, 0, 1}, {1, 1, 1}, 1}}, l2_set[4] = {{{0, 0, 1}, {1, 1, 1}, 1}};
+static float l2_amb[3] = {.25f, .25f, .25f}, l2_amb_set[3] = {.25f, .25f, .25f};
+static int cur_fam; /* family of the draw in progress: 0 L1, 1 L2, 2 L3, 3 L4 */
+#define F3(dst) do { (dst)[0] = c->fr.f[4]; (dst)[1] = c->fr.f[5]; (dst)[2] = c->fr.f[6]; } while (0)
+#define LIGHT_SETTERS(n, i) \
+  static void h_l##n##dir(SH4 *c) { hle_logcall(c, ""); F3(fam[i].dir); R(0) = 0; } \
+  static void h_l##n##int(SH4 *c) { hle_logcall(c, ""); fam[i].dif = c->fr.f[4]; fam[i].amb = c->fr.f[5]; R(0) = 0; } \
+  static void h_l##n##col(SH4 *c) { hle_logcall(c, ""); F3(fam[i].col); R(0) = 0; }
+LIGHT_SETTERS(1, 0)
+LIGHT_SETTERS(3, 2)
+LIGHT_SETTERS(4, 3)
+static void h_l2dir(SH4 *c) { hle_logcall(c, ""); F3(l2_set[0].dir); R(0) = 0; }
+static void h_l2dirn(SH4 *c) { hle_logcall(c, ""); if (R(4) < 4) F3(l2_set[R(4)].dir); R(0) = 0; }
+static void h_l2coln(SH4 *c) { hle_logcall(c, ""); if (R(4) < 4) F3(l2_set[R(4)].col); R(0) = 0; }
+static void h_l2intn(SH4 *c) { hle_logcall(c, ""); if (R(4) < 4) l2_set[R(4)].dif = c->fr.f[4]; R(0) = 0; }
+static void h_l2col(SH4 *c) { hle_logcall(c, ""); F3(l2_amb_set); R(0) = 0; }
+static void h_l2update(SH4 *c) { hle_logcall(c, ""); memcpy(l2, l2_set, sizeof l2); memcpy(l2_amb, l2_amb_set, sizeof l2_amb); R(0) = 0; }
 
 /* ---- vertex buffer ---- */
 #define NVB 32768
@@ -64,7 +86,13 @@ static void xnorm(const float *n, float *o) {
   float l = sqrtf(o[0] * o[0] + o[1] * o[1] + o[2] * o[2]);
   if (l > 1e-12f) { o[0] /= l; o[1] /= l; o[2] /= l; }
 }
-static uint32_t shape_vert, shape_norm; /* shape motion: replacement point / normal arrays for this node */
+/* shape motion: the two key arrays of points / normals around the frame and the blend between them */
+static uint32_t shape_vert, shape_norm, shape_vert1, shape_norm1;
+static float shape_t;
+static void shape_get(uint32_t a0, uint32_t a1, uint32_t i, float *o) {
+  uint32_t s0 = a0 + i * 12, s1 = a1 + i * 12;
+  for (int k = 0; k < 3; k++) { float x = nj_f(s0 + 4u * (uint32_t)k); o[k] = a1 ? x + (nj_f(s1 + 4u * (uint32_t)k) - x) * shape_t : x; }
+}
 static uint32_t n_unknown_v, n_unknown_p;
 static void vlist(uint32_t a) {
   for (int guard = 0; guard < 4096; guard++) {
@@ -80,11 +108,11 @@ static void vlist(uint32_t a) {
     for (uint32_t i = 0; i < n; i++, q += stride) {
       float p[3] = {nj_f(q), nj_f(q + 4), nj_f(q + 8)}, nn[3] = {0, 0, 0};
       uint32_t idx = off + i, extra = ex ? rd32(q + (uint32_t)(pw + nw) * 4) : 0;
-      if (shape_vert) { uint32_t s = shape_vert + i * 12; p[0] = nj_f(s); p[1] = nj_f(s + 4); p[2] = nj_f(s + 8); }
+      if (shape_vert) shape_get(shape_vert, shape_vert1, i, p);
       if (nw >= 3) { uint32_t b = q + (uint32_t)pw * 4; nn[0] = nj_f(b); nn[1] = nj_f(b + 4); nn[2] = nj_f(b + 8); }
       else if (nw == 1) { uint32_t v = rd32(q + (uint32_t)pw * 4); /* 10:10:10 signed */
         nn[0] = (float)((int32_t)(v << 2) >> 22) / 511.0f; nn[1] = (float)((int32_t)(v << 12) >> 22) / 511.0f; nn[2] = (float)((int32_t)(v << 22) >> 22) / 511.0f; }
-      if (shape_norm && nw) { uint32_t s = shape_norm + i * 12; nn[0] = nj_f(s); nn[1] = nj_f(s + 4); nn[2] = nj_f(s + 8); }
+      if (shape_norm && nw) shape_get(shape_norm, shape_norm1, i, nn); /* xnorm renormalises */
       float wgt = 1.0f;
       int mode = -1;
       if (t == 37 || t == 44) { idx = off + (extra & 0xFFFF); wgt = (float)(extra >> 16) / 255.0f; mode = (int)(fl & 3); }
@@ -114,7 +142,7 @@ static uint32_t cache[16];
 static uint32_t n_tris3d, n_models, n_clipped;
 
 static float near_z(void) { float n = nj_f(NJG_NEARFAR); return n > 0.001f ? n : 1.0f; }
-typedef struct { float p[3], u, v; float c[4]; } cv_t; /* view-space vertex before projection */
+typedef struct { float p[3], u, v; float c[4], s[3]; } cv_t; /* view-space vertex before projection; s = offset (specular) */
 static void project(const cv_t *a, rd_vtx *o) {
   float dist = nj_f(NJG_SCREEN), cx = nj_f(NJG_SCREEN + 12), cy = nj_f(NJG_SCREEN + 16);
   float iw = 1.0f / a->p[2]; /* view space: +z forward (checked against the SDK's njCalcPoint) */
@@ -124,12 +152,16 @@ static void project(const cv_t *a, rd_vtx *o) {
   static const int sh[4] = {16, 8, 0, 24}; /* r g b a -> ARGB */
   uint32_t col = 0;
   for (int k = 0; k < 4; k++) { float f = a->c[k] < 0 ? 0 : a->c[k] > 1 ? 1 : a->c[k]; col |= (uint32_t)(f * 255.0f + 0.5f) << sh[k]; }
-  o->col = col; o->ofs = 0;
+  o->col = col;
+  uint32_t ofs = 0xFF000000u;
+  for (int k = 0; k < 3; k++) { float f = a->s[k] < 0 ? 0 : a->s[k] > 1 ? 1 : a->s[k]; ofs |= (uint32_t)(f * 255.0f + 0.5f) << sh[k]; }
+  o->ofs = ofs;
 }
 static void lerpv(const cv_t *a, const cv_t *b, float t, cv_t *o) {
   for (int k = 0; k < 3; k++) o->p[k] = a->p[k] + (b->p[k] - a->p[k]) * t;
   o->u = a->u + (b->u - a->u) * t; o->v = a->v + (b->v - a->v) * t;
   for (int k = 0; k < 4; k++) o->c[k] = a->c[k] + (b->c[k] - a->c[k]) * t;
+  for (int k = 0; k < 3; k++) o->s[k] = a->s[k] + (b->s[k] - a->s[k]) * t;
 }
 /* one triangle in view space: near clip (z >= near is visible), project, emit */
 static void tri3(const rd_state *s, const cv_t *a, const cv_t *b, const cv_t *c, int cull) {
@@ -160,16 +192,50 @@ static void argb4(uint32_t col, float *o) {
 /* the colour of a vertex: pre-lit colour, or the easy light: diffuse * (ambient + max(0, n.L) * intensity) */
 #define CTRL_CONSTANT_MATERIAL 0x10u /* njControl3D: the constant material replaces the diffuse colour */
 static uint32_t diffuse(void) { return (rd32(NJG_CTRL3D) & CTRL_CONSTANT_MATERIAL) ? nj_argb_f(NJG_CMAT) : mat.dif; }
-static void shade(const vb_t *v, const uint32_t *scol, uint32_t sflags, float *o) {
+/* specular (offset colour) of one light: the material's specular colour x (n.h)^exponent, h the half vector
+ * between the light and the eye (view space: the eye looks along +z); the exponent is the specular colour's
+ * alpha byte (S8; strip flag 0x02 ignores it; the L1 "easy" family has none) */
+static float spec_term(const float *n, const float *ldir, const float *pos, float e) {
+  float l[3] = {-ldir[0], -ldir[1], -ldir[2]}, vv[3] = {-pos[0], -pos[1], -pos[2]};
+  float lv = sqrtf(vv[0] * vv[0] + vv[1] * vv[1] + vv[2] * vv[2]);
+  if (lv < 1e-6f) return 0;
+  float h[3] = {l[0] + vv[0] / lv, l[1] + vv[1] / lv, l[2] + vv[2] / lv}, lh = sqrtf(h[0] * h[0] + h[1] * h[1] + h[2] * h[2]);
+  if (lh < 1e-6f) return 0;
+  float nh = (n[0] * h[0] + n[1] * h[1] + n[2] * h[2]) / lh;
+  return nh > 0 ? powf(nh, e < 1 ? 1 : e) : 0;
+}
+static void shade_spec(const vb_t *v, const uint32_t *scol, uint32_t sflags, float *o, float *sp) {
   float d[4];
   argb4(diffuse(), d);
+  sp[0] = sp[1] = sp[2] = 0;
   if (scol) { argb4(*scol, o); return; }
   if (v->hascol) { argb4(v->col, o); o[3] *= d[3]; return; }
   if ((sflags & 1) || !v->hasn) { for (int k = 0; k < 4; k++) o[k] = d[k]; return; }
-  float nl = -(v->n[0] * l_dir[0] + v->n[1] * l_dir[1] + v->n[2] * l_dir[2]); /* the light's direction of travel */
-  float k = l_amb + (nl > 0 ? nl : 0) * l_dif;
-  o[0] = d[0] * k * l_col[0]; o[1] = d[1] * k * l_col[1]; o[2] = d[2] * k * l_col[2]; o[3] = d[3];
+  float spc[4];
+  argb4(mat.spe, spc);
+  int use_spec = cur_fam != 0 && !(sflags & 2) && (spc[0] + spc[1] + spc[2]) > 0;
+  float e = (float)(mat.spe >> 24);
+  if (cur_fam == 1) { /* L2: ambient colour + up to four lights */
+    float k[3] = {l2_amb[0], l2_amb[1], l2_amb[2]};
+    for (int i = 0; i < 4; i++) {
+      float nl = -(v->n[0] * l2[i].dir[0] + v->n[1] * l2[i].dir[1] + v->n[2] * l2[i].dir[2]);
+      if (nl > 0) for (int j = 0; j < 3; j++) k[j] += nl * l2[i].dif * l2[i].col[j];
+      if (use_spec && (l2[i].dir[0] != 0 || l2[i].dir[1] != 0 || l2[i].dir[2] != 0)) {
+        float st = spec_term(v->n, l2[i].dir, v->p, e);
+        for (int j = 0; j < 3; j++) sp[j] += spc[j] * st * l2[i].col[j];
+      }
+    }
+    for (int j = 0; j < 3; j++) o[j] = d[j] * k[j];
+    o[3] = d[3];
+    return;
+  }
+  const light1_t *L = &fam[cur_fam];
+  float nl = -(v->n[0] * L->dir[0] + v->n[1] * L->dir[1] + v->n[2] * L->dir[2]); /* the light's direction of travel */
+  float k = L->amb + (nl > 0 ? nl : 0) * L->dif;
+  o[0] = d[0] * k * L->col[0]; o[1] = d[1] * k * L->col[1]; o[2] = d[2] * k * L->col[2]; o[3] = d[3];
+  if (use_spec) { float st = spec_term(v->n, L->dir, v->p, e); for (int j = 0; j < 3; j++) sp[j] = spc[j] * st * L->col[j]; }
 }
+static void shade(const vb_t *v, const uint32_t *scol, uint32_t sflags, float *o) { float sp[3]; shade_spec(v, scol, sflags, o, sp); }
 
 static void strip_chunk(uint32_t a, uint32_t t, uint32_t sflags) {
   uint32_t hdr2 = rd16(a + 4), ns = hdr2 & 0x3FFF, uoff = hdr2 >> 14;
@@ -192,6 +258,8 @@ static void strip_chunk(uint32_t a, uint32_t t, uint32_t sflags) {
   int cull = (sflags & 0x10) ? 0 : 1; /* drop clockwise-on-screen triangles (y down) */
   if (hle_tracing()) rt_log("hle trace strip %08x type %u flags %x strips %u ctrl3d %x dif %08x amb %08x spe %08x blend %u/%u tex %u tflags %x",
                             a, t, sflags, ns, rd32(NJG_CTRL3D), diffuse(), mat.amb, mat.spe, mat.src, mat.dst, mat.texid, mat.tflags);
+  /* specular needs the offset colour: decide per strip chunk (any lit vertex with a highlight) */
+  if (cur_fam != 0 && !(sflags & 3) && (mat.spe & 0xFFFFFFu)) s.mode |= RD_M_OFFSET;
   uint32_t q = a + 6;
   for (uint32_t i = 0; i < ns; i++) {
     int16_t len = (int16_t)rd16(q); q += 2;
@@ -212,7 +280,7 @@ static void strip_chunk(uint32_t a, uint32_t t, uint32_t sflags) {
       o->p[0] = vv->p[0]; o->p[1] = vv->p[1]; o->p[2] = vv->p[2];
       if (sflags & 0x40) { u = vv->n[0] * 0.5f + 0.5f; v = -vv->n[1] * 0.5f + 0.5f; } /* environment map */
       o->u = u; o->v = v;
-      shade(vv, hs ? &scol : 0, sflags, o->c);
+      shade_spec(vv, hs ? &scol : 0, sflags, o->c, o->s);
       if (j >= 2) {
         /* strip triangle k = j - 2: even k (a b c), odd k reversed; a negative length flips them all */
         int odd = ((j - 2) & 1) ^ (len < 0);
@@ -313,10 +381,15 @@ static void interp3a(uint32_t keys, uint32_t nb, uint32_t nbf, float f, int32_t 
     o[i] = a + (int32_t)((float)(b - a) * t);
   }
 }
-static uint32_t ptrkey(uint32_t keys, uint32_t nb, uint32_t nbf, float f) {
-  uint32_t k0, k1; float t;
-  if (!key_find(keys, nb, 8, nbf, f, &k0, &k1, &t)) return 0;
-  return rd32((t < 0.5f ? k0 : k1) + 4); /* nearest key (shape blending: RENDER.md 7) */
+/* the arrays of the keys around frame f and the blend factor (linear between keys, as the SDK's shape
+ * motion: wraps from the last key to the first over nbFrame) */
+static uint32_t ptrkey(uint32_t keys, uint32_t nb, uint32_t nbf, float f, uint32_t *a1, float *t) {
+  uint32_t k0, k1;
+  *a1 = 0; *t = 0;
+  if (!key_find(keys, nb, 8, nbf, f, &k0, &k1, t)) return 0;
+  uint32_t a0 = rd32(k0 + 4);
+  if (k1 != k0 && *t > 0) { *a1 = rd32(k1 + 4); if (!sh4_is_ram(*a1)) *a1 = 0; }
+  return a0;
 }
 
 #define EV_UNIT_POS 1u
@@ -338,11 +411,13 @@ static void draw_object(SH4 *c, uint32_t o, anim_t *an, int depth) {
       if (mdata_get(an->mot, (int)node, 2, &keys, &nb)) { interp3a(keys, nb, nbf, an->frame, ang); ev &= ~EV_UNIT_ANG; }
       if (mdata_get(an->mot, (int)node, 4, &keys, &nb)) { interp3f(keys, nb, nbf, an->frame, scl); ev &= ~EV_UNIT_SCL; }
     }
-    uint32_t sv = 0, sn = 0;
+    uint32_t sv = 0, sn = 0, sv1 = 0, sn1 = 0;
+    float st = 0, st2 = 0;
     if (an && an->shape) {
       uint32_t nbf = rd32(an->shape + 4);
-      if (mdata_get(an->shape, (int)node, 0x10, &keys, &nb)) sv = ptrkey(keys, nb, nbf, an->frame);
-      if (mdata_get(an->shape, (int)node, 0x20, &keys, &nb)) sn = ptrkey(keys, nb, nbf, an->frame);
+      if (mdata_get(an->shape, (int)node, 0x10, &keys, &nb)) sv = ptrkey(keys, nb, nbf, an->frame, &sv1, &st);
+      if (mdata_get(an->shape, (int)node, 0x20, &keys, &nb)) sn = ptrkey(keys, nb, nbf, an->frame, &sn1, &st2);
+      if (!sv) st = st2;
     }
     if (hle_tracing()) rt_log("hle trace node %08x ev %x model %08x pos %d %d %d ang %x %x %x scl %d %d %d /1000 shape %08x %08x",
                               o, ev, model, (int)(pos[0] * 1000), (int)(pos[1] * 1000), (int)(pos[2] * 1000), ang[0], ang[1], ang[2],
@@ -352,8 +427,9 @@ static void draw_object(SH4 *c, uint32_t o, anim_t *an, int depth) {
     if (!(ev & EV_UNIT_ANG)) gcall(c, (ev & EV_ZXY) ? G_ROTZXY : G_ROTXYZ, CUR_M, (uint32_t)ang[0], (uint32_t)ang[1], (uint32_t)ang[2], 0, 0, 0);
     if (!(ev & EV_UNIT_SCL)) gcall(c, G_SCALE, CUR_M, 0, 0, 0, scl[0], scl[1], scl[2]);
     shape_vert = sh4_is_ram(sv) ? sv : 0; shape_norm = sh4_is_ram(sn) ? sn : 0;
+    shape_vert1 = shape_vert ? sv1 : 0; shape_norm1 = shape_norm ? sn1 : 0; shape_t = st;
     if (!(ev & EV_HIDE) && model) draw_model(model);
-    shape_vert = shape_norm = 0;
+    shape_vert = shape_norm = shape_vert1 = shape_norm1 = 0;
     uint32_t child = rd32(o + 0x2C);
     if (!(ev & EV_BREAK) && child && depth < 64) draw_object(c, child, an, depth + 1);
     gcall(c, G_POP, 1, 0, 0, 0, 0, 0, 0);
@@ -374,7 +450,7 @@ static void self_check(SH4 *c, uint32_t model) {
   load_matrix();
   float in[3] = {nj_f(s), nj_f(s + 4), nj_f(s + 8)}, o[3];
   xform(in, o);
-  cv_t cvv = {{o[0], o[1], o[2]}, 0, 0, {1, 1, 1, 1}};
+  cv_t cvv = {{o[0], o[1], o[2]}, 0, 0, {1, 1, 1, 1}, {0, 0, 0}};
   rd_vtx pv;
   project(&cvv, &pv);
   rt_log("render check calcpoint sdk (%d, %d, %d) ours (%d, %d, %d) x1000; calcscreen sdk (%d, %d) ours (%d, %d)",
@@ -411,6 +487,7 @@ static void volume_tri(uint32_t a, uint32_t b, uint32_t c) {
   rd_state s;
   nj_state(&s, RD_OM, 0, 0);
   cv_t v[3];
+  memset(v, 0, sizeof v);
   const uint32_t ix[3] = {a, b, c};
   for (int k = 0; k < 3; k++) { memcpy(v[k].p, vb[ix[k]].p, 12); v[k].u = v[k].v = 0; v[k].c[0] = v[k].c[1] = v[k].c[2] = v[k].c[3] = 0; }
   tri3(&s, &v[0], &v[1], &v[2], 0);
@@ -483,6 +560,7 @@ static void h_njDrawSprite3D(SH4 *c) {
   if (attr & 2) argb4(nj_argb_f(NJG_CMAT), col);
   load_matrix();
   cv_t v[4];
+  memset(v, 0, sizeof v);
   for (int k = 0; k < 4; k++) {
     float m[3] = {px + qx[k] * cs - qy[k] * sn, py + qx[k] * sn + qy[k] * cs, pz};
     xform(m, v[k].p);
@@ -496,19 +574,110 @@ static void h_njDrawSprite3D(SH4 *c) {
   R(0) = 0;
 }
 
+/* ---- basic models (S8). The game's "nj_ObjectB" (0x8C0C30A8, 1 site, called once per character in races and
+ * in the attract demo) takes a basic NJS_MODEL, not an object: {points*, normals*, nbPoint, meshsets*, mats*,
+ * u16 nbMeshset, u16 nbMat, center[3], r}; it saves the polygon context, checks nbPoint against the vertex
+ * buffer, draws, restores. Meshset (24 bytes): {u16 type << 14 | material, u16 nbMesh, Sint16 *meshes,
+ * attrs*, normals*, NJS_COLOR *vertcolor, NJS_TEX *vertuv} per corner; types 0 triangles, 1 quads (strip
+ * order), 2 N-gons and 3 strips (count first, 0x8000 = reversed). Material (20 bytes): {diffuse ARGB,
+ * specular ARGB, exponent, attr_texId, attrflags}; attrflags: src/dst blend 31-29/28-26, 0x02000000 ignore
+ * light, 0x00800000 double side, 0x00400000 environment, 0x00200000 texture, 0x00100000 alpha,
+ * 0x00080000 ignore specular, 0x40000/0x20000 flip U/V, 0x10000/0x8000 clamp U/V, 13-14 filter. Seen: a
+ * 32-quad fading trail (128 points, vertex colours, texture 202, alpha, double side, ignore light). ---- */
+static uint32_t n_basic;
+static void basic_corner(uint32_t idx, uint32_t uvp, uint32_t vcp, uint32_t ci, uint32_t mattr, cv_t *o) {
+  const vb_t *vv = &vb[idx < NVB ? idx : 0];
+  memcpy(o->p, vv->p, 12);
+  o->u = o->v = 0;
+  if (uvp) { o->u = (float)(int16_t)rd16(uvp + ci * 4) / 256.0f; o->v = (float)(int16_t)rd16(uvp + ci * 4 + 2) / 256.0f; }
+  if (mattr & 0x00400000u) { o->u = vv->n[0] * 0.5f + 0.5f; o->v = -vv->n[1] * 0.5f + 0.5f; }
+  uint32_t sf = ((mattr & 0x02000000u) ? 1u : 0) | ((mattr & 0x00080000u) ? 2u : 0);
+  if (vcp) { uint32_t col = rd32(vcp + ci * 4); shade_spec(vv, &col, sf, o->c, o->s); }
+  else shade_spec(vv, 0, sf, o->c, o->s);
+}
+static void draw_basic(uint32_t m) {
+  if (!sh4_is_ram(m)) return;
+  load_matrix();
+  uint32_t pts = rd32(m), nrm = rd32(m + 4), np = rd32(m + 8), ms = rd32(m + 12), mats = rd32(m + 16);
+  uint32_t nms = rd16(m + 20), nmat = rd16(m + 22);
+  if (np > NVB || !sh4_is_ram(pts)) return;
+  for (uint32_t i = 0; i < np; i++) {
+    float p[3] = {nj_f(pts + i * 12), nj_f(pts + i * 12 + 4), nj_f(pts + i * 12 + 8)};
+    xform(p, vb[i].p);
+    if (sh4_is_ram(nrm)) { float n[3] = {nj_f(nrm + i * 12), nj_f(nrm + i * 12 + 4), nj_f(nrm + i * 12 + 8)}; xnorm(n, vb[i].n); vb[i].hasn = 1; }
+    else { vb[i].n[0] = vb[i].n[1] = 0; vb[i].n[2] = 1; vb[i].hasn = 0; }
+    vb[i].hascol = 0;
+  }
+  for (uint32_t k = 0; k < nms && sh4_is_ram(ms); k++, ms += 24) {
+    uint32_t tm = rd16(ms), type = tm >> 14, mi = tm & 0x3FFF, nb = rd16(ms + 2), me = rd32(ms + 4);
+    uint32_t vcp = rd32(ms + 16), uvp = rd32(ms + 20);
+    if (!sh4_is_ram(me)) continue;
+    if (!sh4_is_ram(vcp)) vcp = 0;
+    if (!sh4_is_ram(uvp)) uvp = 0;
+    uint32_t ma = (sh4_is_ram(mats) && mi < nmat) ? mats + mi * 20 : 0;
+    uint32_t mattr = ma ? rd32(ma + 16) : 0;
+    mat_reset();
+    if (ma) { mat.dif = rd32(ma); mat.spe = (rd32(ma + 4) & 0xFFFFFFu) | ((uint32_t)nj_f(ma + 8) & 0xFF) << 24; mat.texid = rd32(ma + 12) & 0x1FFF; }
+    int alpha = (mattr & 0x00100000u) != 0;
+    uint32_t tex = (mattr & 0x00600000u) ? nj_tex_of(rd32(NJG_TEXLIST), mat.texid) : 0;
+    rd_state s;
+    nj_state(&s, alpha ? RD_TR : RD_OP, tex, alpha);
+    if (alpha) s.mode = (s.mode & ~0x3Fu) | RD_M_SRC(mattr >> 29) | RD_M_DST((mattr >> 26) & 7);
+    s.mode &= ~RD_M_SHADE(3);
+    s.mode |= RD_M_SHADE(alpha ? 3 : 1);
+    if (mattr & 0x00010000u) s.mode |= RD_M_CLAMPU;
+    if (mattr & 0x00008000u) s.mode |= RD_M_CLAMPV;
+    if (mattr & 0x00040000u) s.mode |= RD_M_FLIPU;
+    if (mattr & 0x00020000u) s.mode |= RD_M_FLIPV;
+    if (!((mattr >> 13) & 3)) s.mode &= ~RD_M_FILTER;
+    if (cur_fam != 0 && !(mattr & 0x02080000u) && (mat.spe & 0xFFFFFFu)) s.mode |= RD_M_OFFSET;
+    int cull = (mattr & 0x00800000u) ? 0 : 1;
+    uint32_t q = me, ci = 0;
+    for (uint32_t pi = 0; pi < nb; pi++) {
+      int n = type == 0 ? 3 : type == 1 ? 4 : 0, rev = 0;
+      if (type >= 2) { uint32_t w = rd16(q); q += 2; n = (int)(w & 0x3FFF); rev = (w & 0x8000) != 0; }
+      cv_t win[3];
+      for (int j = 0; j < n; j++, ci++) {
+        uint32_t idx = rd16(q); q += 2;
+        if (j >= 3) { win[0] = win[1]; win[1] = win[2]; }
+        cv_t *o = &win[j < 3 ? j : 2];
+        basic_corner(idx, uvp, vcp, ci, mattr, o);
+        if (j >= 2) {
+          int odd = ((j - 2) & 1) ^ rev;
+          if (odd) tri3(&s, &win[1], &win[0], &win[2], cull); else tri3(&s, &win[0], &win[1], &win[2], cull);
+        }
+      }
+    }
+  }
+  n_basic++;
+}
+static void h_basic_model(SH4 *c) { hle_logcall(c, ""); cpu_now = c; cur_fam = 0; draw_basic(R(4)); R(0) = 0; }
 void nj_model_log(void) {
-  rt_log("render 3d models %u triangles %u near-clipped-out %u unknown vlist %u plist %u volumes %u", n_models, n_tris3d, n_clipped, n_unknown_v, n_unknown_p, n_volumes);
+  rt_log("render 3d models %u basic %u triangles %u near-clipped-out %u unknown vlist %u plist %u volumes %u", n_models, n_basic, n_tris3d, n_clipped, n_unknown_v, n_unknown_p, n_volumes);
 }
 
+#define FAMILY(n, i) \
+  static void h_model_##n(SH4 *c) { cur_fam = i; h_model(c); } \
+  static void h_motion_##n(SH4 *c) { cur_fam = i; h_motion(c); } \
+  static void h_shapemotion_##n(SH4 *c) { cur_fam = i; h_shapemotion(c); }
+FAMILY(l1, 0)
+FAMILY(l2, 1)
+FAMILY(l3, 2)
+FAMILY(l4, 3)
+static void h_object_l1(SH4 *c) { cur_fam = 0; h_object(c); }
 const nj_impl_t nj_model_impls[] = {
-  {"nj_ModelL1", h_model}, {"nj_ModelL2", h_model}, {"nj_ModelL3", h_model}, {"nj_ModelL4", h_model},
-  {"nj_ObjectL1", h_object},
-  {"nj_MotionL1", h_motion}, {"nj_MotionL2", h_motion}, {"nj_MotionL3", h_motion}, {"nj_MotionL3b", h_motion}, {"nj_MotionL4", h_motion},
-  {"nj_ShapeMotionL1", h_shapemotion}, {"nj_ShapeMotionL1b", h_shapemotion}, {"nj_ShapeMotionL2", h_shapemotion},
-  {"nj_ShapeMotionL2b", h_shapemotion}, {"nj_ShapeMotionL3", h_shapemotion}, {"nj_ShapeMotionL3b", h_shapemotion},
-  {"nj_ShapeMotionL4", h_shapemotion},
+  {"nj_ModelL1", h_model_l1}, {"nj_ModelL2", h_model_l2}, {"nj_ModelL3", h_model_l3}, {"nj_ModelL4", h_model_l4},
+  {"nj_ObjectL1", h_object_l1}, {"nj_ObjectB", h_basic_model},
+  {"nj_MotionL1", h_motion_l1}, {"nj_MotionL2", h_motion_l2}, {"nj_MotionL3", h_motion_l3}, {"nj_MotionL3b", h_motion_l3}, {"nj_MotionL4", h_motion_l4},
+  {"nj_ShapeMotionL1", h_shapemotion_l1}, {"nj_ShapeMotionL1b", h_shapemotion_l1}, {"nj_ShapeMotionL2", h_shapemotion_l2},
+  {"nj_ShapeMotionL2b", h_shapemotion_l2}, {"nj_ShapeMotionL3", h_shapemotion_l3}, {"nj_ShapeMotionL3b", h_shapemotion_l3},
+  {"nj_ShapeMotionL4", h_shapemotion_l4},
   {"njDrawSprite3D", h_njDrawSprite3D}, {"njCnkModDrawModel", h_njCnkModDrawModel},
   {"njSetCheapShadowMode", h_njSetCheapShadowMode},
-  {"nj_LightL1Dir", h_lightdir}, {"nj_LightL1Intensity", h_lightint}, {"nj_LightL1Color", h_lightcol},
+  {"nj_LightL1Dir", h_l1dir}, {"nj_LightL1Intensity", h_l1int}, {"nj_LightL1Color", h_l1col},
+  {"nj_LightL3Dir", h_l3dir}, {"nj_LightL3Intensity", h_l3int}, {"nj_LightL3Color", h_l3col},
+  {"nj_LightL4Dir", h_l4dir}, {"nj_LightL4Intensity", h_l4int}, {"nj_LightL4Color", h_l4col},
+  {"nj_LightL2Dir", h_l2dir}, {"nj_LightL2DirN", h_l2dirn}, {"nj_LightL2ColorN", h_l2coln}, {"nj_LightL2IntensityN", h_l2intn},
+  {"nj_LightL2Color", h_l2col}, {"nj_LightL2Update", h_l2update},
 };
 const int nj_model_nimpls = (int)(sizeof nj_model_impls / sizeof nj_model_impls[0]);

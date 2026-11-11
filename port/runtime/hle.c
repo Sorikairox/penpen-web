@@ -86,7 +86,7 @@ static void logcall(SH4 *c, const char *extra) {
   { int i = (int)((seq - 1) % RING); ring[i].seq = seq; ring[i].pr = c->pr; ring[i].name = cur->name;
     for (int k = 0; k < 4; k++) ring[i].a[k] = R(4 + k); }
   if (hle_tracing())
-    rt_log("hle trace %s(%x, %x, %x, %x) fr4 %d/1000%s from %08x", cur->name, R(4), R(5), R(6), R(7), (int)(c->fr.f[4] * 1000), extra, c->pr);
+    rt_log("hle trace %s(%x, %x, %x, %x) fr4-7 %d %d %d %d /1000%s from %08x", cur->name, R(4), R(5), R(6), R(7), (int)(c->fr.f[4] * 1000), (int)(c->fr.f[5] * 1000), (int)(c->fr.f[6] * 1000), (int)(c->fr.f[7] * 1000), extra, c->pr);
   /* the first calls of each function in full, then only counts */
   if (seq <= (uint32_t)hle_verbose && cur->calls <= 8)
     rt_log("hle %u %s(%x, %x, %x, %x)%s from %08x", seq, cur->name, R(4), R(5), R(6), R(7), extra, c->pr);
