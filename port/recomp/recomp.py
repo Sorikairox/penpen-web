@@ -428,6 +428,80 @@ class Gen:
         return s + 'R_%d: TAIL_I(t_, %d); return;' % (n, n)
 
 
+def sdk_names(a):
+    """name -> address of the SDK targets (sdk_calls.tsv) and the runtime's extra ones (hle_extra.tsv)."""
+    out = {}
+    for path in (a.sdk, a.also_rt):
+        if not path:
+            continue
+        for line in open(path):
+            if line.startswith('#') or not line.strip():
+                continue
+            f = line.rstrip('\n').split('\t')
+            out[f[1]] = int(f[0], 16)
+    return out
+
+
+# code ranges of the image (PLAN 3, S1): game code + SHC runtime, SDK code, SDK code placed in the data area; the
+# words there are instructions and literal pools (followed as edges), not data
+CODE_REGIONS = ((0x8C010000, 0x8C066900), (0x8C0998D4, 0x8C17994C), (0x8C18F112, 0x8C197090))
+
+
+def trim(img, funcs, table, names, via_rt, hle_c):
+    """S8: keep only the functions that can run (docs/port/RECOMP.md 9). Roots: every function of the game range
+    (game code + the SHC runtime), the entries, the SDK functions the runtime runs as guest code (hle.c guest[]),
+    and every function whose start address is stored as a word in the image outside the code (callbacks, tables:
+    conservative; literal pools inside the code ranges are edges instead). Edges: bsr/bra targets and literal-pool constants that are function starts. An SDK target the
+    runtime takes over (HLE) is never entered: it is not translated and its callees are not followed through it.
+    Anything dropped that still runs goes through rt_call to the interpreter fallback (logged as rt interp)."""
+    src = open(hle_c).read()
+    i = src.index('guest[] = {')
+    guest = set(re.findall(r'"([A-Za-z0-9_]+)"', src[i:src.index('};', i)]))
+    keep = {names[n] for n in guest if n in names}
+    hle = set(via_rt) - keep
+    code = sorted(table)
+    import bisect
+    starts = [c[0] for c in code]
+
+    def in_code(a):
+        k = bisect.bisect_right(starts, a) - 1
+        return k >= 0 and code[k][0] <= a < code[k][1]
+    roots = {f for f in funcs if 0x8C010000 <= f < 0x8C066900 or funcs[f][1].startswith('entry_')} | keep
+    data_ptrs = 0
+    for o in range(0, len(img.data) - 3, 4):
+        a = LOAD + o
+        w = struct.unpack_from('<I', img.data, o)[0]
+        if w & 1 or not (0x8C000000 <= (w & 0x1FFFFFFF) | 0x80000000 < img.end):
+            continue
+        w = norm(w)
+        if w in funcs and not in_code(a) and not any(lo <= a < hi for lo, hi in CODE_REGIONS):
+            roots.add(w)
+            data_ptrs += 1
+    reach, work = set(), list(roots)
+    while work:
+        f = work.pop()
+        if f in reach or f not in funcs or f in hle:
+            continue
+        reach.add(f)
+        end = funcs[f][0]
+        for b in analyse(img, f, end)[0]:
+            op, name = decode(img, b)
+            t = None
+            if name in ('BSR', 'BRA'):
+                t = norm(target(op, name, b))
+            elif name == 'MOVL_PC':
+                w = img.u32(((b & ~3) + 4 + (op & 0xFF) * 4) & 0xFFFFFFFF)
+                t = norm(w) if w is not None and not w & 1 else None
+            if t is not None and t in funcs and t not in reach and not (f <= t < end):
+                work.append(t)
+    drop = [f for f in funcs if f not in reach]
+    for f in drop:
+        del funcs[f]
+    print('gen trim: roots %d (data pointers %d, guest SDK %d), kept %d, dropped %d (HLE targets %d)' % (
+        len(roots), data_ptrs, len(keep), len(reach), len(drop), len(hle & set(drop))))
+    return len(drop)
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('--bin', required=True)
@@ -440,6 +514,9 @@ def main():
     ap.add_argument('--mutant', type=int, default=0)
     ap.add_argument('--only-affected', action='store_true')
     ap.add_argument('--per-file', type=int, default=150)
+    ap.add_argument('--trim', metavar='HLE_C', help='S8: emit only the code that can run: drop the SDK functions the '
+                    'runtime takes over (HLE) and what only they reach; HLE_C = port/runtime/hle.c (its guest[] names '
+                    'stay translated)')
     a = ap.parse_args()
     img = Img(a.bin)
     sdk = set()
@@ -511,6 +588,9 @@ def main():
             funcs[k] = (e, 'entry_%08x' % k)
             nmid += cand[k] == 'static'
             nextra += cand[k] == 'listed'
+    ntrim = 0
+    if a.trim:
+        ntrim = trim(img, funcs, table, sdk_names(a), via_rt, a.trim)
     g = Gen(img, funcs, a.mutant, via_rt if a.ranges == 'boot' else ())
     os.makedirs(a.out, exist_ok=True)
     for fn in os.listdir(a.out):
@@ -561,8 +641,8 @@ def main():
             for addr in sorted(funcs):
                 if addr not in es:
                     o.write('void f_%08x(SH4 *c) { rt_call(c, 0x%08xu); }\n' % (addr, addr))
-    print('gen functions %d files %d labels %d indirect %d mutant %d affected %d entries static %d listed %d' % (
-        len(emitted), files, ninsn, nind, a.mutant, naff, nmid, nextra))
+    print('gen functions %d files %d labels %d indirect %d mutant %d affected %d entries static %d listed %d trimmed %d' % (
+        len(emitted), files, ninsn, nind, a.mutant, naff, nmid, nextra, ntrim))
 
 
 if __name__ == '__main__':

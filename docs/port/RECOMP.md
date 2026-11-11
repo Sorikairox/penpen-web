@@ -270,3 +270,20 @@ The generated C is resumable so the retrowser host can step it (`rtw_frame`): ev
 emitted in loop mode (entry and back edges through `D_`), keeping the control flow reducible; the resume switch
 is separate from the label switch. The interpreter fallback saves and restores its own state the same way. The
 harness builds the same C with `rt_unw` always 0. Design, checks and numbers: `docs/port/RTW.md` 2.
+
+## 9. S8: the translation trimmed to the code that can run
+
+`recomp.py --trim port/runtime/hle.c` (the default of `tools/s3.sh gen` since S8; `NOTRIM=1` translates everything)
+keeps only functions that can execute. Roots: every function of the game range (game + SHC runtime), the entries,
+the SDK functions the runtime runs as guest code (`hle.c` `guest[]`, 53 found by name), and every function whose
+start address is stored as a word in the data ranges (outside the three code ranges: callbacks and function
+tables, conservatively). Edges: `bsr`/`bra` targets and literal-pool constants that are function starts. An SDK
+entry point the runtime takes over (HLE) is never entered, so it is not translated and its callees are not
+followed through it. Anything dropped that still runs goes through `rt_call` to the interpreter fallback (and
+`rt interp` says so).
+
+Result: **5 943 of 8 068 functions kept** (2 125 dropped, 172 of them HLE targets; 306 836 of 526 470 labels), the
+wasm **47.1 MB → 24.6 MB**. The trimmed and the full wasm give **the same frame lines and RAM digests** over 6 000
+frames of the S4 route and 8 000 frames of the no-input boot (attract demo), both with **0 interpreter calls**.
+The differential harness runs on the trimmed translation by default (`GEN=genfull` after
+`NOTRIM=1 tools/s3.sh gen --out /build/genfull` for every function).

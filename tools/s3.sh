@@ -1,7 +1,8 @@
 #!/bin/sh
 # Pen Pen S3: SH-4 interpreter, recompiler scaffold, differential harness and boot runs, all in Docker.
 #   tools/s3.sh test            unit tests of the interpreter (our own vectors; no disc data)
-#   tools/s3.sh gen [args]      recompile 1ST_READ.BIN -> C in penpen-build:/build/gen (local-only scaffold)
+#   tools/s3.sh gen [args]      recompile 1ST_READ.BIN -> C in penpen-build:/build/gen (local-only scaffold);
+#                               S8: trimmed to the code that can run (--trim); NOTRIM=1 translates everything
 #   tools/s3.sh export          check /build/gen (our grammar only), copy it to port/gen/ (gitignored, local only)
 #   tools/s3.sh diff [args]     build + run the differential harness (interpreter vs recompiled C);
 #                               GEN=genall after `gen --ranges all --out /build/genall` tests the SDK too
@@ -24,6 +25,8 @@ box() { # sandboxed container: repo read-only at /src, volumes as given by the c
 }
 # What may be printed from a container that read disc-derived data: our own log vocabulary only.
 filt() { grep -E '^(S3 |audio |check_gen |sh4 |diff |mut |hle |boot |rt |io |gen |build |frame |render |shot |  )[ -~]*$' || true; }
+TRIM=${NOTRIM:+}
+[ -n "${NOTRIM:-}" ] || TRIM="--trim /src/port/runtime/hle.c"
 CF="-O2 -std=gnu11 -Wall -Wno-unused-label -Wno-unused-function -fwrapv -fno-strict-aliasing -ffp-contract=off"
 case "${1:-}" in
   test)
@@ -32,7 +35,7 @@ case "${1:-}" in
     shift
     box -v penpen-work:/work:ro -v penpen-build:/build -v "$REPO/port/symbols":/symbols:ro $IMG \
       sh -c "mkdir -p /build/gen && python3 -I /src/port/recomp/recomp.py --bin /work/fs/1ST_READ.BIN \
-        --funcs /symbols/functions.tsv --sdk /symbols/sdk_calls.tsv --entries /symbols/entries.tsv --also-rt /symbols/hle_extra.tsv --out /build/gen --ranges boot $*" 2>&1 | filt ;;
+        --funcs /symbols/functions.tsv --sdk /symbols/sdk_calls.tsv --entries /symbols/entries.tsv --also-rt /symbols/hle_extra.tsv --out /build/gen --ranges boot $TRIM $*" 2>&1 | filt ;;
   export)
     # copy the game translation to port/gen/ (gitignored: never committed) after a grammar check
     box -v penpen-build:/build:ro $IMG python3 -I /src/port/recomp/check_gen.py /build/gen | filt
