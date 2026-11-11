@@ -11,6 +11,9 @@ static void gdFsGetFileSctSize(gaddr handle, gaddr sectors_out) { CALL2(0x8C09E3
 static int32_t gdFsRead(gaddr handle, int32_t sectors, gaddr buffer) { return (int32_t)CALL3(0x8C09E3DEu, handle, sectors, buffer); }
 static void gdFsEntryErrFuncAll(gaddr func, gaddr obj) { CALL2(0x8C09EC1Eu, func, obj); }
 static int32_t gdFsDaPause(void) { return (int32_t)CALL0(0x8C09ECACu); }
+static int32_t gdFsDaPlay(int32_t first_track, int32_t last_track, int32_t repeat) {
+  return (int32_t)CALL3(0x8C09EC7Cu, first_track, last_track, repeat);
+}
 
 /* still translated (the runs never call them: a directory change, the error callback) */
 static void file_change_dir(gaddr dir_name) { CALL1(0x8C012D1Cu, dir_name); } /* func_8C012D1C: gdFsChangeDir until it succeeds */
@@ -85,4 +88,11 @@ void cd_pause(void) {
   }
 }
 HW_EXPORT(8c012d5c, cd_pause())
+
+/* was func_8C012D38: play the tracks first..last (repeat: 15 = for ever, 0 = once) */
+void cd_play(int32_t first_track, int32_t last_track, int32_t repeat) {
+  while (gdFsDaPlay(first_track, last_track, repeat) != 0) {
+  }
+}
+HW_EXPORT(8c012d38, cd_play((int32_t)ARG0, (int32_t)ARG1, (int32_t)ARG2))
 

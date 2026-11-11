@@ -26,11 +26,8 @@ void file_free(gaddr block);
 
 /* ---- CDDA (the music tracks on the disc) ---- */
 void cd_pause(void);
-/* still translated (no route's sampled frames reach them): func_8C012D38 play, func_8C012D72 stop,
- * func_8C012D88 release */
-static inline void cd_play(int32_t first_track, int32_t last_track, int32_t repeat) {
-  CALL3(0x8C012D38u, first_track, last_track, repeat);
-}
+void cd_play(int32_t first_track, int32_t last_track, int32_t repeat);
+/* still translated (no route calls them): func_8C012D72 stop (gdFsDaStop), func_8C012D88 release (gdFsDaRelease) */
 
 /* ---- data containers ---- */
 typedef struct ContainerEntry {
