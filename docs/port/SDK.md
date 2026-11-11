@@ -143,9 +143,10 @@ posts it; most check an "initialised" flag and report errors through one functio
 - Driver and memory: `sdDrvInit(drv)` (downloads `MANATEE.DRV`, `SDRV` magic), `sdLibInit`, `sdSysFinish`,
   `sdSysServer` (every V-blank), `sdMemBlkCreate/SetPrm/Destroy`, `sdMultiUnitDownload` (an `SMLT` bank file into
   AICA RAM; uses `sdSndMemAllocateBank`).
-- MIDI sequences: `sdMidiOpenPort`, `sdMidiClosePort`, `sdMidiPlay(port, bank, seq, fade)` (cmd 1),
+- MIDI sequences: `sdMidiOpenPort(&handle)` (0x8C09A878), `sdMidiClosePort(handle)` (0x8C09A828; S7: the S2 names
+  of the two port functions were swapped: the one the game calls 8 times at start-up allocates a port and writes the handle), `sdMidiPlay(port, bank, seq, fade)` (cmd 1),
   `sdMidiStop` (2), `sdMidiSetVol`/`sdMidiSetPan` (5/6, order low).
-- One-shots: `sdShotOpenPort`, `sdShotClosePort`, `sdShotPlay(port, bank, no, prio)` (17), `sdShotStop` (18),
+- One-shots: `sdShotOpenPort(&handle)` (0x8C09AB08), `sdShotClosePort(handle)` (0x8C09AAB8), `sdShotPlay(port, bank, no, prio)` (17), `sdShotStop` (18),
   `sdShotSetVol`/`SetPan` (21/22), `sdShotSetPitch` (24).
 - Global: `sd_SetStereoMono('STRO'|'MONO')`, `sd_SetMasterVol(0..15)`, and four commands we have not named
   (`sd_Cmd53`, `sd_Cmd54`, `sd_CmdBytes`, `sd_CmdU8U8`, `sd_CmdReset`).
