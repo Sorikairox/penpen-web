@@ -2,6 +2,53 @@
 
 Newest session first. Read `docs/port/PLAN.md` (disc facts, survey, approach, phases, rules) before working.
 
+## S2 — 2026-11-11: census of the SDK surface
+
+All analysis in the S1 sandbox (`tools/ghidra.sh`, containers `--network none --read-only --cap-drop ALL`); the
+working dumps (census, call sequences, data-flow summaries, hardware tags) stay in `penpen-work:/work/s2`. Only
+addresses, counts, assigned names and our own descriptions reached the host.
+
+- **The 224 SDK targets the game calls (2 091 call sites)** are in `port/symbols/sdk_calls.tsv`: 150 with SDK API
+  names (37 high, 69 medium, 44 low), 73 role names (behaviour known, SDK name not pinned: mostly Ninja draw
+  families and their light setters, some Manatee commands), 1 is data. Anchors: the game's copies of the SDK
+  sample `sbInitSystem`/`sbExitSystem` (0x8C010184/0x8C01022C), constant arguments (sprite attributes, blending
+  modes, `NJM_LOCATION`, gdFsInit's aligned buffers, the 4 port numbers), data-flow shapes (matrix rows, `fsca`,
+  `fipr`), magic numbers (`SDRV`, `SMLT`, `PVMH`, `STRO`/`MONO`), PVR register offsets written through Kamui's
+  register helper.
+- `docs/port/SDK.md`: the surface by library with HLE semantics and session priority; graphics, input/VMU,
+  container, 0x8C23D900 and recompiler sections.
+- **Regions**: `port/symbols/regions_s2.tsv` (23 overrides) + `tools/s2_apply.py` (run by `ghidra.sh export`,
+  idempotent): gdFs (API + driver table, GD/ISO9660 core), pd/pdLcd/pdVib, bu (API + core), **kd = the Maple bus
+  driver**, syChain/syInt/sySq, syBtCfg, **syFbr** (fibers, used by CRI), BIOS syscall stubs inside the old
+  `shc_rt` range, CRI_SJ (low), two big `unknown` runs → Ninja strip emitters. `unknown` 213 → 70. Method: call
+  graph from the API functions + the order of the libraries' version strings in data, which follows code order.
+- **Graphics**: lists opaque + opaque modifier volume (cheap shadows, `njSetCheapShadowMode(160)`, one
+  `njCnkModDrawModel` site) + translucent; `njInitVertexBuffer(op=-0x80000, om=24576, tr=0x40000, tm=0, pt=0)`:
+  no punch-through, no translucent MV. Render-to-texture code is linked but unreachable; no read-back path found.
+  Split screen = per-player `njSetScreen` + camera + user tile clip (`njClip2D` → Kamui per list). Modes: VGA 1 or
+  TV 56 (640×480i), 60 Hz.
+- **Input/VMU**: 4 ports (A0–D0) through `pdGetPeripheral`; fields read +4, +8, +0x10, +0x1C–+0x22, +0x30 (the
+  trigger fields +0x18/+0x1A not seen: to confirm); VMU LCD picture on A1–D1; one save file via `bu`; Jump Pack via
+  `pdVibMx*`.
+- **Containers**: loader 0x8C012EBE, 19 record types with their fix-up functions (basic vs chunk object trees,
+  motions, texlists, actions, links, raw); table in SDK.md 4.
+- **0x8C23D900** is the static-constructor table (3 game constructors + terminator, then empty destructor list);
+  the "call" is Ghidra folding the empty destructor loop. The zero block is `.bss` cleared by 0x8C0100D8. The
+  bogus function is now region `data` (and removed from the project by `S2Names`).
+- **Recompiler notes** (SDK.md 6): 604 register-indirect `jsr` in game code, 21 `braf` switch tables, FPU mode
+  switches only in the SDK (game code is FPSCR-default single precision; rt doubles toggle PR), no PC-relative
+  loads in delay slots, no self-modifying code, **calls into the P2 mirror (0xAC0xxxxx)** of the cache code, cache
+  and store-queue ops SDK-only, fibers (syFbr) and exception entries in the SDK.
+- Files: `tools/ghidra/S2Census.java`, `S2Flow.java`, `S2Seq.java`, `S2Hw.java`, `S2Xref.java`, `S2Words.java`,
+  `S2Reach.java`, `S2Tail.java`, `S2Lit.java`, `S2Switch.java`, `S2Recomp.java`, `S2Recomp2.java`,
+  `S2Names.java`; `tools/ghidra.sh s2` (dumps + names into the project); `tools/s2_apply.py`.
+
+Left for later sessions (see SDK.md 8): SDK names of the Ninja draw families; the unnamed Manatee commands; CDDA
+function names; the pd trigger fields; 70 `unknown` functions and the SJ boundaries; VRAM helper directions.
+
+Next: S3 (SH-4 interpreter + recompiler scaffold in `port_work/`), using SDK.md 6; the HLE stubs for the 224
+targets are the first thing the recompiled binary will hit (`syHwInit`, `syMallocInit`, `njInitSystem`).
+
 ## S1 — 2026-11-11: Ghidra in Docker, function table, SDK region table
 
 All analysis in sandboxed containers (`--network none --read-only --cap-drop ALL --security-opt no-new-privileges`,

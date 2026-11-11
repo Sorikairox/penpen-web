@@ -5,6 +5,10 @@
 #   tools/ghidra.sh seed          second-pass function discovery (S1Seed) on the code ranges
 #   tools/ghidra.sh export        regions + names (S1Regions) and copy the two TSVs to port/symbols/ (validated)
 #   tools/ghidra.sh all           import, seed, export
+#   tools/ghidra.sh s2            S2 census dumps into penpen-work:/work/s2 (stay in the sandbox), and
+#                                 push the port/symbols names into the project (S2Names)
+# export also runs tools/s2_apply.py: S2 names (sdk_calls.tsv) and region overrides
+# (regions_s2.tsv) on top of the S1 tables.
 # The disc-derived inputs and the Ghidra project stay in Docker volumes; only
 # address/size/name tables reach the host, after a format check.
 set -eu
@@ -17,7 +21,7 @@ run() {
     --hostname localhost --user 1000:1000 --tmpfs /tmp:exec,size=2g,mode=1777 --tmpfs /home/ubuntu:exec,size=1g,uid=1000,gid=1000 \
     -e GHIDRA_HEADLESS_MAXMEM=${MAXMEM:-3G} \
     -v penpen-work:/work -v penpen-ghidra:/proj \
-    -v "$REPO/tools/ghidra":/scripts:ro \
+    -v "$REPO/tools/ghidra":/scripts:ro -v "$REPO/port/symbols":/symbols:ro \
     $IMG "$@"
 }
 H="/opt/ghidra/support/analyzeHeadless /proj PenPen"
@@ -54,6 +58,15 @@ case "${1:-}" in
       fi
       mv "$REPO/port/symbols/$f.new" "$REPO/port/symbols/$f"
     done
+    python3 -I "$REPO/tools/s2_apply.py"
     wc -l "$REPO/port/symbols/"*.tsv ;;
+  s2)
+    # census (224 SDK targets), call sequences, hardware tags, data-flow summaries: sandbox only
+    run sh -c "mkdir -p /work/s2 && $H -process 1ST_READ.BIN -noanalysis -scriptPath /scripts \
+      -postScript S2Names.java \
+      -postScript S2Census.java 0x8C010184 0x8C066900 /work/s2/census.tsv \
+      -postScript S2Seq.java 0x8C010184 0x8C066900 /work/s2 \
+      -postScript S2Hw.java /work/s2 \
+      -postScript S2Flow.java /work/s2/flow.txt" | grep -E 'S2[A-Za-z]+.java> ' ;;
   *) sed -n '2,10p' "$0"; exit 2 ;;
 esac

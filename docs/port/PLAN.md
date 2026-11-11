@@ -9,7 +9,10 @@ Read this first, then `docs/port/HANDOFF.md`. Method reference: retrowser's spec
 (`~/Code/retrowser/spec/`), the `retrowser-decomp-port` skill, and the Pokémon Snap port
 (`~/Code/pokemonsnap/docs/port/PLAN.md`, `RTW.md`).
 
-Status: **S1 tooling done (2026-11-11)**: Ghidra 12.2 headless in Docker, 7 925 functions, SDK region table
+Status: **S2 census done (2026-11-11)**: the 224 SDK functions the game calls are named and described in
+`docs/port/SDK.md` (150 with SDK API names, 73 role names, 1 is data), region table refined (gdFs, pd, bu, kd, SJ,
+syChain/syFbr placed; `unknown` 213 → 70 functions), container type map, graphics/input/VMU findings, recompiler
+notes for S3. S1 (2026-11-11): Ghidra 12.2 headless in Docker, 7 925 functions, SDK region table
 (`port/symbols/`). No decomp work has started, and none exists upstream.
 
 ## 0. Starting point
@@ -126,8 +129,8 @@ Not on the disc: no ADX/AFS music files (music is CDDA), no `.VMS`/`.VMI` templa
 | 0x8C0998D4–0x8C17994A | **SDK code**, 3 737 functions; the libraries **interleave** (the linker pulls library objects on demand), so a library is several runs, not one block |
 | 0x8C17994A–0x8C18F112 | SDK data: version banners, error strings, config keys, tables |
 | 0x8C18F112–0x8C197090 | 40 SDK functions placed in the data area (called through tables) |
-| 0x8C197090–0x8C23D900 | 682 KB of zeros inside the image (zero-initialised data shipped in the file) |
-| 0x8C23D900–0x8C23E8BC | tail data; game code calls 0x8C23D900 (code put there at run time? S2) |
+| 0x8C197090–0x8C23D900 | 682 KB of zeros inside the image: `.bss`, cleared again at start-up by the section-init routine 0x8C0100D8 |
+| 0x8C23D900–0x8C23E8BC | initialised game data: the static-constructor table first (S2: the "call" to 0x8C23D900 is the empty destructor loop folded by Ghidra; not code) |
 
 - **Functions (S1, Ghidra + `S1Seed`): 7 925** — game 4 010, start-up 6, SHC runtime 132, SDK 3 777. Coverage of the
   code ranges: 84.4 % instruction bytes, 93.4 % with literal pools (game 93.8 %, SDK 95.5 %).
@@ -153,7 +156,7 @@ Katana SDK libraries built March–April 1999 (syCache July 1999); the exact SDK
 | gdFs | 1.07 | GD-ROM filesystem: reads by file name and by FAD (CRI uses `ADXSTM_OpenRange` by FAD) → the disc reader |
 | pd 1.46, pdLcd 1.03, pdVib 1.01 | | Maple peripherals: pads, **VMU LCD**, **Jump Pack** |
 | bu | 1.44 + "VMS File System for Application" | **VMU backup** (save files) |
-| kd | 1.45 | a Shinobi part, role to identify in S2 |
+| kd | 1.45 | the Maple bus driver under pd, bu, pdLcd and pdVib (S2) |
 | fmMng | 1.03 | flash memory manager |
 | Ninja | `01000086` (Apr 09 1999) | SEGA's 3D library: chunk models, motions, PVM textures, matrices |
 | Kamui | 1.06 (Feb 25 1999): first-generation Kamui, not Kamui2 | PowerVR2 driver: TA vertex lists via store queues, ISP/TSP params |
@@ -181,21 +184,28 @@ not separated yet (no direct anchors survive: gdFs goes through the BIOS GD-ROM 
 entry points are named from strings that name the function (`ADXF_Open`, `mwSndOpenPort`, `mwRnaCreate`,
 `sdPstmPlay` (a thunk into the Manatee code), ...), column `name_conf` in `functions.tsv`.
 
+S2 refined the table (`port/symbols/regions_s2.tsv`, applied by `tools/s2_apply.py`): gdFs, pd/pdLcd/pdVib,
+bu, kd, syChain/syFbr/syBtCfg, the BIOS syscall stubs and a CRI_SJ guess are placed; `unknown` is down to 70
+functions. See `docs/port/SDK.md` 7.
+
 ## 5. Save, controls, video (what is known so far)
 
 - **Save: VMU** through `bu` (VMS files on a 128 KiB VMU flash). No `.VMS` template on disc, so icons and headers
   are built in code. Native image for retrowser: the **128 KiB VMU flash image** (the format Flycast writes as
   `vmu_save_A1.bin`), port A slot 1. VMU LCD graphics (`pdLcd`) are shown on a VMU screen: optional in the port.
-- **Jump Pack** (`pdVib`) → `rtw_rumble`.
+- **Jump Pack** (`pdVib`) → `rtw_rumble`. S2: `pdVibMxStart/Stop/SetStopTime/IsReady`, 1 call site each.
+- S2: one save file through `bu` (`buMakeBackupFileImage` + `buSaveFile`/`buLoadFile`, drives A1–D1); a picture
+  on every VMU LCD (`pdVmsLcdWrite` on ports A1–D1). Details in `docs/port/SDK.md` 2.3–2.4.
 - **Controller**: standard pad, analog stick and **analog L/R triggers** (used by racing games for brakes /
   actions; to check how the game reads them: analog value or threshold).
-- **Players: 4** (Pen Pen is a 4-player split-screen racer; the 4 ports via `pd`; to confirm in code).
+- **Players: 4**, confirmed (S2): the game polls ports A0, B0, C0, D0 and draws players 0–3 in turn, each with its
+  own screen, camera and user tile-clip rectangle (`docs/port/SDK.md` 3).
 - **Video**: VGA box supported (IP.BIN), so 640×480 progressive is possible; NTSC 60 Hz (US). `syCbl` detects the
   cable. The game draws with Kamui 1.06 / Ninja on the PowerVR2 (tile-based, per-pixel translucency sorting;
   modifier volumes possible but not yet seen: needs the Kamui list types used).
-- **Read-backs:** nothing found yet. No strings hint at render-to-texture; Kamui 1.x had render-to-texture
-  support, so the game's Kamui calls must be checked in the decomp (S2). Split-screen is 4 viewports in one frame,
-  not a read-back.
+- **Read-backs (S2): none.** Kamui's render-to-texture path is linked but unreachable (no callers). Lists used:
+  opaque, **opaque modifier volume** (cheap shadows, intensity 160) and translucent; no punch-through, no
+  translucent modifier volume. Video modes: VGA (mode 1) or TV 640×480 interlaced (mode 56), 60 Hz.
 
 ## 6. What retrowser needs for a `dreamcast` platform (host work, not in this repo)
 
@@ -270,7 +280,7 @@ sources or libraries.
 |---|---|---|
 | S0 Survey | this document | done 2026-11-11 |
 | S1 Tooling | analysis tool approved and set up in Docker (Ghidra or rizin); SH-4 loader for 1ST_READ at 0x8C010000; function boundaries; SDK library ranges identified (strings, error messages, call graphs) | done 2026-11-11: `docker/ghidra/`, `tools/ghidra.sh`, `port/symbols/functions.tsv` + `regions.tsv` |
-| S2 Census | SDK API surface the game calls (Ninja/Kamui/sd/pd/bu/gdFs/sy/mw entry points: 224 distinct SDK targets called from game code), the container type map, Kamui list types (modifier volumes?), render-to-texture check, how triggers and VMU are used; refine the S1 region table (gdFs, bu, kd, SJ not yet separated; `unknown` and low rows) | `docs/port/SDK.md` |
+| S2 Census | SDK API surface the game calls (Ninja/Kamui/sd/pd/bu/gdFs/sy/mw entry points: 224 distinct SDK targets called from game code), the container type map, Kamui list types (modifier volumes?), render-to-texture check, how triggers and VMU are used; refine the S1 region table (gdFs, bu, kd, SJ not yet separated; `unknown` and low rows) | done 2026-11-11: `docs/port/SDK.md`, `port/symbols/sdk_calls.tsv`, `regions_s2.tsv`, `tools/s2_apply.py` |
 | S3 SH-4 interpreter + recompiler scaffold | local tool: interpreter (oracle) and SH-4 → C translator; runs in `port_work/` only | recompiled binary boots to the first SDK call on wasm |
 | S4 HLE: files + memory + timers | gdFs on the disc reader, syMalloc, sy timers/interrupt chains as a frame loop | title data loads |
 | S5 HLE: Ninja + Kamui → WebGL2 | PVR textures (VQ, twiddled, mipmaps), chunk models, TA lists, translucency order | logos and title screen visible (looked at) |

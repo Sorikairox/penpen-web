@@ -1,0 +1,24 @@
+# start	end	library	confidence	evidence
+8c062440	8c062464	sy	medium	syCbl:cable-bits-from-port-register;called-by-njInitSystem-and-boot
+8c063024	8c063164	bios_stub	high	BIOS-syscall-wrappers:GD-0xBC(13),sysinfo-0xB0(3)
+8c063d54	8c063da4	bios_stub	high	BIOS-syscall-wrappers:flash-0xB8(4)
+8c09c93a	8c09c9e0	CRI_mw	low	graph:mwPly-callers
+8c09cec8	8c09ed34	gdFs	medium	gdFs-API+driver-table-0x8C179DEC;sbinit-gdFsInit;data-order
+8c09ed34	8c09f428	pd	high	pdInitPeripheral/pdGetPeripheral/pdExitPeripheral
+8c09f428	8c09fd04	sy	high	syMalloc/syHw/syTmr;sbinit-sbexit
+8c09fd04	8c09fe68	pd	medium	pdLcd:VMU-LCD-writes-ports-A1-D1;data-order
+8c09fe68	8c0a0e84	bu	medium	bu-API:init/load/save/stat/backup-image;data-order
+8c0a0e84	8c0a10f4	sy	medium	syCfg(sysvars-0x8C00007D/7E)+syBt(BIOS-0xE0);data-order
+8c0a10f4	8c0a1264	pd	low	pdVib-API(start/stop/stop-time)
+8c0dae06	8c0dbe14	CRI_SJ	low	data-order(SJ-version-before-syChain)+CRI-callers
+8c0dbe14	8c0dc6c4	gdFs	high	only-callers-of-GD-BIOS-stubs;ISO9660-directory
+8c0dc6c4	8c0dd130	sy	medium	syChain(Holly-IRQ-handler-chains)/syInt/sySq;data-order
+8c0dd130	8c0de2b0	kd	medium	Maple-bus-driver-core-shared-by-pd/bu/pdLcd/pdVib;data-order(kd-after-sySq)
+8c0de2b0	8c0e2bcc	bu	medium	bu-core(called-by-bu-API);VMU-filesystem
+8c0e2bcc	8c0e2e10	sy	medium	syBtCfg:sysinfo+flash-config;data-order
+8c0e2e10	8c0e3268	sy	medium	syFbr:context-switch(rte);used-by-mwPly;data-order
+8c0e3268	8c0e342c	pd	medium	pdVib-core;data-order(pdVib-after-syFbr)
+8c12b350	8c12b7c4	sy	medium	exception/interrupt-entry(VBR,rte)
+8c16f718	8c175ae2	Ninja	medium	strip-emitters:store-queue-TA-output;Ninja-callers/callees
+8c175af0	8c17994a	Ninja	medium	strip-emitters:store-queue-TA-output;Ninja-callers/callees
+8c23d900	8c23d902	data	high	static-constructor-table(not-code)
