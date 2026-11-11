@@ -8,6 +8,7 @@ DF="$CF -DSH4_MEM_HOOK -DRT_DIFF -I$S/recomp -I$GEN"
 STAMP="$DF $(cat $S/sh4/sh4.h $S/sh4/sh4_ops.h $S/recomp/rt_gen.h | md5sum)"
 if [ "$(cat "$OUT/flags" 2>/dev/null)" != "$STAMP" ]; then rm -rf "$OUT/obj"; fi
 mkdir -p "$OUT/obj"; echo "$STAMP" > "$OUT/flags"
+for o in "$OUT"/obj/g_*.o; do [ -e "$o" ] || continue; b=$(basename "$o" .o); [ -e "$GEN/$b.c" ] || rm -f "$o"; done
 ls "$GEN"/g_*.c "$GEN"/table.c | xargs -P "$J" -I{} sh -c 'o='"$OUT"'/obj/$(basename {} .c).o; [ "$o" -nt {} ] || gcc '"$DF"' -O1 -c {} -o $o'
 gcc $DF -c $S/recomp/diff_main.c -o "$OUT/obj/diff_main.o"
 gcc $DF -c $S/sh4/sh4_interp.c -o "$OUT/obj/sh4_interp.o"

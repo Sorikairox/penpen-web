@@ -13,6 +13,8 @@ F="$CF -I$S/recomp -I$S/runtime -I$S/render -I$S/audio -I$GEN"
 STAMP="$KIND $F $(cat $S/sh4/sh4.h $S/sh4/sh4_ops.h $S/recomp/rt_gen.h | md5sum)"
 if [ "$(cat "$OUT/flags" 2>/dev/null)" != "$STAMP" ]; then rm -rf "$OUT/obj"; fi
 mkdir -p "$OUT/obj"; echo "$STAMP" > "$OUT/flags"
+# objects of generated files that are gone (S8: a trimmed translation has fewer files) would be linked twice
+for o in "$OUT"/obj/g_*.$O; do [ -e "$o" ] || continue; b=$(basename "$o" .$O); [ -e "$GEN/$b.c" ] || rm -f "$o"; done
 ls "$GEN"/g_*.c "$GEN"/table.c | xargs -P "$J" -I{} sh -c 'o='"$OUT"'/obj/$(basename {} .c).'$O'; [ "$o" -nt {} ] || '"$CC $F $EXTRA"' -c {} -o $o'
 for f in $RT; do $CC $F -c $f -o "$OUT/obj/rt_$(basename $f .c).$O"; done
 if [ "$KIND" = native ]; then
