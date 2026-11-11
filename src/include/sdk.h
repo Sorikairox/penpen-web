@@ -40,7 +40,7 @@ static inline gaddr gdFs_Api34(void) { return CALL0(0x8C09EBF2u); }             
 static inline int32_t gdFsGetStat(gaddr handle) { return (int32_t)CALL1(0x8C09E864u, handle); }
 static inline int32_t gdFsGetDrvStat(void) { return (int32_t)CALL0(0x8C09EC4Cu); }
 enum { GDD_STAT_BUSY_HANDLE = 4 };                                  /* gdFsGetStat: the request is still running */
-enum { GDD_DRVSTAT_OPEN = 6, GDD_DRVSTAT_NODISC = 7, GDD_DRVSTAT_ERROR = 9 };
+enum { GDD_DRVSTAT_PLAY = 3, GDD_DRVSTAT_OPEN = 6, GDD_DRVSTAT_NODISC = 7, GDD_DRVSTAT_ERROR = 9 };
 
 /* ---- CRI middleware ---- */
 static inline void mw_PreInit(void) { CALL0(0x8C09C280u); }

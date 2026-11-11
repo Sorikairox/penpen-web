@@ -1,6 +1,7 @@
 /* Pen Pen port, S11: the sound front end (game/sound.h). */
 #include "sound.h"
 #include "sdk.h"
+#include "../core/file.h"
 
 /* ---- the Manatee driver (sd), CDDA and file calls this module makes ---- */
 static void sdLibInit(void) { CALL3(0x8C09AEE4u, 0, 0, 0); }
@@ -30,16 +31,12 @@ static void syCfgGetSoundMode(gaddr mode_out) { CALL1(0x8C0A0ED6u, mode_out); }
 #define SD_MONO 0x4F4E4F4Du   /* 'MONO' */
 #define GD_DRVSTAT_PLAY 3
 
-/* still translated */
-static gaddr load_file(gaddr name, int32_t arg) { return CALL2(0x8C01311Cu, name, arg); } /* func_8C01311C: a whole file into a new block */
-static void cdda_play(int32_t first, int32_t last, int32_t repeat) { CALL3(0x8C012D38u, first, last, repeat); } /* func_8C012D38 */
-static void cdda_stop(void) { CALL0(0x8C012D5Cu); }                                  /* func_8C012D5C */
 
 /* was func_8C015BFC: start the driver (its program from the disc), open the 8 + 8 ports, silence the music, clear
  * every request */
 void sound_init(void) {
   sdLibInit();
-  gaddr driver = load_file(SOUND_DRIVER_FILE, 0);
+  gaddr driver = file_load_fixed(SOUND_DRIVER_FILE, 0);
   gaddr block = hw_stack_alloc(4); /* the driver writes the block handle there */
   GUEST_VAR(gaddr, block) = 0;
   sdMemBlkCreate(block);
@@ -87,9 +84,9 @@ static void music_update(void) {
     g_cdda_volume = CDDA_VOLUME_OFF;
     sd_Cmd53(CDDA_VOLUME_OFF, CDDA_VOLUME_OFF);
     if (g_music_requested < 0)
-      cdda_stop();
+      cd_pause();
     else
-      cdda_play(g_music_playing, g_music_playing, g_music_repeat ? 15 : 0);
+      cd_play(g_music_playing, g_music_playing, g_music_repeat ? 15 : 0);
   }
 }
 
@@ -139,7 +136,7 @@ HW_EXPORT(8c015d10, sound_update())
 
 /* was func_8C015FFC: load a sound bank file and hand it to the driver */
 static void sound_download_bank(gaddr file_name, int32_t arg) {
-  gaddr data = load_file(file_name, arg);
+  gaddr data = file_load_fixed(file_name, (gaddr)arg);
   gaddr block = hw_stack_alloc(4);
   GUEST_VAR(gaddr, block) = 0;
   sdMemBlkCreate(block);
@@ -166,7 +163,7 @@ void music_stop(void) {
   g_music_requested = -1;
   g_cdda_volume = CDDA_VOLUME_OFF;
   sd_Cmd53(g_cdda_volume, CDDA_VOLUME_OFF);
-  cdda_stop();
+  cd_pause();
 }
 HW_EXPORT(8c01604e, music_stop())
 

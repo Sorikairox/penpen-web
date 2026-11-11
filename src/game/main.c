@@ -3,6 +3,7 @@
 #include "../core/view.h"
 #include "sound.h"
 #include "sdk.h"
+#include "../core/file.h"
 
 /* still translated (the start-up of each subsystem; names say what they are where known) */
 static void sb_init_system(int32_t mode, int32_t frame, int32_t count) { CALL3(0x8C010184u, mode, frame, count); } /* the SDK sample's sbInitSystem, linked into the game */
@@ -15,7 +16,6 @@ static void game_shutdown(void) { CALL0(0x8C016792u); }    /* never reached: the
 static void run_static_destructors(void) { CALL0(0x8C016510u); }
 static void draw_panel(gaddr panel, int32_t split_mode) { CALL2(0x8C02CC3Eu, panel, split_mode); }
 #define func_8C061DB8() CALL0(0x8C061DB8u)
-#define func_8C012D04() CALL0(0x8C012D04u)
 #define func_8C018CBA() CALL0(0x8C018CBAu)
 #define func_8C015224() CALL0(0x8C015224u)
 #define func_8C018DD0() CALL0(0x8C018DD0u)
@@ -77,7 +77,7 @@ void game_init(void) {
   syCfgInit(SYCFG_WORK);
   video_init();
   func_8C061DB8();
-  func_8C012D04();
+  file_init();
   graphics_init();
   sound_init(); /* (the original goes through the thunk func_8C016A4E) */
   func_8C018CBA();
