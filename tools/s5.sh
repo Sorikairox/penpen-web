@@ -5,6 +5,7 @@
 #                                        dump, then render them with port/render/gl in headless Chromium
 #                                        (penpen-chromium image) to /build/shots/png/fNNNNN.png
 #   tools/s5.sh render                   only the Chromium step, on the dumps already there
+#                                        (LISTS=mask: draw only those lists, bit 0 OP, 1 OM, 2 TR, 3 PT)
 #   tools/s5.sh look fNNNNN [...]        copy those PNGs (checked to be PNG files) to $SHOTS for viewing
 #                                        (a scratch directory outside the repo; never committed)
 # Both containers run with --network none --read-only --cap-drop ALL; the disc, the wasm and the dumps stay in
@@ -16,7 +17,7 @@ CHR=${CHROMIUM_IMAGE:-penpen-chromium:1}
 SHOTS=${SHOTS:-/private/tmp/claude-501/-Users-sorikairo-Code-pokemonsnap/f6d4a533-34b6-4407-a635-03b29c8ddb2f/scratchpad/penpen-shots}
 render() {
   $D run --rm --network none --read-only --cap-drop ALL --security-opt no-new-privileges --user 1000:1000 \
-    --tmpfs /tmp:exec,size=2g,mode=1777 -e HOME=/tmp -v "$REPO/port":/src/port:ro -v penpen-build:/build $CHR \
+    --tmpfs /tmp:exec,size=2g,mode=1777 -e HOME=/tmp -e LISTS=${LISTS:-15} -e CMDS=${CMDS:-0} -e PROBE=${PROBE:-} -v "$REPO/port":/src/port:ro -v penpen-build:/build $CHR \
     sh -c "rm -rf /build/shots/png && node /src/port/render/shot/shot.mjs /src/port/render /build/shots/dump /build/shots/png" \
     | grep -E '^shot [ -~]*$' || true
 }

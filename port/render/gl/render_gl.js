@@ -89,7 +89,8 @@ void main() {
       return o >>> 0;
     }
 
-    r.frame = function (buffer, ptr) {
+    r.frame = function (buffer, ptr, opt) {
+      const listMask = opt && opt.lists !== undefined ? opt.lists : 15; // debugging: draw only these lists (bit per list)
       const u32 = new Uint32Array(buffer, ptr, 24);
       if (u32[0] !== 0x4C445050) throw new Error('not a draw list');
       const W = u32[3], H = u32[4];
@@ -139,7 +140,7 @@ void main() {
       for (let i = 0; i < ncmd; i++) {
         const list = C[8 * i], first = C[8 * i + 1], count = C[8 * i + 2], tid = C[8 * i + 3], m = C[8 * i + 4];
         const x0 = C[8 * i + 5] & 0xFFFF, y0 = C[8 * i + 5] >>> 16, x1 = C[8 * i + 6] & 0xFFFF, y1 = C[8 * i + 6] >>> 16;
-        if (x1 <= x0 || y1 <= y0 || !count) continue;
+        if (x1 <= x0 || y1 <= y0 || !count || !((listMask >> list) & 1)) continue;
         gl.scissor(x0, H - y1, x1 - x0, y1 - y0);
         gl.depthFunc(ZF[(m >>> 7) & 7]);
         gl.depthMask(list === 2 ? ((m >>> 6) & 1) === 1 : true);

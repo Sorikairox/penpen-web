@@ -47,9 +47,33 @@ let ok = false;
 for (let i = 0; i < 100 && !ok; i++) { await sleep(100); try { ok = (await evaluate('document.title')) === 'READY'; } catch {} }
 if (!ok) { console.log('shot page not ready: ' + (await evaluate('document.title'))); ch.kill(); process.exit(1); }
 console.log('shot renderer ' + (await evaluate("(() => { const g = document.createElement('canvas').getContext('webgl2'); const e = g.getExtension('WEBGL_debug_renderer_info'); return e ? g.getParameter(e.UNMASKED_RENDERER_WEBGL) : g.getParameter(g.RENDERER); })()")));
+// CMDS=1: per command list, texture, mode, triangles, screen box and 1/w range (from the dump, no GL)
+function cmdInfo(n) {
+  const b = fs.readFileSync(path.join(shotDir, n)), buf = b.buffer.slice(b.byteOffset, b.byteOffset + b.length);
+  const h = new Uint32Array(buf, 0, 24), C = new Uint32Array(buf, h[9], h[8] * 8), V = new Float32Array(buf, h[11], h[10] * 7);
+  for (let i = 0; i < h[8]; i++) {
+    const f = C[8 * i + 1], cnt = C[8 * i + 2];
+    let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9, w0 = 1e9, w1 = -1e9;
+    for (let k = f; k < f + cnt; k++) { const x = V[7 * k], y = V[7 * k + 1], w = V[7 * k + 2];
+      x0 = Math.min(x0, x); y0 = Math.min(y0, y); x1 = Math.max(x1, x); y1 = Math.max(y1, y); w0 = Math.min(w0, w); w1 = Math.max(w1, w); }
+    if (process.env.PROBE) { // triangles covering a pixel: their 1/w there
+      const [px, py] = process.env.PROBE.split(',').map(Number);
+      for (let k = f; k + 2 < f + cnt; k += 3) {
+        const P = [0, 1, 2].map((j) => [V[7 * (k + j)], V[7 * (k + j) + 1], V[7 * (k + j) + 2]]);
+        const d = (P[1][1] - P[2][1]) * (P[0][0] - P[2][0]) + (P[2][0] - P[1][0]) * (P[0][1] - P[2][1]);
+        if (!d) continue;
+        const a = ((P[1][1] - P[2][1]) * (px - P[2][0]) + (P[2][0] - P[1][0]) * (py - P[2][1])) / d;
+        const b = ((P[2][1] - P[0][1]) * (px - P[2][0]) + (P[0][0] - P[2][0]) * (py - P[2][1])) / d;
+        if (a >= 0 && b >= 0 && a + b <= 1) console.log(`shot probe cmd ${i} list ${C[8 * i]} tri ${(k - f) / 3} iw ${(a * P[0][2] + b * P[1][2] + (1 - a - b) * P[2][2]).toExponential(4)}`);
+      }
+    }
+    console.log(`shot cmd ${i} list ${C[8 * i]} tex ${C[8 * i + 3]} mode ${C[8 * i + 4].toString(16)} tris ${cnt / 3} box ${x0 | 0} ${y0 | 0} ${x1 | 0} ${y1 | 0} iw ${w0.toExponential(3)} ${w1.toExponential(3)}`);
+  }
+}
 for (const n of names) {
+  if (process.env.CMDS === '1') cmdInfo(n);
   try {
-    const v = await evaluate(`renderOne(${JSON.stringify(n)})`);
+    const v = await evaluate(`renderOne(${JSON.stringify(n)}, ${Number(process.env.LISTS ?? 15)})`);
     fs.writeFileSync(path.join(outDir, n.replace('.ppdl', '.png')), Buffer.from(v.png.slice(22), 'base64'));
     const s = v.stats;
     console.log(`shot ${n} cmds ${s.cmds} draws ${s.draws} verts ${s.verts} textures ${s.textures} op ${s.op} tr-tris ${s.trTris} om-tris ${s.omTris} culled ${s.culled}`);

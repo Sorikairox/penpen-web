@@ -13,6 +13,7 @@ extern const int nj_model_nimpls;
 
 void nj_frame_begin(uint32_t frame);
 void nj_frame_end(void);
+void nj_model_log(void);
 void hle_logcall(SH4 *c, const char *extra); /* hle.c: count + log one HLE call */
 uint32_t hle_frame(void);
 

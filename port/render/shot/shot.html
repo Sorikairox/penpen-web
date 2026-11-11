@@ -9,9 +9,9 @@
   const canvas = document.getElementById('c');
   const r = PenpenGL.create(canvas);
   // render one dump; resolve to {png: dataURL, stats}
-  window.renderOne = async (name) => {
+  window.renderOne = async (name, lists) => {
     const buf = await (await fetch('/shots/' + name)).arrayBuffer();
-    const stats = r.frame(buf, 0);
+    const stats = r.frame(buf, 0, { lists });
     r.gl.finish();
     return { png: canvas.toDataURL('image/png'), stats };
   };

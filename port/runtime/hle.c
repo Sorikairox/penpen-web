@@ -584,6 +584,7 @@ void hle_summary(void) {
   uint32_t total = 0;
   int used = 0;
   for (int i = 0; i < NTAB; i++) if (tab[i].calls) { total += tab[i].calls; used++; }
+  nj_model_log();
   rt_log("hle summary: %u calls to %d functions, %u frames, %d files opened", total, used, frame, gd_files_loaded);
   for (int i = 0; i < NTAB; i++)
     if (tab[i].calls)
