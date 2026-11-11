@@ -1,0 +1,15 @@
+# Work output (may contain disc-derived data): never commit
+port_work/
+# Disc images and dumps
+*.bin
+*.BIN
+*.cue
+*.gdi
+*.iso
+*.chd
+*.cdi
+*.raw
+*.7z
+*.vms
+*.VMS
+.DS_Store

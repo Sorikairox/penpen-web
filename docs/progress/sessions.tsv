@@ -1,0 +1,2 @@
+session	date	what	result
+S0	2026-11-11	static survey of the US GD-ROM in sandboxed Docker (IP.BIN, ISO9660 of track 48, asset formats, 1ST_READ.BIN layout/function estimate, SDK versions) + retrowser dreamcast needs + port plan	docs/port/PLAN.md + HANDOFF.md + survey script sources; 194 files, 1ST_READ 2287804 B ~7000-7500 funcs, Katana SDK (Shinobi 1.42, Ninja 01000086, Kamui 1.06, Manatee sd 1.00.18, CRI); estimate 115-230 sessions; open: licence, retrowser platform, tool downloads
