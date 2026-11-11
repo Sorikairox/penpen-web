@@ -38,6 +38,31 @@ public class S13Decomp extends GhidraScript {
         d.openProgram(currentProgram);
         FunctionManager fm = currentProgram.getFunctionManager();
         for (String a : getScriptArgs()) {
+            // "+ADDR": disassemble from ADDR first (code Ghidra left as data, e.g. after a call it thinks never
+            // returns); "!ADDR:LEN": print the instructions of that range (after any "+")
+            if (a.startsWith("+")) {
+                ghidra.app.cmd.disassemble.DisassembleCommand dc =
+                    new ghidra.app.cmd.disassemble.DisassembleCommand(toAddr(Long.parseLong(a.substring(1).replace("0x", ""), 16)), null, true);
+                Address at = toAddr(Long.parseLong(a.substring(1).replace("0x", ""), 16));
+                currentProgram.getListing().clearCodeUnits(at, at.add(1), false);
+                dc.applyTo(currentProgram, monitor);
+                continue;
+            }
+            if (a.startsWith("~")) { // "~ADDR": the function at ADDR returns (Ghidra wrongly marked it no-return)
+                Function nf = fm.getFunctionAt(toAddr(Long.parseLong(a.substring(1).replace("0x", ""), 16)));
+                if (nf != null) nf.setNoReturn(false);
+                continue;
+            }
+            if (a.startsWith("!")) {
+                String[] p = a.substring(1).split(":");
+                Address at = toAddr(Long.parseLong(p[0].replace("0x", ""), 16));
+                Address end = at.add(Long.parseLong(p[1], 16));
+                for (Instruction in : currentProgram.getListing().getInstructions(at, true)) {
+                    if (in.getAddress().compareTo(end) >= 0) break;
+                    System.out.println("S4D " + in.getAddress() + "  " + in.toString());
+                }
+                continue;
+            }
             long v = Long.parseLong(a.replace("@", "").replace("0x", ""), 16);
             if (a.startsWith("@")) v = getInt(toAddr(v)) & 0xFFFFFFFFL;
             Function f = fm.getFunctionContaining(toAddr(v));

@@ -64,3 +64,42 @@ void view_set_split(int32_t mode) {
   }
 }
 HW_EXPORT(8c010e40, view_set_split((int32_t)ARG0))
+
+/* ---- the per-view light and fog (read by the view's camera set-up, func_8C011C7C) ---- */
+
+/* was func_8C01B10C */
+void view_set_light_dir(f32 x, f32 y, f32 z, int32_t index) { vec3_set(x, y, z, hw_addr(&g_views[index].light_dir)); }
+HW_EXPORT(8c01b10c, view_set_light_dir(FARG0, FARG1, FARG2, (int32_t)ARG0))
+/* was func_8C01B0DC */
+void view_set_light_intensity(f32 a, f32 b, f32 c, int32_t index) {
+  View *v = &g_views[index];
+  v->light_intensity.x = a;
+  v->light_intensity.y = b;
+  v->light_intensity.z = c;
+}
+HW_EXPORT(8c01b0dc, view_set_light_intensity(FARG0, FARG1, FARG2, (int32_t)ARG0))
+/* was func_8C01B0F4 */
+void view_set_light_color(f32 r, f32 g, f32 b, int32_t index) {
+  View *v = &g_views[index];
+  v->light_color.x = r;
+  v->light_color.y = g;
+  v->light_color.z = b;
+}
+HW_EXPORT(8c01b0f4, view_set_light_color(FARG0, FARG1, FARG2, (int32_t)ARG0))
+/* was func_8C01F5B0 */
+void view_fog_off(int32_t index) { g_views[index].fog = 0; }
+HW_EXPORT(8c01f5b0, view_fog_off((int32_t)ARG0))
+/* was func_8C042452: fog as the current view wants it */
+void view_apply_fog(void) {
+  if (((View *)hw_ptr(g_cur_view))->fog == 0)
+    njFogDisable();
+  else
+    njFogEnable();
+}
+HW_EXPORT(8c042452, view_apply_fog())
+/* was func_8C028E90: the current view's Ninja screen */
+gaddr view_screen(void) { return hw_addr(((View *)hw_ptr(g_cur_view))->screen); }
+HW_EXPORT(8c028e90, RET(view_screen()))
+/* was func_8C0165E2 */
+int32_t view_current_index(void) { return g_cur_view_index; }
+HW_EXPORT(8c0165e2, RET(view_current_index()))

@@ -66,5 +66,12 @@ HW_EXPORT(8c010a68, RET(pad_pressed((const Pad *)hw_ptr(ARG0), ARG1)))
 int32_t port_held(int32_t port, uint32_t buttons) { return (g_pad_held[port] & buttons) != 0; }
 HW_EXPORT(8c019d14, RET(port_held((int32_t)ARG0, ARG1)))
 
-/* as func_8C019D2A (stays translated: only a soft reset from ports 2-4 reaches it, never on the tested runs) */
+/* was func_8C019D2A (S13: exported with its copies; S11 left it translated: only a soft reset from ports 2-4 reaches
+ * this copy) */
 int32_t port_pressed(int32_t port, uint32_t buttons) { return (g_pad_pressed[port] & buttons) != 0; }
+HW_EXPORT(8c019d2a, RET(port_pressed((int32_t)ARG0, ARG1)))
+
+/* was func_8C01AFE0: a standard controller is plugged into the port (device type word 1); a method: the port is
+ * the second argument */
+int32_t port_has_controller(int32_t port) { return g_pad_type[port] == 1; }
+HW_EXPORT(8c01afe0, RET(port_has_controller((int32_t)ARG1)))

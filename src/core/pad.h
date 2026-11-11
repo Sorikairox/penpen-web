@@ -52,5 +52,6 @@ int32_t pad_held(const Pad *pad, uint32_t buttons);
 int32_t pad_pressed(const Pad *pad, uint32_t buttons);
 int32_t port_held(int32_t port, uint32_t buttons);
 int32_t port_pressed(int32_t port, uint32_t buttons);
+int32_t port_has_controller(int32_t port);
 
 #endif

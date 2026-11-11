@@ -31,6 +31,14 @@ void task_init(Task *task, gaddr parent) {
   task->owner = 0;
 }
 
+/* was func_8C015200 (and its copies: the Task constructor every subclass inlines): a fresh task under `parent`;
+ * returns the task */
+gaddr task_construct(gaddr task, gaddr parent) {
+  task_init(task_at(task), parent);
+  return task;
+}
+HW_EXPORT(8c015200, RET(task_construct(ARG0, ARG1)))
+
 /* was func_8C0102C0: make `first` (and the siblings chained after it) the first children of `parent`; the
  * parent's existing children follow them. The new tasks take the parent and its owner. */
 void task_add_children(Task *parent, Task *first) {

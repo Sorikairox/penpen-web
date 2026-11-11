@@ -96,3 +96,10 @@ void cd_play(int32_t first_track, int32_t last_track, int32_t repeat) {
 }
 HW_EXPORT(8c012d38, cd_play((int32_t)ARG0, (int32_t)ARG1, (int32_t)ARG2))
 
+
+/* was func_8C022B64: wait until the drive is no longer playing CDDA (after a stop request) */
+void cd_wait_stopped(void) {
+  while (gdFsGetDrvStat() == GDD_DRVSTAT_PLAY) {
+  }
+}
+HW_EXPORT(8c022b64, cd_wait_stopped())

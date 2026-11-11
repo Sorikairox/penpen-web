@@ -199,3 +199,14 @@ void drive_watch(void) {
   }
 }
 HW_EXPORT(8c012dc4, drive_watch())
+
+/* was func_8C01B202 / func_8C01B20A: the V-sync callback's work (background colour, V-blank count) on / off
+ * (scenes turn it off while they load) */
+void video_resume(void) { g_video_running = 1; }
+void video_pause(void) { g_video_running = 0; }
+HW_EXPORT(8c01b202, video_resume())
+HW_EXPORT(8c01b20a, video_pause())
+
+/* was func_8C03C698: the split-screen panel object */
+gaddr panel_get(void) { return g_panel; }
+HW_EXPORT(8c03c698, RET(panel_get()))

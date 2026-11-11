@@ -58,6 +58,7 @@ uint32_t task_call_draw(Task *task);
 uint32_t task_call_destroy(Task *task, int32_t free_memory);
 
 void task_init(Task *task, gaddr parent);
+gaddr task_construct(gaddr task, gaddr parent);
 void task_add_children(Task *parent, Task *first);
 void task_update_tree(gaddr task, gaddr link, int32_t paused);
 void task_draw_tree(Task *task);

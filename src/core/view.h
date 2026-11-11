@@ -8,11 +8,24 @@
 #define PENPEN_VIEW_H
 
 #include "hw.h"
+#include "vec.h"
 
 typedef struct View {
   int32_t layout;               /* 0x000: index into the layout table (screen rectangle, ...) */
-  uint8_t camera[0x18C - 4];    /* 0x004: camera, screen and projection (floats; translated code) */
+  uint8_t clip[0x20];           /* 0x004: the njClip2D rectangle */
+  uint8_t camera[0x40];         /* 0x024: the Ninja camera (NJS_CAMERA) */
+  uint8_t screen[0x8C];         /* 0x064: the Ninja screen in use, and its set-up (from 0x9C) */
+  int32_t fog;                  /* 0x0F0: fog on */
+  Vec3 light_dir;               /* 0x0F4: the lights' direction (turned by the camera) */
+  Vec3 light_intensity;         /* 0x100: (unused, diffuse, ambient): nj_Light*Intensity */
+  uint32_t unknown10c;          /* 0x10C */
+  Vec3 light_color;             /* 0x110: nj_Light*Color */
+  uint8_t unknown11c[0x18C - 0x11C];
 } View;
+HW_OFFSET(View, camera, 0x24);
+HW_OFFSET(View, screen, 0x64);
+HW_OFFSET(View, fog, 0xF0);
+HW_OFFSET(View, light_color, 0x110);
 HW_SIZE(View, 0x18C);
 
 #define VIEW_MAX 4
@@ -30,5 +43,12 @@ void view_select(int32_t index);
 void view_finish(void);
 void views_reset(void);
 void view_set_split(int32_t mode);
+void view_set_light_dir(f32 x, f32 y, f32 z, int32_t index);
+void view_set_light_intensity(f32 a, f32 b, f32 c, int32_t index);
+void view_set_light_color(f32 r, f32 g, f32 b, int32_t index);
+void view_fog_off(int32_t index);
+void view_apply_fog(void);
+gaddr view_screen(void);
+int32_t view_current_index(void);
 
 #endif

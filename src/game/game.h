@@ -83,4 +83,7 @@ Game *game_construct(Game *game, int32_t first_mode);
 Game *game_reset(Game *game, int32_t first_mode);
 void game_update(gaddr game);
 
+gaddr panel_get(void);
+void video_resume(void);
+void video_pause(void);
 #endif

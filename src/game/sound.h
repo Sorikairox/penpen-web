@@ -58,5 +58,7 @@ void sound_reset_requests(void);
 void sound_select_set(int32_t set);
 void music_play(int32_t track, int32_t fade_frames, int32_t repeat);
 void music_stop(void);
+void sound_play(int32_t port, int32_t sound, int32_t priority);
+void sound_play_port_sound(int32_t port);
 
 #endif

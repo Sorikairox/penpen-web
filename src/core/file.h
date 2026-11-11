@@ -136,4 +136,5 @@ void fix_cnk_object_tree(gaddr object, gaddr base);
 void fix_cnk_model(gaddr model, gaddr base);
 gaddr container_load(gaddr name, gaddr dir_name);
 
+void cd_wait_stopped(void);
 #endif

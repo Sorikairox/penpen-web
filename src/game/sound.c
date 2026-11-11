@@ -242,3 +242,17 @@ void sound_select_set(int32_t set) {
   g_sound_set = set;
 }
 HW_EXPORT(8c016a5a, sound_select_set((int32_t)ARG0))
+
+/* was func_8C01B158: a one-shot sound on a port at full volume, centred, normal pitch */
+void sound_play(int32_t port, int32_t sound, int32_t priority) { sound_shot_request(port, priority, sound, 0x7F, 0, 0); }
+HW_EXPORT(8c01b158, sound_play((int32_t)ARG0, (int32_t)ARG1, (int32_t)ARG2))
+/* was func_8C01B182 / func_8C01B1A2 / func_8C01B1C2 / func_8C01B1E2: sound 5 + port on port 0-3 (priority 0: always
+ * replaces) */
+void sound_play_port_sound(int32_t port) { sound_shot_request(port, 0, 5 + port, 0x7F, 0, 0); }
+HW_EXPORT(8c01b182, sound_play_port_sound(0))
+HW_EXPORT(8c01b1a2, sound_play_port_sound(1))
+HW_EXPORT(8c01b1c2, sound_play_port_sound(2))
+HW_EXPORT(8c01b1e2, sound_play_port_sound(3))
+/* was func_8C01B17C and func_8C022B5E: local jumps to music_play / music_stop */
+HW_EXPORT(8c01b17c, music_play((int32_t)ARG0, (int32_t)ARG1, (int32_t)ARG2))
+HW_EXPORT(8c022b5e, music_stop())

@@ -27,6 +27,11 @@ def main():
         a, n = int(f[0], 16), int(f[1])
         if n < 4 or a - BASE + n > len(data):
             continue
+        # a function Ghidra cut short (its code runs on past the listed size, e.g. into bytes left as data) has no
+        # rts / jmp / bra / braf / rte in its range: its bytes are not the whole function, so it is never grouped
+        ops = [rd16(pc) for pc in range(a, a + n, 2)]
+        if not any(o == 0x000B or (o & 0xF0FF) in (0x402B, 0x0023) or (o >> 12) == 0xA for o in ops):
+            continue
         key = []
         for pc in range(a, a + n, 2):
             op = rd16(pc)
