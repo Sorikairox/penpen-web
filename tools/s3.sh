@@ -8,7 +8,8 @@
 #                               GEN=genall after `gen --ranges all --out /build/genall` tests the SDK too
 #   tools/s3.sh mutants         recompile with each mutant and count the functions that catch it
 #                               (RANGES=all: on the SDK code too; MUTS="2 7": a subset)
-#   tools/s3.sh mutate [args]   S12: run the mutants of port_work/mut/mutants.json (tools/mut_worker.py)
+#   tools/s3.sh mutate [args]   S12 (first pipeline, retired): rebuild per mutant (tools/mut_worker.py)
+#   tools/s3.sh mull [args]     S12: mutation testing with Mull (tools/mull_run.py in the penpen-mull:1 image)
 #   tools/s3.sh native [args]   build + run the boot natively (disc read from penpen-disc)
 #   tools/s3.sh wasm [args]     build the boot as wasm32 + run it in node (disc read by the node host)
 # Every container that sees disc-derived data runs with --network none --read-only --cap-drop ALL; the
@@ -26,7 +27,7 @@ box() { # sandboxed container: repo read-only at /src, volumes as given by the c
 }
 # What may be printed from a container that read disc-derived data: our own log vocabulary only (-a: a log line
 # with a non-ASCII byte must not turn grep's output into "binary file matches": the pattern drops such lines).
-filt() { grep --line-buffered -aE '^(S3 |audio |check_gen |sh4 |diff |mut |hle |boot |rt |io |gen |build |frame |render |shot |hw |  )[ -~]*$' || true; }
+filt() { grep --line-buffered -aE '^(S3 |audio |check_gen |sh4 |diff |mut |mull |hle |boot |rt |io |gen |build |frame |render |shot |hw |  )[ -~]*$' || true; }
 # S11: GEN=genhand HAND=1 gen = the translation without the hand-written functions (src/); GEN=x native|wasm builds
 # /build/x into /build/native-x | /build/wasm-x (tools/s11.sh wraps these)
 # S12: the run arguments go into a `sh -c` string: quote each one (a pad script's "A|SL" is not a pipe)
@@ -72,11 +73,16 @@ case "${1:-}" in
     box -v penpen-disc:/disc:ro -v penpen-build:/build:ro -v "$REPO/port_work/mut":/mut:ro -e CF="$CF" \
       -v "${MUTSRC:-$REPO/src}":/mutsrc:ro -e SRC=/mutsrc -e MUTANTS="${MUTANTS:-/mut/mutants.json}" $IMG \
       sh -c 'python3 -I /src/tools/mut_worker.py "$MUTANTS" /src/tools/routes.tsv "$@"' sh "$@" 2>&1 | filt ;;
+  mull)
+    # S12: Mull (tools/mull_run.py, image penpen-mull:1 from docker/mull): every mutant of src/ in one build
+    shift
+    box -v penpen-disc:/disc:ro -v penpen-build:/build:ro -e CF="$CF" -v "${MUTSRC:-$REPO/src}":/mutsrc:ro -e SRC=/mutsrc \
+      ${MULL_IMAGE:-penpen-mull:1} python3 -I /src/tools/mull_run.py /src/tools/routes.tsv "$@" 2>&1 | filt ;;
   native)
     shift
     box -v penpen-disc:/disc:ro -v penpen-build:/build $IMG sh -c "{ sh /src/port/runtime/build.sh native /build/$G /build/native$SFX '$CF' $J || { echo 'build FAILED (compiler messages are not shown: they may quote generated code)'; exit 1; }; } && /build/native$SFX/penpen --disc /disc $(qargs "$@")" 2>&1 | filt ;;
   wasm)
     shift
     box -v penpen-disc:/disc:ro -v penpen-build:/build $IMG sh -c "{ sh /src/port/runtime/build.sh wasm /build/$G /build/wasm$SFX '$CF' $J || { echo 'build FAILED (compiler messages are not shown: they may quote generated code)'; exit 1; }; } && /emsdk/node/22.16.0_64bit/bin/node /src/port/runtime/node/run.mjs /build/wasm$SFX/penpen.wasm /disc $(qargs "$@")" 2>&1 | filt ;;
-  *) sed -n '2,13p' "$0"; exit 2 ;;
+  *) sed -n '2,14p' "$0"; exit 2 ;;
 esac

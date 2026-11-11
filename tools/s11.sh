@@ -12,10 +12,10 @@
 #   tools/s11.sh compare [native|wasm]   pure vs hand: frame lines (RAM digest every frame, stack area left out) over
 #                                 every route; prints the first difference, if any (ROUTES="a b": some routes)
 #   tools/s11.sh progress         docs/progress/decomp.tsv + decomp_functions.tsv (tools/decomp_progress.py)
-#   tools/s11.sh mutate [worker args]   S12: mutation testing of src/ (tools/mutate.py + tools/mut_worker.py, in the
-#                                 sandbox): every mutant through the gates of every route in tools/routes.tsv;
-#                                 MUTGEN="--max-per-func N --only f,g" limits the mutants, SESSION=S12 records the
-#                                 score; worker args: --jobs N (8) --digest K (16) --ids a,b --budget B (160); --digest 16: the RAM digest every 16 frames (every frame line is compared)
+#   tools/s11.sh mutate [args]    S12: mutation testing of src/ with Mull (tools/mull_run.py + tools/mull_gate.py in
+#                                 the penpen-mull:1 sandbox): every mutant through the gates of the routes that run
+#                                 its line; SESSION=S12 records the score; args: --workers N (8) --digest K (16: the
+#                                 RAM digest every 16 frames, every frame line compared) --budget B (160)
 #   tools/s11.sh report           the mutation report again (after editing docs/progress/mutation_notes.tsv)
 # Logs (frame lines, test lines: our vocabulary only) go to port_work/s11 (gitignored).
 set -eu
@@ -63,19 +63,18 @@ case "${1:-}" in
   progress)
     python3 -I "$REPO/tools/decomp_progress.py" "$REPO" ${2:-} ;;
   mutate)
-    # S12: mutation testing (docs/port/DECOMP.md 11): generate the mutants of src/, run them in the sandbox
-    # (tools/mut_worker.py through tools/s3.sh mutate), report (docs/progress/mutation*.tsv)
+    # S12: mutation testing with Mull (docs/port/DECOMP.md 10): src/ compiled once with Mull's clang plugin in the
+    # penpen-mull:1 image (docker/mull), mull-runner runs our gates (tools/mull_gate.py) per mutant; then the report
     shift
-    M=$REPO/port_work/mut; mkdir -p "$M"
+    M=$REPO/port_work/mull; mkdir -p "$M"
     "$REPO/tools/s3.sh" native --frames 1 > /dev/null          # both builds up to date
     GEN=genhand "$REPO/tools/s3.sh" native --frames 1 > /dev/null
-    python3 -I "$REPO/tools/mutate.py" gen "$REPO" "$M/mutants.json" ${MUTGEN:-}
     t0=$(date +%s)
-    "$REPO/tools/s3.sh" mutate "$@" > "$M/run.out" 2>&1 || true
-    grep -v '^mut cov' "$M/run.out" | grep -v '^mut [0-9a-f]\{10\} ' || true
+    "$REPO/tools/s3.sh" mull "$@" > "$M/run.out" 2>&1 || true
+    grep -v '^mull cov' "$M/run.out" | grep -v '^mull mutant ' || true
     echo "mutate: $(( $(date +%s) - t0 )) s"
-    python3 -I "$REPO/tools/mutate.py" report "$REPO" "$M/run.out" ${SESSION:-} ;;
+    python3 -I "$REPO/tools/mutate.py" report-mull "$REPO" "$M/run.out" ${SESSION:-} ;;
   report)
-    python3 -I "$REPO/tools/mutate.py" report "$REPO" "$REPO/port_work/mut/run.out" ${SESSION:-} ;;
+    python3 -I "$REPO/tools/mutate.py" report-mull "$REPO" "$REPO/port_work/mull/run.out" ${SESSION:-} ;;
   *) sed -n '2,24p' "$0"; exit 2 ;;
 esac

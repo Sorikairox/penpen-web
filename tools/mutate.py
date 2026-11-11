@@ -1,5 +1,8 @@
 #!/usr/bin/env python3
-"""Pen Pen S12: mutation testing of the hand-written C in src/ (docs/port/DECOMP.md 11).
+"""Pen Pen S12: mutation testing of the hand-written C in src/ (docs/port/DECOMP.md 10).
+
+S12 switched to Mull (tools/mull_run.py): `report-mull REPO RUN.out [SESSION]` is the report in use. `gen` and
+`report` belong to the first, retired pipeline (rebuild per mutant: tools/mut_worker.py); kept for its history.
 
 A mutant is one small change to one place in src/ (one operator, one site); each is built and run against the gates
 (tools/mut_worker.py, in the sandboxed container: per-function difftest, frame lines with the RAM digest, audio
@@ -639,8 +642,141 @@ def main_report(argv):
         open(p, 'w').write('\n'.join(rows) + '\n')
 
 
+def owners(repo):
+    """{(file, line): (owner function, [export addresses])} for every line inside a function body or an adapter"""
+    files, exports = collect(repo)
+    out = {}
+    for f in files:
+        for kind, name, i, j in f.functions:
+            l0, l1 = f.toks[i].line, f.toks[j].line
+            if kind == 'export':
+                name = f.toks[i].region[1] if f.toks[i].region and f.toks[i].region[1] else 'export_' + name
+            for ln in range(l0, l1 + 1):
+                if (f.rel, ln) not in out or kind == 'export':
+                    out[(f.rel, ln)] = (name, exports.get(name, []))
+    lines = {f.rel: f.lines for f in files}
+    return out, lines
+
+
+# what each Mull mutator does (Mull 0.37.0's own descriptions, abridged)
+MULL_OPS = {
+    'cxx_add_to_sub': '+ -> -', 'cxx_sub_to_add': '- -> +', 'cxx_mul_to_div': '* -> /', 'cxx_div_to_mul': '/ -> *',
+    'cxx_rem_to_div': '% -> /', 'cxx_minus_to_noop': '-x -> x', 'cxx_add_assign_to_sub_assign': '+= -> -=',
+    'cxx_sub_assign_to_add_assign': '-= -> +=', 'cxx_mul_assign_to_div_assign': '*= -> /=',
+    'cxx_div_assign_to_mul_assign': '/= -> *=', 'cxx_rem_assign_to_div_assign': '%= -> /=',
+    'cxx_and_to_or': '& -> |', 'cxx_or_to_and': '| -> &', 'cxx_xor_to_or': '^ -> |', 'cxx_lshift_to_rshift': '<< -> >>',
+    'cxx_rshift_to_lshift': '>> -> <<', 'cxx_bitwise_not_to_noop': '~x -> x', 'cxx_and_assign_to_or_assign': '&= -> |=',
+    'cxx_or_assign_to_and_assign': '|= -> &=', 'cxx_xor_assign_to_or_assign': '^= -> |=',
+    'cxx_lshift_assign_to_rshift_assign': '<<= -> >>=', 'cxx_rshift_assign_to_lshift_assign': '>>= -> <<=',
+    'cxx_eq_to_ne': '== -> !=', 'cxx_ne_to_eq': '!= -> ==', 'cxx_lt_to_ge': '< -> >=', 'cxx_lt_to_le': '< -> <=',
+    'cxx_le_to_gt': '<= -> >', 'cxx_le_to_lt': '<= -> <', 'cxx_gt_to_le': '> -> <=', 'cxx_gt_to_ge': '> -> >=',
+    'cxx_ge_to_lt': '>= -> <', 'cxx_ge_to_gt': '>= -> >', 'cxx_pre_inc_to_pre_dec': '++x -> --x',
+    'cxx_pre_dec_to_pre_inc': '--x -> ++x', 'cxx_post_inc_to_post_dec': 'x++ -> x--',
+    'cxx_post_dec_to_post_inc': 'x-- -> x++', 'cxx_remove_negation': '!a -> a', 'negate_mutator': 'condition negated',
+    'cxx_remove_void_call': 'void call removed', 'cxx_replace_scalar_call_zr': 'call replaced by 0',
+    'cxx_replace_scalar_call_nz': 'call replaced by 42',
+    'cxx_assign_const': 'a = b -> a = c (constant b: lowest bit flipped; otherwise 42)',
+    'cxx_init_const': 'T a = b -> T a = c (constant b: lowest bit flipped; otherwise 42)',
+}
+
+
+def main_report_mull(argv):
+    """the Mull run's lines (tools/mull_run.py: mull mutant ID STATUS MUTATOR VERDICT GATE DETAIL ROUTES TIME) with the
+    same classes and files as the first pipeline's report"""
+    repo, res = argv[0], argv[1]
+    session = argv[2] if len(argv) > 2 else None
+    own, lines = owners(repo)
+    notes = read_notes(repo)
+    reach = read_reach(repo)
+    per, surv = {}, []
+    tot = {'mutants': 0, 'stillborn': 0, 'killed': 0, 'equivalent': 0, 'unreached': 0, 'survived': 0, 'missing': 0}
+    gates, ops = {}, {}
+    for line in open(res, errors='replace'):
+        f = line.split()
+        if len(f) < 5 or f[0] != 'mull' or f[1] != 'mutant':
+            continue
+        mid, status, mutator = f[2], f[3], f[4]
+        verdict, gate, detail, routes = (f[5:9] + ['-'] * 4)[:4]
+        if verdict == 'skipped':  # a pilot (mull_run.py --sample): not run, not counted
+            continue
+        parts = mid.split(':')
+        rel, ln = parts[1], int(parts[2])
+        owner, exps = own.get((rel, ln), ('(file scope) ' + rel, []))
+        src = lines.get(rel, [''] * ln)[ln - 1].strip() if rel in lines and ln <= len(lines[rel]) else ''
+        m = {'id': mid, 'owner': owner, 'file': rel, 'line': ln, 'op': mutator, 'orig': src,
+             'new': '%s at column %s' % (MULL_OPS.get(mutator, mutator), parts[3]), 'exports': exps}
+        ops[mutator] = ops.get(mutator, 0) + 1
+        cls, reason = notes.get(mid, (None, ''))
+        if status in ('Killed', 'Timedout', 'TimedOut', 'Crashed', 'Failed'):
+            key = 'killed'
+            g = gate if verdict == 'killed' else status.lower()
+            gates[g] = gates.get(g, 0) + 1
+        elif cls == 'equivalent':
+            key = 'equivalent'
+        elif verdict == 'uncovered' or cls == 'unreachable':
+            key = 'unreached'
+            if not reason:
+                for o, sub, why in reach:
+                    if o == owner and (sub == '*' or sub in src or (re.fullmatch(r'L\d+', sub) and int(sub[1:]) == ln)):
+                        reason = why
+                        break
+            if not reason:
+                reason = 'no route runs this line'
+        elif status in ('Survived',):
+            key = 'survived'
+        else:
+            key = 'missing'
+        p = per.setdefault(owner, {'file': rel, 'exports': exps, 'mutants': 0, 'stillborn': 0, 'killed': 0,
+                                   'equivalent': 0, 'unreached': 0, 'survived': 0, 'missing': 0})
+        p['mutants'] += 1
+        p[key] += 1
+        tot['mutants'] += 1
+        tot[key] += 1
+        if key != 'killed':
+            surv.append((m, key, status, reason or ('(no note)' if key == 'survived' else ''), routes))
+    write_reports(repo, per, surv, tot, gates, session, 'Mull 0.37.0 (LLVM 18)')
+    print('mutate report-mull operators: ' + ' '.join('%s %d' % kv for kv in sorted(ops.items())))
+
+
+def write_reports(repo, per, surv, tot, gates, session, tool):
+    hdr = ('# Mutation testing of the hand-written C (%s; docs/port/DECOMP.md 10). score = killed / (mutants - '
+           'equivalent); reach score = killed / (mutants - equivalent - unreached)\n' % tool)
+    with open(os.path.join(repo, 'docs/progress/mutation.tsv'), 'w') as o:
+        o.write(hdr)
+        o.write('function\tfile\texports\tmutants\tstillborn\tkilled\tequivalent\tunreached\tsurvived\tscore\treach_score\n')
+        for name, p in sorted(per.items(), key=lambda kv: (kv[1]['file'], kv[0])):
+            valid = p['mutants'] - p['stillborn'] - p['equivalent']
+            rv = valid - p['unreached']
+            o.write('%s\t%s\t%s\t%d\t%d\t%d\t%d\t%d\t%d\t%s\t%s\n' % (
+                name, p['file'], ','.join(p['exports']) or '-', p['mutants'], p['stillborn'], p['killed'],
+                p['equivalent'], p['unreached'], p['survived'] + p['missing'],
+                '%.1f' % (100.0 * p['killed'] / valid) if valid else '-',
+                '%.1f' % (100.0 * p['killed'] / rv) if rv else '-'))
+    with open(os.path.join(repo, 'docs/progress/mutation_survivors.tsv'), 'w') as o:
+        o.write('# Every mutant not killed (%s): class = equivalent (cannot change behaviour), unreached (no route '
+                'reaches it: the input that would), survived (a test gap)\n' % tool)
+        o.write('id\tclass\tfunction\tfile\tline\top\toriginal\tmutant\treason\n')
+        for m, key, verdict, reason, detail in surv:
+            o.write('%s\t%s\t%s\t%s\t%d\t%s\t%s\t%s\t%s\n' % (m['id'], key, m['owner'], m['file'], m['line'], m['op'],
+                                                          m['orig'].replace('\t', ' '), m['new'], reason))
+    valid = tot['mutants'] - tot['stillborn'] - tot['equivalent']
+    rv = valid - tot['unreached']
+    score = 100.0 * tot['killed'] / valid if valid else 0
+    rscore = 100.0 * tot['killed'] / rv if rv else 0
+    print('mutate report %d mutants: %d killed (%s), %d equivalent, %d unreached, %d survived, %d missing; score %.1f %% '
+          '(reach score %.1f %%)' % (tot['mutants'], tot['killed'], ' '.join('%s %d' % kv for kv in sorted(gates.items())),
+                                     tot['equivalent'], tot['unreached'], tot['survived'], tot['missing'], score, rscore))
+    if session:
+        p = os.path.join(repo, 'docs/progress/mutation_sessions.tsv')
+        rows = [l for l in open(p).read().split('\n') if l and not l.startswith(session + '\t')] if os.path.exists(p) else []
+        rows.append('%s\t%d\t%d\t%d\t%d\t%d\t%d\t%.1f\t%.1f\t%s\t%s' % (
+            session, tot['mutants'], tot['stillborn'], tot['killed'], tot['equivalent'], tot['unreached'],
+            tot['survived'] + tot['missing'], score, rscore, ' '.join('%s %d' % kv for kv in sorted(gates.items())), tool))
+        open(p, 'w').write('\n'.join(rows) + '\n')
+
+
 if __name__ == '__main__':
-    if len(sys.argv) < 2 or sys.argv[1] not in ('gen', 'report'):
+    if len(sys.argv) < 2 or sys.argv[1] not in ('gen', 'report', 'report-mull'):
         print(__doc__)
         sys.exit(2)
-    (main_gen if sys.argv[1] == 'gen' else main_report)(sys.argv[2:])
+    {'gen': main_gen, 'report': main_report, 'report-mull': main_report_mull}[sys.argv[1]](sys.argv[2:])

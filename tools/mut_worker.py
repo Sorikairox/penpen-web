@@ -1,5 +1,9 @@
 #!/usr/bin/env python3
-"""Pen Pen S12: the mutation runner (docs/port/DECOMP.md 11). Runs ONLY inside the sandboxed container of
+"""Pen Pen S12: the first mutation runner, RETIRED as a runner (rebuild per mutant: too slow; the user switched to
+Mull: tools/mull_run.py). Kept as the library of our gates (references, gate_run, gcov parsing), which
+tools/mull_run.py and tools/mull_gate.py import. docs/port/DECOMP.md 10.
+
+The former runner: Runs ONLY inside the sandboxed container of
 tools/s3.sh mutate (it runs the disc's code): --network none, --read-only, --cap-drop ALL, everything it writes goes
 to the container's /tmp.
 
