@@ -3,7 +3,8 @@
  * dump file the file is that memory, header at 0): docs/port/RENDER.md 2.
  *   header 24 words: 'PPDL', version, frame, width, height, back colour 0/1/2, ncmd, cmd_off, nvert,
  *     vert_off, nup, up_off, nfree, free_off, fog colour, fog_off (128 floats, 0 = fog not set), stats x4
- *     (opaque commands, translucent triangles, volume triangles, culled), cheap shadow intensity | 0x100, 0
+ *     (opaque commands, translucent triangles, volume triangles, culled), cheap shadow intensity | 0x100,
+ *     FOG_DENSITY (PVR register: mantissa 1.7 in bits 15-8, signed exponent in 7-0)
  *   command 8 words: list, first vertex, vertex count (triangles), texture id, mode, clip x0|y0<<16,
  *     clip x1|y1<<16, 0
  *   vertex 7 words: x, y, 1/w, u, v (floats), base ARGB, offset ARGB
@@ -32,7 +33,8 @@ static rd_vtx *vtx; static uint32_t nvtx, cvtx;
 static cmd_t *cmd; static uint32_t ncmd, ccmd;
 static tri_t *trs; static uint32_t ntr, ctr;
 static rd_state *sts; static uint32_t nst, cst;
-static uint32_t frame_no, back[3] = {0xFF000000u, 0xFF000000u, 0xFF000000u}, fog_col;
+static uint32_t frame_no, back[3] = {0xFF000000u, 0xFF000000u, 0xFF000000u}, fog_col, fog_den;
+void rd_fog_density(uint32_t reg) { fog_den = reg; }
 static float fog_tab[128]; static int fog_set;
 static uint32_t n_om, n_culled, shadow_mode = 160;
 void rd_shadow(uint32_t intensity) { shadow_mode = intensity & 255; }
@@ -152,7 +154,7 @@ void rd_end(void) {
   h[5] = back[0]; h[6] = back[1]; h[7] = back[2];
   h[8] = ncmd; h[9] = hdr; h[10] = nvtx; h[11] = hdr + csz; h[12] = nups; h[13] = hdr + csz + vsz;
   h[14] = nfrees; h[15] = hdr + csz + vsz + usz; h[16] = fog_col; h[17] = fog_set ? hdr + csz + vsz + usz + fsz : 0;
-  h[18] = op_cmds; h[19] = ntr; h[20] = n_om; h[21] = n_culled; h[22] = shadow_mode | 0x100u;
+  h[18] = op_cmds; h[19] = ntr; h[20] = n_om; h[21] = n_culled; h[22] = shadow_mode | 0x100u; h[23] = fog_den;
   uint32_t *cw = (uint32_t *)(out + hdr);
   for (uint32_t i = 0; i < ncmd; i++, cw += 8) {
     cw[0] = cmd[i].s.list; cw[1] = cmd[i].first; cw[2] = cmd[i].count; cw[3] = cmd[i].s.tex; cw[4] = cmd[i].s.mode;

@@ -104,6 +104,7 @@ static const char *const guest[] = {
   "nj_ReadChunkFile", "nj_MemCopy4",
   /* S5: pure setters of the Ninja render state; the draw HLE reads their globals (render/nj.h) */
   "njSetTexture", "njControl3D", "njSetConstantAttr", "njSetConstantMaterial", "njInitTextureBuffer",
+  "njGenerateFogTable3",
 };
 /* the heap's free list (SDK globals of syMalloc, for the per-frame log): rover -> circular list of
  * {next, size in 32-byte units} */

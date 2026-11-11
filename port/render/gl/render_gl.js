@@ -21,8 +21,18 @@ void main() {
   const FS = `#version 300 es
 precision highp float;
 in vec2 v_uv; in vec4 v_col; in vec4 v_ofs;
-uniform sampler2D u_tex; uniform int u_hastex, u_shade, u_alpha, u_notexa, u_offset, u_punch;
+uniform sampler2D u_tex; uniform int u_hastex, u_shade, u_alpha, u_notexa, u_offset, u_punch, u_fog;
+uniform float u_fogtab[128]; uniform float u_fogden; uniform vec3 u_fogcol;
 out vec4 o;
+// PVR table fog: z = 1/w * FOG_DENSITY clamped to [1, 256), index = 16 * exponent + 4 mantissa bits
+float fogf(float iw) {
+  float z = clamp(iw * u_fogden, 1.0, 255.999);
+  float e = floor(log2(z));
+  float m = z / exp2(e) * 16.0 - 16.0;
+  int i = int(e) * 16 + int(floor(m));
+  float a = u_fogtab[clamp(i, 0, 127)], b = u_fogtab[clamp(i + 1, 0, 127)];
+  return mix(a, b, fract(m));
+}
 void main() {
   vec4 c = v_col;
   if (u_alpha == 0) c.a = 1.0;
@@ -37,6 +47,7 @@ void main() {
   } else p = c;
   if (u_offset == 1) p.rgb += v_ofs.rgb;
   if (u_punch == 1 && p.a < 0.5) discard;
+  if (u_fog == 1) p.rgb = mix(p.rgb, u_fogcol, clamp(fogf(gl_FragCoord.w), 0.0, 1.0));
   o = clamp(p, 0.0, 1.0);
   gl_FragDepth = 1.0 / (1.0 + max(gl_FragCoord.w, 0.0));
 }`;
@@ -55,7 +66,7 @@ void main() {
     gl.linkProgram(prog);
     if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) throw new Error('link: ' + gl.getProgramInfoLog(prog));
     const U = {};
-    for (const n of ['u_size', 'u_tex', 'u_hastex', 'u_shade', 'u_alpha', 'u_notexa', 'u_offset', 'u_punch']) U[n] = gl.getUniformLocation(prog, n);
+    for (const n of ['u_size', 'u_tex', 'u_hastex', 'u_shade', 'u_alpha', 'u_notexa', 'u_offset', 'u_punch', 'u_fog', 'u_fogtab', 'u_fogden', 'u_fogcol']) U[n] = gl.getUniformLocation(prog, n);
     const vao = gl.createVertexArray(), vbo = gl.createBuffer();
     gl.bindVertexArray(vao); gl.bindBuffer(gl.ARRAY_BUFFER, vbo);
     const A = (n) => gl.getAttribLocation(prog, n);
@@ -119,6 +130,16 @@ void main() {
       gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT | gl.STENCIL_BUFFER_BIT);
       gl.useProgram(prog);
       gl.uniform2f(U.u_size, W, H);
+      // fog: table (128 floats), colour, density (FOG_DENSITY: mantissa 1.7 in bits 15-8, signed exponent 7-0)
+      const fogOff = u32[17], fd = u32[23];
+      const hasFog = fogOff !== 0;
+      if (hasFog) {
+        gl.uniform1fv(U.u_fogtab, new Float32Array(buffer, ptr + fogOff, 128));
+        const fc = u32[16];
+        gl.uniform3f(U.u_fogcol, ((fc >>> 16) & 255) / 255, ((fc >>> 8) & 255) / 255, (fc & 255) / 255);
+        gl.uniform1f(U.u_fogden, ((fd >>> 8) & 255) / 128 * Math.pow(2, ((fd & 255) << 24) >> 24));
+      }
+      gl.uniform1i(U.u_fog, 0);
       gl.uniform1i(U.u_tex, 0);
       gl.disable(gl.CULL_FACE);
       // background plane (depth far, no depth write)
@@ -173,6 +194,7 @@ void main() {
           gl.uniform1i(U.u_notexa, (m >>> 18) & 1);
           gl.uniform1i(U.u_offset, (m >>> 19) & 1);
           gl.uniform1i(U.u_punch, list === 3 ? 1 : 0);
+          gl.uniform1i(U.u_fog, hasFog && ((m >>> 20) & 1) ? 1 : 0);
           gl.drawArrays(gl.TRIANGLES, first, count);
           draws++;
         }
@@ -186,7 +208,7 @@ void main() {
             const k = Math.round(shadow * 255), col = (0xFF000000 | (k << 16) | (k << 8) | k) >>> 0;
             [[0, 0], [W, 0], [0, H], [W, 0], [W, H], [0, H]].forEach((q, j) => { f[7 * j] = q[0]; f[7 * j + 1] = q[1]; f[7 * j + 2] = 1; w[7 * j + 5] = col; });
             gl.bindVertexArray(bgvao); gl.bindBuffer(gl.ARRAY_BUFFER, bgvbo); gl.bufferData(gl.ARRAY_BUFFER, b, gl.STREAM_DRAW);
-            gl.uniform1i(U.u_hastex, 0); gl.uniform1i(U.u_alpha, 0); gl.uniform1i(U.u_offset, 0);
+            gl.uniform1i(U.u_hastex, 0); gl.uniform1i(U.u_alpha, 0); gl.uniform1i(U.u_offset, 0); gl.uniform1i(U.u_fog, 0);
             gl.drawArrays(gl.TRIANGLES, 0, 6);
             gl.bindVertexArray(vao); gl.bindBuffer(gl.ARRAY_BUFFER, vbo);
             gl.enable(gl.SCISSOR_TEST); gl.enable(gl.DEPTH_TEST);

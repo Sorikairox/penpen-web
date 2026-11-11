@@ -27,17 +27,19 @@ uint32_t nj_argb_f(uint32_t a) {
 uint32_t nj_blend_src = 4, nj_blend_dst = 5; /* src alpha, 1 - src alpha */
 int16_t nj_clip[4] = {0, 0, RD_W, RD_H_};
 int nj_filter = 1;
+int nj_fog_on;
 void nj_state(rd_state *s, int list, uint32_t tex, int use_alpha) {
   s->list = (uint32_t)list; s->tex = tex;
   s->mode = RD_M_SRC(nj_blend_src) | RD_M_DST(nj_blend_dst) | RD_M_ZFUNC(6) | RD_M_SHADE(3) | (nj_filter ? RD_M_FILTER : 0) |
-            (use_alpha ? RD_M_ALPHA : 0) | (list == RD_TR ? 0 : RD_M_ZWRITE);
+            (use_alpha ? RD_M_ALPHA : 0) | (list == RD_TR ? 0 : RD_M_ZWRITE) | (nj_fog_on ? RD_M_FOG : 0);
   memcpy(s->clip, nj_clip, sizeof s->clip);
 }
 
 /* ---- frame ---- */
 static uint32_t back_c[3] = {0xFF000000u, 0xFF000000u, 0xFF000000u};
 void nj_frame_begin(uint32_t f) { frame_no = f; rd_begin(f); }
-void nj_frame_end(void) { rd_back_color(back_c[0], back_c[1], back_c[2]); rd_end(); }
+#define PVR_FOG_DENSITY 0xA05F80B8u
+void nj_frame_end(void) { rd_back_color(back_c[0], back_c[1], back_c[2]); rd_fog_density(rd32(PVR_FOG_DENSITY)); rd_end(); }
 static void h_njSetBackColor(SH4 *c) { hle_logcall(c, ""); back_c[0] = R(4); back_c[1] = R(5); back_c[2] = R(6); R(0) = 0; }
 static void h_njSetBorderColor(SH4 *c) { hle_logcall(c, ""); R(0) = 0; } /* outside the picture: not shown */
 /* njColorBlendingMode(target, mode): target 0 = source, 1 = destination; Kamui's blending modes */
@@ -75,8 +77,19 @@ static void h_njClip2D(SH4 *c) {
   }
   R(0) = 0;
 }
-static void h_njSetFogColor(SH4 *c) { hle_logcall(c, ""); R(0) = 0; }
-static void h_njSetFogTable(SH4 *c) { hle_logcall(c, ""); R(0) = 0; }
+/* table fog: njSetFogColor(ARGB), njSetFogTable(Float[128]), the density register FOG_DENSITY written by
+ * the SDK's njGenerateFogTable3 (guest code), njFogEnable/Disable per polygon (Kamui context +0x3C) */
+static uint32_t fog_color;
+static void h_njSetFogColor(SH4 *c) { hle_logcall(c, ""); fog_color = R(4); R(0) = 0; }
+static void h_njSetFogTable(SH4 *c) {
+  hle_logcall(c, "");
+  float t[128];
+  for (uint32_t i = 0; i < 128; i++) t[i] = nj_f(R(4) + 4 * i);
+  rd_fog(fog_color, t, 128);
+  R(0) = 0;
+}
+static void h_njFogEnable(SH4 *c) { hle_logcall(c, ""); nj_fog_on = 1; R(0) = 0; }
+static void h_njFogDisable(SH4 *c) { hle_logcall(c, ""); nj_fog_on = 0; R(0) = 0; }
 
 /* ---- textures ---- */
 #define NMEM 1024
@@ -229,6 +242,7 @@ const nj_impl_t nj_impls[] = {
   {"njSetBackColor", h_njSetBackColor}, {"njSetBorderColor", h_njSetBorderColor},
   {"njColorBlendingMode", h_njColorBlendingMode}, {"njTextureFilterMode", h_njTextureFilterMode},
   {"njClip2D", h_njClip2D}, {"njSetFogColor", h_njSetFogColor}, {"njSetFogTable", h_njSetFogTable},
+  {"njFogEnable", h_njFogEnable}, {"njFogDisable", h_njFogDisable},
   {"njInitTexture", h_njInitTexture}, {"njLoadTexturePvmMemory", h_njLoadTexturePvmMemory},
   {"njReleaseTexture", h_njReleaseTexture}, {"njDrawSprite2D", h_njDrawSprite2D},
 };
