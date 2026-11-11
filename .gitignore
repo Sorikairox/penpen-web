@@ -13,3 +13,6 @@ port_work/
 *.vms
 *.VMS
 .DS_Store
+
+# Recompiled game code (tools/s3.sh gen + export): local only, never committed (S3, user decision)
+port/gen/
