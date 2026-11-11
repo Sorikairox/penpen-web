@@ -7,7 +7,7 @@
 #include "../sh4/sh4_ops.h"
 
 typedef void (*rt_fn)(SH4 *);
-typedef struct { uint32_t addr; rt_fn fn; } rt_fn_entry;
+typedef struct { uint32_t addr; rt_fn fn; uint32_t hand; } rt_fn_entry; /* hand: S11, hand-written (src/) */
 extern const rt_fn_entry rt_fn_table[]; /* sorted by address */
 extern const int rt_fn_count;
 

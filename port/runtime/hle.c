@@ -68,7 +68,7 @@ hle_fn hle_find(uint32_t a) {
 }
 int hle_known(uint32_t a) { hle_ent *e = lookup(a); return e && e->fn; }
 
-#define R(i) c->r[i]
+#define R(i) HLE_R(i) /* S11: marks the argument registers read (rt.h) */
 /* the last calls, dumped when the run stops (to see what led to a fault) */
 #define RING 24
 static struct { uint32_t seq, pr, a[4]; const char *name; } ring[RING];
@@ -84,12 +84,12 @@ static void logcall(SH4 *c, const char *extra) {
   cur->calls++; cur->fcalls++; f_hle++;
   seq++;
   { int i = (int)((seq - 1) % RING); ring[i].seq = seq; ring[i].pr = c->pr; ring[i].name = cur->name;
-    for (int k = 0; k < 4; k++) ring[i].a[k] = R(4 + k); }
+    for (int k = 0; k < 4; k++) ring[i].a[k] = c->r[4 + k]; }
   if (hle_tracing())
-    rt_log("hle trace %s(%x, %x, %x, %x) fr4-7 %d %d %d %d /1000%s from %08x", cur->name, R(4), R(5), R(6), R(7), (int)(c->fr.f[4] * 1000), (int)(c->fr.f[5] * 1000), (int)(c->fr.f[6] * 1000), (int)(c->fr.f[7] * 1000), extra, c->pr);
+    rt_log("hle trace %s(%x, %x, %x, %x) fr4-7 %d %d %d %d /1000%s from %08x", cur->name, c->r[4], c->r[5], c->r[6], c->r[7], (int)(c->fr.f[4] * 1000), (int)(c->fr.f[5] * 1000), (int)(c->fr.f[6] * 1000), (int)(c->fr.f[7] * 1000), extra, c->pr);
   /* the first calls of each function in full, then only counts */
   if (seq <= (uint32_t)hle_verbose && cur->calls <= 8)
-    rt_log("hle %u %s(%x, %x, %x, %x)%s from %08x", seq, cur->name, R(4), R(5), R(6), R(7), extra, c->pr);
+    rt_log("hle %u %s(%x, %x, %x, %x)%s from %08x", seq, cur->name, c->r[4], c->r[5], c->r[6], c->r[7], extra, c->pr);
 }
 static void h_default(SH4 *c) { logcall(c, ""); R(0) = 0; }
 void hle_logcall(SH4 *c, const char *extra) { logcall(c, extra); }
@@ -414,9 +414,28 @@ int hle_set_watch(const char *s) {
   }
   return nwatch;
 }
+/* S11 (DECOMP.md 6): the guest stack's layout is not program state. Hand-written functions keep no frames on the
+ * guest stack, so with --digest-nostack the digest leaves the stack area out and counts every word that points into
+ * it (a stack address some code stored in a global) as the same token. */
+int hle_digest_nostack;
+#define STACK_AREA_LO 0x0C00C000u
+#define STACK_AREA_HI 0x0C00F400u
+static uint32_t stack_token(uint32_t w) {
+  uint32_t p = w & 0x1FFFFFFFu;
+  return p >= STACK_AREA_LO && p < STACK_AREA_HI && (w >> 29) != 7 ? 0x57AC4000u : w;
+}
 static uint64_t ram_digest(void) {
   uint64_t h = 0x9E3779B97F4A7C15ull, v;
-  for (uint32_t i = 0; i < (16u << 20); i += 8) { memcpy(&v, sh4_ram + i, 8); h ^= v; h *= 0x100000001B3ull; h ^= h >> 29; }
+  for (uint32_t i = 0; i < (16u << 20); i += 8) {
+    if (hle_digest_nostack) {
+      if (i >= (STACK_AREA_LO & 0xFFFFFF) && i < (STACK_AREA_HI & 0xFFFFFF)) continue;
+      uint32_t w[2];
+      memcpy(w, sh4_ram + i, 8);
+      w[0] = stack_token(w[0]); w[1] = stack_token(w[1]);
+      memcpy(&v, w, 8);
+    } else memcpy(&v, sh4_ram + i, 8);
+    h ^= v; h *= 0x100000001B3ull; h ^= h >> 29;
+  }
   return h;
 }
 /* screens, inferred from the call pattern: the set of SDK functions called in a frame (HLE and guest).

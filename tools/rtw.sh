@@ -29,9 +29,11 @@ case "${1:-}" in
     $D build -t $IMG "$T"
     rm -rf "$T" ;;
   build)
-    OUT=$($D run $SAFE --tmpfs /tmp:exec,size=4g,mode=1777 -e HOME=/tmp -v "$REPO/port":/src/port:ro -v penpen-build:/build $EMSDK \
-      sh -c "sh /src/port/runtime/build.sh wasm /build/gen /build/wasm '$CF' 8 && rm -rf /build/rtw && mkdir -p /build/rtw &&
-        cp /build/wasm/penpen.wasm /build/rtw/penpen.wasm &&
+    # S11: GEN=genhand builds the module from the translation without the hand-written functions + src/
+    G=${GEN:-gen}
+    OUT=$($D run $SAFE --tmpfs /tmp:exec,size=4g,mode=1777 -e HOME=/tmp -v "$REPO/port":/src/port:ro -v "$REPO/src":/src/src:ro -v penpen-build:/build $EMSDK \
+      sh -c "sh /src/port/runtime/build.sh wasm /build/$G /build/wasm${GEN:+-$GEN} '$CF' 8 && rm -rf /build/rtw && mkdir -p /build/rtw &&
+        cp /build/wasm${GEN:+-$GEN}/penpen.wasm /build/rtw/penpen.wasm &&
         cat /src/port/render/gl/render_gl.js /src/port/rtw/glue.js > /build/rtw/penpen.js &&
         cp /src/port/rtw/retrowser.json /build/rtw/retrowser.json && echo rtw module assembled" 2>&1 || true)
     echo "$OUT" | filt

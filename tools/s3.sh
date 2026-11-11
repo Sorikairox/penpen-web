@@ -21,10 +21,15 @@ J=${JOBS:-8}
 box() { # sandboxed container: repo read-only at /src, volumes as given by the caller
   $D run --rm --network none --read-only --cap-drop ALL --security-opt no-new-privileges --user 1000:1000 \
     --tmpfs /tmp:exec,size=4g,mode=1777 -e HOME=/tmp -e EM_CACHE=/tmp/emcache \
-    -v "$REPO/port":/src/port:ro -v "$REPO/tools":/src/tools:ro "$@"
+    -v "$REPO/port":/src/port:ro -v "$REPO/tools":/src/tools:ro -v "$REPO/src":/src/src:ro "$@"
 }
 # What may be printed from a container that read disc-derived data: our own log vocabulary only.
-filt() { grep -E '^(S3 |audio |check_gen |sh4 |diff |mut |hle |boot |rt |io |gen |build |frame |render |shot |  )[ -~]*$' || true; }
+filt() { grep -E '^(S3 |audio |check_gen |sh4 |diff |mut |hle |boot |rt |io |gen |build |frame |render |shot |hw |  )[ -~]*$' || true; }
+# S11: GEN=genhand HAND=1 gen = the translation without the hand-written functions (src/); GEN=x native|wasm builds
+# /build/x into /build/native-x | /build/wasm-x (tools/s11.sh wraps these)
+G=${GEN:-gen}
+SFX=${GEN:+-$GEN}
+HANDARG=${HAND:+--hand /src/src}
 TRIM=${NOTRIM:+}
 [ -n "${NOTRIM:-}" ] || TRIM="--trim /src/port/runtime/hle.c"
 CF="-O2 -std=gnu11 -Wall -Wno-unused-label -Wno-unused-function -fwrapv -fno-strict-aliasing -ffp-contract=off"
@@ -34,8 +39,8 @@ case "${1:-}" in
   gen)
     shift
     box -v penpen-work:/work:ro -v penpen-build:/build -v "$REPO/port/symbols":/symbols:ro $IMG \
-      sh -c "mkdir -p /build/gen && python3 -I /src/port/recomp/recomp.py --bin /work/fs/1ST_READ.BIN \
-        --funcs /symbols/functions.tsv --sdk /symbols/sdk_calls.tsv --entries /symbols/entries.tsv --also-rt /symbols/hle_extra.tsv --out /build/gen --ranges boot $TRIM $*" 2>&1 | filt ;;
+      sh -c "mkdir -p /build/$G && python3 -I /src/port/recomp/recomp.py --bin /work/fs/1ST_READ.BIN \
+        --funcs /symbols/functions.tsv --sdk /symbols/sdk_calls.tsv --entries /symbols/entries.tsv --also-rt /symbols/hle_extra.tsv --out /build/$G --ranges boot $TRIM $HANDARG $*" 2>&1 | filt ;;
   export)
     # copy the game translation to port/gen/ (gitignored: never committed) after a grammar check
     box -v penpen-build:/build:ro $IMG python3 -I /src/port/recomp/check_gen.py /build/gen | filt
@@ -49,7 +54,7 @@ case "${1:-}" in
     du -sh "$REPO/port/gen"; ls "$REPO/port/gen" | wc -l ;;
   diff)
     shift
-    G=/build/${GEN:-gen}
+    G=/build/$G
     box -v penpen-work:/work:ro -v penpen-build:/build -e DIFF_META=$G/meta.tsv $IMG sh -c "sh /src/port/recomp/build_diff.sh $G $G-diff '$CF' $J && $G-diff/diff --bin /work/fs/1ST_READ.BIN $*" 2>&1 | filt ;;
   mutants)
     shift
@@ -58,9 +63,9 @@ case "${1:-}" in
       sh /src/port/recomp/mutants.sh "$CF" $J "$*" 2>&1 | filt ;;
   native)
     shift
-    box -v penpen-disc:/disc:ro -v penpen-build:/build $IMG sh -c "sh /src/port/runtime/build.sh native /build/gen /build/native '$CF' $J && /build/native/penpen --disc /disc $*" 2>&1 | filt ;;
+    box -v penpen-disc:/disc:ro -v penpen-build:/build $IMG sh -c "sh /src/port/runtime/build.sh native /build/$G /build/native$SFX '$CF' $J && /build/native$SFX/penpen --disc /disc $*" 2>&1 | filt ;;
   wasm)
     shift
-    box -v penpen-disc:/disc:ro -v penpen-build:/build $IMG sh -c "sh /src/port/runtime/build.sh wasm /build/gen /build/wasm '$CF' $J && /emsdk/node/22.16.0_64bit/bin/node /src/port/runtime/node/run.mjs /build/wasm/penpen.wasm /disc $*" 2>&1 | filt ;;
+    box -v penpen-disc:/disc:ro -v penpen-build:/build $IMG sh -c "sh /src/port/runtime/build.sh wasm /build/$G /build/wasm$SFX '$CF' $J && /emsdk/node/22.16.0_64bit/bin/node /src/port/runtime/node/run.mjs /build/wasm$SFX/penpen.wasm /disc $*" 2>&1 | filt ;;
   *) sed -n '2,12p' "$0"; exit 2 ;;
 esac

@@ -52,6 +52,26 @@ void rt_guest_call(SH4 *c, uint32_t fn, uint32_t a0, uint32_t a1, uint32_t a2, u
 void rt_summary(void);
 void rt_rew_done(void);   /* the yielding HLE was reached again by the rewind */
 int rt_rw_depth(void);    /* deepest call chain saved so far */
+/* S11: hand-written code (src/include/hw.h, hw.c) and its in-run differential test (difftest.c) */
+extern int rt_sandbox, hwt_recording, hwt_enabled, rt_hle_depth;
+void rt_unw_save_blob(uint32_t fn, int site, uint32_t t, const void *blob, int n);
+int rt_rew_pop_blob(uint32_t fn, uint32_t *t, void *blob, int n);
+void hwt_sandbox_call(SH4 *c, uint32_t a);
+__attribute__((noreturn)) void hwt_sandbox_abort(int code, uint32_t at);
+void hwt_record_hle(SH4 *c, uint32_t a);
+uint32_t hwt_io_read(uint32_t a);
+void hwt_record_io(uint32_t a, uint32_t v);
+void hwt_io_write(uint32_t a, uint32_t v, int size);
+int hwt_begin(SH4 *c, uint32_t addr);
+void hwt_end(int sample);
+void hwt_abandon(void);
+void hwt_summary(void);
+int hwt_set(const char *opt);
+extern int hle_digest_nostack;
+/* S11: the argument registers the running HLE function touched (bits 4-7); the difftest compares only those */
+extern uint32_t hle_arg_mask;
+static inline uint32_t *hle_reg(SH4 *c, int i) { hle_arg_mask |= 1u << i; return &c->r[i]; }
+#define HLE_R(i) (*hle_reg(c, (i)))
 #define GUEST_SCRATCH 0x8C001000u /* the BIOS work area (no BIOS runs): HLE structures */
 
 #endif

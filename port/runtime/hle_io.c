@@ -14,7 +14,7 @@
 #include "hle_io.h"
 #include "vmu.h"
 
-#define R(i) c->r[i]
+#define R(i) HLE_R(i) /* S11: marks the argument registers read (rt.h) */
 RTW_IMPORT("rtw_rumble") int rtw_rumble(int port, int on);
 
 #define PAD_BASE (GUEST_SCRATCH + 0x000u) /* 4 connectors x 6 units x 0x40 */

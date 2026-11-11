@@ -151,6 +151,7 @@ inst.exports.rt_set_verbose?.(opt('--verbose', 600));
 inst.exports.rt_set_digest?.(opt('--digest', 1));
 inst.exports.rt_set_frame_log?.(opt('--frame-log', 1));
 inst.exports.rt_set_audio?.(opt('--audio', 1));
+inst.exports.rt_set_digest_nostack?.(opt('--digest-nostack', 0));
 if (strOpt('--rtc')) inst.exports.penpen_set_rtc?.(opt('--rtc', 0)); // S8: else the module's fixed test default
 {
   const i = rest.indexOf('--pad');

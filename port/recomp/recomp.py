@@ -502,6 +502,25 @@ def trim(img, funcs, table, names, via_rt, hle_c):
     return len(drop)
 
 
+HAND_RX = re.compile(r'^HW_EXPORT(?:_[A-Z]+)?\(([0-9a-f]{8}),', re.M)
+
+
+def hand_exports(root):
+    """S11: address -> source file of every function the hand-written tree exports (docs/port/DECOMP.md 2)."""
+    out = {}
+    for d, _, files in os.walk(root):
+        for fn in sorted(files):
+            if not fn.endswith('.c'):
+                continue
+            path = os.path.join(d, fn)
+            for m in HAND_RX.finditer(open(path).read()):
+                addr = norm(int(m.group(1), 16))
+                if addr in out:
+                    raise SystemExit('gen hand: %08x exported twice (%s, %s)' % (addr, out[addr], path))
+                out[addr] = os.path.relpath(path, root)
+    return out
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('--bin', required=True)
@@ -517,6 +536,8 @@ def main():
     ap.add_argument('--trim', metavar='HLE_C', help='S8: emit only the code that can run: drop the SDK functions the '
                     'runtime takes over (HLE) and what only they reach; HLE_C = port/runtime/hle.c (its guest[] names '
                     'stay translated)')
+    ap.add_argument('--hand', metavar='DIR', help='S11: the hand-written C tree (src/): every function it exports '
+                    '(HW_EXPORT(<addr>, ...)) is left out of the output; table.c points to the hand-written symbol')
     a = ap.parse_args()
     img = Img(a.bin)
     sdk = set()
@@ -591,6 +612,10 @@ def main():
     ntrim = 0
     if a.trim:
         ntrim = trim(img, funcs, table, sdk_names(a), via_rt, a.trim)
+    hand = hand_exports(a.hand) if a.hand else {}
+    for addr in hand:
+        if addr not in funcs:
+            raise SystemExit('gen hand: %08x (%s) is not a translated function' % (addr, hand[addr]))
     g = Gen(img, funcs, a.mutant, via_rt if a.ranges == 'boot' else ())
     os.makedirs(a.out, exist_ok=True)
     for fn in os.listdir(a.out):
@@ -611,6 +636,9 @@ def main():
 
     for addr in sorted(funcs):
         end, name = funcs[addr]
+        if addr in hand:
+            emitted.append(addr)  # in table.c, as the hand-written f_<addr>
+            continue
         code, n, ind = g.emit_func(addr, end)
         if a.only_affected and g.affected == 0:
             continue
@@ -631,7 +659,7 @@ def main():
     with open(os.path.join(a.out, 'table.c'), 'w') as o:
         o.write('#include "funcs.h"\nconst rt_fn_entry rt_fn_table[] = {\n')
         for addr in emitted:
-            o.write('  {0x%08xu, f_%08x},\n' % (addr, addr))
+            o.write('  {0x%08xu, f_%08x, %d},\n' % (addr, addr, int(addr in hand)))
         o.write('};\nconst int rt_fn_count = %d;\n' % len(emitted))
     # functions referenced but not emitted (only-affected builds) still need a body: stub them
     if a.only_affected:
@@ -641,8 +669,11 @@ def main():
             for addr in sorted(funcs):
                 if addr not in es:
                     o.write('void f_%08x(SH4 *c) { rt_call(c, 0x%08xu); }\n' % (addr, addr))
-    print('gen functions %d files %d labels %d indirect %d mutant %d affected %d entries static %d listed %d trimmed %d' % (
-        len(emitted), files, ninsn, nind, a.mutant, naff, nmid, nextra, ntrim))
+    with open(os.path.join(a.out, 'hand.tsv'), 'w') as o:
+        for addr in sorted(hand):
+            o.write('%08x\t%d\t%s\n' % (addr, funcs[addr][0] - addr, hand[addr]))
+    print('gen functions %d files %d labels %d indirect %d mutant %d affected %d entries static %d listed %d trimmed %d hand %d' % (
+        len(emitted), files, ninsn, nind, a.mutant, naff, nmid, nextra, ntrim, len(hand)))
 
 
 if __name__ == '__main__':

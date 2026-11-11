@@ -4,7 +4,10 @@
  * Options (native argv / wasm exports): --frames N, --verbose N (first HLE calls logged), --pad SCRIPT
  * (hle.c: "F[+N]:BTN|BTN,..." on port A), --digest N (RAM digest every N frames, 0 = off),
  * --frame-log 0|1 (the per-frame line), --watch A,B,... (guest words shown on the frame line); S7: --audio 0|1 (the
- * sd HLE + CDDA + mixer, default on), --audio-solo cdda|sfx (hear one source), --wav FILE (native: every drained sample into a 44.1 kHz stereo WAV). */
+ * sd HLE + CDDA + mixer, default on), --audio-solo cdda|sfx (hear one source), --wav FILE (native: every drained sample into a 44.1 kHz stereo WAV).
+ * S11: --hwtest BUDGET[:SPREAD[:ADDR]] (native: the in-run differential test of the hand-written functions, difftest.c),
+ * --digest-nostack 0|1 (the RAM digest leaves out the stack area 0x8C00C000-0x8C00F3FF: hand-written functions keep
+ * no frames on the guest stack, docs/port/DECOMP.md 6). */
 #include "rt.h"
 #include "hle_io.h"
 #include "vmu.h"
@@ -47,7 +50,10 @@ EXPORT("rtw_start") int rtw_start(void) {
   memcpy(sh4_ram + 0x8000, ip, sizeof ip);
   int n = load_file("1ST_READ.BIN", ENTRY);
   if (n <= 0) rt_stop("1ST_READ.BIN not found");
-  rt_log("boot 1ST_READ.BIN %u bytes at %08x, %d recompiled functions", (uint32_t)n, ENTRY, rt_fn_count);
+  int hand = 0;
+  for (int i = 0; i < rt_fn_count; i++) hand += rt_fn_table[i].hand != 0;
+  rt_log("boot 1ST_READ.BIN %u bytes at %08x, %d recompiled functions, %d of them hand-written", (uint32_t)n, ENTRY,
+         rt_fn_count - hand, hand);
   sh4_reset(c);
   hle_init(c);
   /* the state the BIOS boot leaves: privileged, bank 1, interrupts masked; stack below IP.BIN's end */
@@ -139,6 +145,8 @@ int main(int argc, char **argv) {
     else if (!strcmp(argv[i], "--wav")) { wav = fopen(argv[++i], "wb+"); if (!wav) return 2; wav_header(); }
     else if (!strcmp(argv[i], "--rtc")) hle_rtc_base = (uint32_t)strtoul(argv[++i], 0, 10);
     else if (!strcmp(argv[i], "--trace")) { char *e; hle_trace_lo = (int)strtol(argv[++i], &e, 10); hle_trace_hi = *e == '-' ? atoi(e + 1) : hle_trace_lo; }
+    else if (!strcmp(argv[i], "--hwtest")) { if (hwt_set(argv[++i]) < 0) return 2; }
+    else if (!strcmp(argv[i], "--digest-nostack")) hle_digest_nostack = atoi(argv[++i]);
     else if (!strcmp(argv[i], "--force-interp")) { extern uint32_t rt_force_interp; rt_force_interp = (uint32_t)strtoul(argv[++i], 0, 16); }
   }
   if (vmu_path) {
@@ -156,6 +164,7 @@ __attribute__((export_name("rt_set_frames"))) void rt_set_frames(int n) { hle_ma
 __attribute__((export_name("rt_set_verbose"))) void rt_set_verbose(int n) { hle_verbose = n; }
 __attribute__((export_name("rt_set_digest"))) void rt_set_digest(int n) { hle_digest_every = n; }
 __attribute__((export_name("rt_set_frame_log"))) void rt_set_frame_log(int n) { hle_frame_log = n; }
+__attribute__((export_name("rt_set_digest_nostack"))) void rt_set_digest_nostack(int n) { hle_digest_nostack = n; }
 __attribute__((export_name("rt_set_audio"))) void rt_set_audio(int n) { audio_enabled = n; }
 /* the host writes a NUL-terminated pad script into rt_arg_buf, then calls rt_set_pad */
 static char arg_buf[4096];

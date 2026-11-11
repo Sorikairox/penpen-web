@@ -15,7 +15,7 @@
 #include "nj.h"
 #include "pvr.h"
 
-#define R(i) c->r[i]
+#define R(i) HLE_R(i) /* S11: marks the argument registers read (rt.h) */
 static uint32_t frame_no;
 
 float nj_f(uint32_t a) { uint32_t u = rd32(a); float f; memcpy(&f, &u, 4); return f; }

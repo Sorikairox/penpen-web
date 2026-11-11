@@ -30,7 +30,7 @@
 #include "audio.h"
 #include "seq.h"
 
-#define R(i) c->r[i]
+#define R(i) HLE_R(i) /* S11: marks the argument registers read (rt.h) */
 #define SD_BASE (GUEST_SCRATCH + 0xC00u) /* 16 ports x 8 bytes, then 8 memory blocks x 16 bytes */
 #define PORTS SD_BASE
 #define MEMBLK (SD_BASE + 0x80u)

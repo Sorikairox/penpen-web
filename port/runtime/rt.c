@@ -39,6 +39,7 @@ void rt_log(const char *fmt, ...) {
 }
 
 void rt_stop(const char *why) {
+  if (rt_sandbox) { rt_log("hw sandbox stop: %s", why); hwt_sandbox_abort(7, 0); }
   rt_log("boot stop: %s", why);
   hle_ring_dump();
   rt_summary();
@@ -71,7 +72,7 @@ static int io_slot(uint32_t a) {
 static uint32_t rtc_reads;
 #define RTC_HI 0x00710000u
 #define RTC_LO 0x00710004u
-static uint32_t io_read(uint32_t a) {
+static uint32_t io_read_live(uint32_t a) {
   if ((a & ~3u) == TMU_TCNT0) return ~hle_tmu_count(); /* the frame-driven timer (hle.c) */
   if ((a & 0x1FFFFFFCu) == RTC_HI) { rtc_reads++; return hle_rtc() >> 16; }
   if ((a & 0x1FFFFFFCu) == RTC_LO) { rtc_reads++; return hle_rtc() & 0xFFFFu; }
@@ -80,6 +81,13 @@ static uint32_t io_read(uint32_t a) {
   io[i].nr++;
   return io[i].v;
 }
+/* S11: a difftest sample records the hardware reads of the live call; its sandbox sides replay them */
+static uint32_t io_read(uint32_t a) {
+  if (rt_sandbox) return hwt_io_read(a & ~3u);
+  uint32_t v = io_read_live(a);
+  if (hwt_recording) hwt_record_io(a & ~3u, v);
+  return v;
+}
 static void io_write(uint32_t a, uint32_t v, int size) {
   int i = io_slot(a & ~3u);
   if (i < 0) return;
@@ -87,12 +95,15 @@ static void io_write(uint32_t a, uint32_t v, int size) {
   io[i].v = (io[i].v & ~m) | ((v << sh) & m);
   io[i].nw++;
 }
+/* S11: in a difftest sandbox (difftest.c) hardware accesses touch nothing real: reads replay the live call's (else
+ * a fixed value per address), writes are logged per side and compared */
+#define SBX_IO_W(a, v, n) if (rt_sandbox) { hwt_io_write(a, v, n); return; }
 uint32_t sh4_io_r32(uint32_t a) { return io_read(a); }
 uint16_t sh4_io_r16(uint32_t a) { return (uint16_t)(io_read(a) >> ((a & 2) * 8)); }
 uint8_t sh4_io_r8(uint32_t a) { return (uint8_t)(io_read(a) >> ((a & 3) * 8)); }
-void sh4_io_w32(uint32_t a, uint32_t v) { io_write(a, v, 4); }
-void sh4_io_w16(uint32_t a, uint16_t v) { io_write(a, v, 2); }
-void sh4_io_w8(uint32_t a, uint8_t v) { io_write(a, v, 1); }
+void sh4_io_w32(uint32_t a, uint32_t v) { SBX_IO_W(a, v, 4); io_write(a, v, 4); }
+void sh4_io_w16(uint32_t a, uint16_t v) { SBX_IO_W(a, v, 2); io_write(a, v, 2); }
+void sh4_io_w8(uint32_t a, uint8_t v) { SBX_IO_W(a, v, 1); io_write(a, v, 1); }
 void sh4_io_pref(uint32_t a) { (void)a; } /* store queues: the HLE replaces the TA/texture paths */
 
 /* ---- dispatch ---- */
@@ -111,12 +122,40 @@ rt_fn rt_lookup(uint32_t a) {
 int rt_unw, rt_rew;
 uint32_t rt_rew_t;
 #define RW_MAX 512
-static struct { uint32_t fn, t; int site; } rw[RW_MAX];
+/* S11: a record may also hold the locals of a hand-written resumable function (src/include/hw.h) */
+#define RW_BLOB 64
+static struct { uint32_t fn, t; int site, nblob; uint8_t blob[RW_BLOB]; } rw[RW_MAX];
 static int rw_n, rw_depth_max;
+/* S11: every function that ever saved a site = the functions a frame yields through; hand-written C (src/) must
+ * not be one of them unless it is written resumable (docs/port/DECOMP.md 4) */
+#define YF_MAX 256
+static uint32_t yf[YF_MAX];
+static int yf_n;
 void rt_unw_save(uint32_t fn, int site, uint32_t t) {
   if (rw_n >= RW_MAX) rt_stop("unwind: call chain too deep");
-  rw[rw_n].fn = fn; rw[rw_n].site = site; rw[rw_n].t = t; rw_n++;
+  if (site >= 0) {
+    int k = 0;
+    while (k < yf_n && yf[k] != fn) k++;
+    if (k == yf_n && yf_n < YF_MAX) yf[yf_n++] = fn;
+  }
+  rw[rw_n].fn = fn; rw[rw_n].site = site; rw[rw_n].t = t; rw[rw_n].nblob = 0; rw_n++;
   if (rw_n > rw_depth_max) rw_depth_max = rw_n;
+}
+void rt_unw_save_blob(uint32_t fn, int site, uint32_t t, const void *blob, int n) {
+  if (n > RW_BLOB) { rt_log("rt unwind: %08x saves %d bytes of locals (max %d)", fn, n, RW_BLOB); rt_stop("unwind"); }
+  rt_unw_save(fn, site, t);
+  memcpy(rw[rw_n - 1].blob, blob, (size_t)n);
+  rw[rw_n - 1].nblob = n;
+}
+int rt_rew_pop_blob(uint32_t fn, uint32_t *t, void *blob, int n) {
+  if (!rw_n || rw[rw_n - 1].fn != fn || rw[rw_n - 1].nblob != n) {
+    rt_log("rt rewind: hand-written %08x finds %08x (%d bytes) on top", fn, rw_n ? rw[rw_n - 1].fn : 0, rw_n ? rw[rw_n - 1].nblob : -1);
+    rt_stop("rewind");
+  }
+  rw_n--;
+  *t = rw[rw_n].t;
+  memcpy(blob, rw[rw_n].blob, (size_t)n);
+  return rw[rw_n].site;
 }
 int rt_rew_pop(SH4 *c, uint32_t fn) {
   (void)c;
@@ -193,12 +232,28 @@ static void interp_call(SH4 *c, uint32_t a) {
   }
 }
 
+uint32_t rt_stack_low = 0xFFFFFFFFu; /* S11: the lowest r15 seen at a call through rt_call */
+int rt_sandbox;          /* S11: a difftest side is running (difftest.c): HLE calls are replayed, nothing is counted */
+int rt_hle_depth;        /* HLE calls in progress (an HLE may call guest code, which may call the HLE) */
+uint32_t hle_arg_mask;
 void rt_call(SH4 *c, uint32_t a) {
   uint32_t n = RT_NORM(a);
   hle_fn h;
   rt_fn f;
+  if (rt_sandbox) { hwt_sandbox_call(c, n); return; }
   n_calls++;
-  if ((h = hle_find(n))) { n_hle++; h(c); c->pc = c->pr; return; }
+  if (c->r[15] < rt_stack_low) rt_stack_low = c->r[15];
+  if ((h = hle_find(n))) {
+    int rewinding = rt_rew; /* the yielding HLE entered again by the rewind: not a new call */
+    n_hle++;
+    rt_hle_depth++;
+    hle_arg_mask = 0;
+    h(c);
+    rt_hle_depth--;
+    c->pc = c->pr;
+    if (hwt_recording && !rewinding) hwt_record_hle(c, n); /* a sampled hand-written call's HLE results */
+    return;
+  }
   if ((f = rt_lookup(n)) && n != rt_force_interp) { f(c); return; }
   interp_call(c, n);
 }
@@ -214,22 +269,35 @@ void rt_guest_call(SH4 *c, uint32_t fn, uint32_t a0, uint32_t a1, uint32_t a2, u
   c->r[0] = r0;
 }
 
-void rt_illegal(SH4 *c, uint32_t a) { (void)c; rt_log("rt illegal instruction at %08x", a); rt_stop("illegal"); }
-void rt_illegal_slot(SH4 *c, uint32_t a) { (void)c; rt_log("rt illegal slot at %08x", a); rt_stop("illegal slot"); }
-void rt_unsupported(SH4 *c, uint32_t a) { (void)c; rt_log("rt unsupported instruction at %08x", a); rt_stop("unsupported"); }
+void rt_illegal(SH4 *c, uint32_t a) { (void)c; if (rt_sandbox) hwt_sandbox_abort(2, a); rt_log("rt illegal instruction at %08x", a); rt_stop("illegal"); }
+void rt_illegal_slot(SH4 *c, uint32_t a) { (void)c; if (rt_sandbox) hwt_sandbox_abort(3, a); rt_log("rt illegal slot at %08x", a); rt_stop("illegal slot"); }
+void rt_unsupported(SH4 *c, uint32_t a) { (void)c; if (rt_sandbox) hwt_sandbox_abort(4, a); rt_log("rt unsupported instruction at %08x", a); rt_stop("unsupported"); }
 void rt_badret(SH4 *c, uint32_t want, uint32_t at) {
+  if (rt_sandbox) hwt_sandbox_abort(5, at);
   rt_log("rt call at %08x returned to %08x, expected %08x", at, c->pc, want);
   rt_stop("bad return");
 }
 void rt_budget(SH4 *c, uint32_t at) {
+  if (rt_sandbox) hwt_sandbox_abort(6, at);
   rt_log("rt watchdog: a loop at %08x ran %u back-edges (pc of last call %08x)", at, 200000000u, c->pr);
   rt_stop("watchdog");
 }
 
 void rt_summary(void) {
+  hwt_summary();
   rt_log("rt calls %u hle %u interp-calls %u interp-steps %u yield-depth %d", n_calls, n_hle, n_interp_calls, n_interp_steps, rw_depth_max);
   int shown = 0;
   for (int i = 0; i < IO_N && shown < 40; i++)
     if (io[i].nr | io[i].nw) { rt_log("io %08x reads %u writes %u", io[i].a, io[i].nr, io[i].nw); shown++; }
   rt_log("io addresses %d%s; rtc reads %u", io_n, io_full ? " (table full)" : "", rtc_reads);
+  rt_log("rt stack low %08x; yield-chain functions %d", rt_stack_low, yf_n);
+  for (int i = 0; i < yf_n; i += 8) {
+    char b[8 * 9 + 1], *o = b;
+    for (int k = i; k < yf_n && k < i + 8; k++) {
+      for (int d = 0; d < 8; d++) *o++ = "0123456789abcdef"[(yf[k] >> (28 - 4 * d)) & 15];
+      *o++ = ' ';
+    }
+    *o = 0;
+    rt_log("rt yield-chain %s", b);
+  }
 }

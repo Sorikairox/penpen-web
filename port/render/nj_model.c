@@ -14,7 +14,7 @@
  * Projection: the screen of njSetScreen (dist, cx, cy at 0x8C1EF2A4...) with near clipping in view space. */
 #include <math.h>
 #include "nj.h"
-#define R(i) c->r[i]
+#define R(i) HLE_R(i) /* S11: marks the argument registers read (rt.h) */
 
 /* SDK guest functions used for the node transforms */
 #define G_PUSH 0x8C0C3D90u
