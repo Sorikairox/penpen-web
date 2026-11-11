@@ -1,6 +1,9 @@
 /* Pen Pen port, S3: boot. Read IP.BIN and 1ST_READ.BIN from the player's disc into guest RAM (as the
  * BIOS does: IP.BIN at 0x8C008000, the program at 0x8C010000), set the CPU up as the BIOS leaves it,
- * and call the entry point; the recompiled code then runs until the frame limit, a stop or a fault. */
+ * and call the entry point; the recompiled code then runs until the frame limit, a stop or a fault.
+ * Options (native argv / wasm exports): --frames N, --verbose N (first HLE calls logged), --pad SCRIPT
+ * (hle.c: "F[+N]:BTN|BTN,..." on port A), --digest N (RAM digest every N frames, 0 = off),
+ * --frame-log 0|1 (the per-frame line), --watch A,B,... (guest words shown on the frame line). */
 #include "rt.h"
 
 #define ENTRY 0x8C010000u
@@ -62,6 +65,10 @@ int main(int argc, char **argv) {
     if (!strcmp(argv[i], "--disc")) disc_dir = argv[++i];
     else if (!strcmp(argv[i], "--frames")) hle_max_frames = atoi(argv[++i]);
     else if (!strcmp(argv[i], "--verbose")) hle_verbose = atoi(argv[++i]);
+    else if (!strcmp(argv[i], "--pad")) { if (hle_set_pad_script(argv[++i]) < 0) return 2; }
+    else if (!strcmp(argv[i], "--watch")) { if (hle_set_watch(argv[++i]) < 0) return 2; }
+    else if (!strcmp(argv[i], "--digest")) hle_digest_every = atoi(argv[++i]);
+    else if (!strcmp(argv[i], "--frame-log")) hle_frame_log = atoi(argv[++i]);
   }
   rtw_start();
   return 0;
@@ -69,4 +76,10 @@ int main(int argc, char **argv) {
 #else
 __attribute__((export_name("rt_set_frames"))) void rt_set_frames(int n) { hle_max_frames = n; }
 __attribute__((export_name("rt_set_verbose"))) void rt_set_verbose(int n) { hle_verbose = n; }
+__attribute__((export_name("rt_set_digest"))) void rt_set_digest(int n) { hle_digest_every = n; }
+__attribute__((export_name("rt_set_frame_log"))) void rt_set_frame_log(int n) { hle_frame_log = n; }
+/* the host writes a NUL-terminated pad script into rt_arg_buf, then calls rt_set_pad */
+static char arg_buf[4096];
+__attribute__((export_name("rt_arg_buf"))) char *rt_arg_buf(void) { return arg_buf; }
+__attribute__((export_name("rt_set_pad"))) int rt_set_pad(void) { arg_buf[sizeof arg_buf - 1] = 0; return hle_set_pad_script(arg_buf); }
 #endif

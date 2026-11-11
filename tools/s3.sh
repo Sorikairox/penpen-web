@@ -23,7 +23,7 @@ box() { # sandboxed container: repo read-only at /src, volumes as given by the c
     -v "$REPO/port":/src/port:ro -v "$REPO/tools":/src/tools:ro "$@"
 }
 # What may be printed from a container that read disc-derived data: our own log vocabulary only.
-filt() { grep -E '^(S3 |check_gen |sh4 |diff |mut |hle |boot |rt |io |gen |build |  )[ -~]*$' || true; }
+filt() { grep -E '^(S3 |check_gen |sh4 |diff |mut |hle |boot |rt |io |gen |build |frame |  )[ -~]*$' || true; }
 CF="-O2 -std=gnu11 -Wall -Wno-unused-label -Wno-unused-function -fwrapv -fno-strict-aliasing -ffp-contract=off"
 case "${1:-}" in
   test)
@@ -32,7 +32,7 @@ case "${1:-}" in
     shift
     box -v penpen-work:/work:ro -v penpen-build:/build -v "$REPO/port/symbols":/symbols:ro $IMG \
       sh -c "mkdir -p /build/gen && python3 -I /src/port/recomp/recomp.py --bin /work/fs/1ST_READ.BIN \
-        --funcs /symbols/functions.tsv --sdk /symbols/sdk_calls.tsv --out /build/gen $*" 2>&1 | filt ;;
+        --funcs /symbols/functions.tsv --sdk /symbols/sdk_calls.tsv --entries /symbols/entries.tsv --also-rt /symbols/hle_extra.tsv --out /build/gen --ranges boot $*" 2>&1 | filt ;;
   export)
     # copy the game translation to port/gen/ (gitignored: never committed) after a grammar check
     box -v penpen-build:/build:ro $IMG python3 -I /src/port/recomp/check_gen.py /build/gen | filt

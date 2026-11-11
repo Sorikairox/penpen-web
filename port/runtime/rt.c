@@ -40,6 +40,7 @@ void rt_log(const char *fmt, ...) {
 
 void rt_stop(const char *why) {
   rt_log("boot stop: %s", why);
+  hle_ring_dump();
   rt_summary();
   hle_summary();
 #ifdef __wasm__
@@ -63,7 +64,9 @@ static int io_slot(uint32_t a) {
   }
   return -1;
 }
+#define TMU_TCNT0 0xFFD8000Cu
 static uint32_t io_read(uint32_t a) {
+  if ((a & ~3u) == TMU_TCNT0) return ~hle_tmu_count(); /* the frame-driven timer (hle.c) */
   int i = io_slot(a & ~3u);
   if (i < 0) return 0;
   io[i].nr++;
@@ -97,6 +100,7 @@ rt_fn rt_lookup(uint32_t a) {
 }
 
 static uint32_t n_calls, n_hle, n_interp_calls, n_interp_steps;
+uint32_t rt_interp_calls(void) { return n_interp_calls; }
 #define SEEN_N 64
 static uint32_t interp_seen[SEEN_N];
 static int interp_seen_n;
@@ -114,13 +118,13 @@ static void interp_call(SH4 *c, uint32_t a) {
     int r = sh4_step(c);
     n_interp_steps++;
     if (r) {
-      rt_log("rt interp fault %d at %08x", r, c->fault);
+      rt_log("rt interp fault %d at %08x (entered at %08x, return address %08x, sp %08x)", r, c->fault, a, ret, sp);
       rt_stop("interpreter fault");
     }
     if (c->last == SH4_BR_NONE) continue;
     if (c->last == SH4_BR_RET && c->pc == ret && c->r[15] >= sp) return;
     uint32_t t = RT_NORM(c->pc);
-    if (hle_find(t) || rt_lookup(t)) {
+    if (hle_known(t) || rt_lookup(t)) {
       rt_call(c, t); /* native; returns with c->pc = where it returned to */
       if (c->last != SH4_BR_CALL && c->pc == ret) return; /* a tail jump came back to our caller */
     }

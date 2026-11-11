@@ -54,8 +54,8 @@ static int load_root(void) {
 
 static int upper(int ch) { return ch >= 'a' && ch <= 'z' ? ch - 32 : ch; }
 
-/* walk the root directory; name == NULL counts the files */
-static int walk(const char *name, uint32_t *lba, uint32_t *size) {
+/* walk the root directory; name == NULL counts the files; *index = the file's ordinal in the directory */
+static int walk(const char *name, uint32_t *lba, uint32_t *size, int *index) {
   if (load_root()) return -1;
   int count = 0;
   for (uint32_t p = 0; p < dirlen;) {
@@ -72,10 +72,15 @@ static int walk(const char *name, uint32_t *lba, uint32_t *size) {
     uint32_t i = 0;
     for (; i < nl && nm[i] != ';' && name[i]; i++)
       if (upper(nm[i]) != upper(name[i])) break;
-    if ((i == nl || nm[i] == ';') && !name[i]) { *lba = le32(r + 2); *size = le32(r + 10); return 0; }
+    if ((i == nl || nm[i] == ';') && !name[i]) {
+      *lba = le32(r + 2); *size = le32(r + 10);
+      if (index) *index = count - 1;
+      return 0;
+    }
   }
   return name ? -4 : count;
 }
 
-int disc_find(const char *name, uint32_t *lba, uint32_t *size) { return walk(name, lba, size); }
-int disc_file_count(void) { return walk(0, 0, 0); }
+int disc_find(const char *name, uint32_t *lba, uint32_t *size) { return walk(name, lba, size, 0); }
+int disc_find_ex(const char *name, uint32_t *lba, uint32_t *size, int *index) { return walk(name, lba, size, index); }
+int disc_file_count(void) { return walk(0, 0, 0, 0); }
