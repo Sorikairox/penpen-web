@@ -1,0 +1,6 @@
+# address	name	library	evidence
+# S4: SDK functions outside the census (sdk_calls.tsv: what the game calls) that the runtime takes over
+# because SDK code run as translated guest code calls them (CRI's ADX file stream uses the gdFs
+# asynchronous read). Names from behaviour (Katana API names, confidence low/medium).
+8c09e544	gdFsReqRd32	gdFs	handle+0x4c open check, -10 bad handle, -14 buffer not 32-byte aligned, clamps to the file, status 2 then 1
+8c09e892	gdFsCancel	gdFs	cancels a handle in status 2/4 (called by gdFsClose), waits with syTmrGetCount

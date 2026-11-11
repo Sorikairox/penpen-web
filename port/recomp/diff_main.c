@@ -265,7 +265,7 @@ int main(int argc, char **argv) {
     }
     if (bad) failn++;
     else if (ok) pass++;
-    else untested++;
+    else { untested++; if (!quiet) printf("diff untested %08x\n", start); }
   }
   fclose(m);
   printf("diff functions %d pass %d fail %d untested %d runs %d (error-ending %d) interp-timeouts %d\n", nf, pass,

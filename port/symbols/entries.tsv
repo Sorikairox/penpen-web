@@ -1,0 +1,58 @@
+# address	reason
+# S4: entry points outside the starts of functions.tsv that code reaches without a bsr/bra or a
+# literal-pool jsr/jmp (those recomp.py finds itself): callbacks in data (pointer words into gaps of the
+# function table whose first instruction is a prologue or a leaf), and entries found by the boot
+# runtime's interpreter fallback log (rt interp). recomp.py gives each a C function to the end of the
+# containing function or, in a gap, to the next function start.
+8c016be0	run time (rt interp)
+8c01a4fe	data pointer, prologue
+8c01b080	run time (rt interp)
+8c01bb0c	data pointer, prologue
+8c01ca24	run time (rt interp)
+8c02933c	run time (rt interp)
+8c02fe38	data pointer, prologue
+8c038a24	run time (rt interp)
+8c039478	run time (rt interp)
+8c03f05e	run time (rt interp)
+8c045736	run time (rt interp)
+8c046a86	run time (rt interp)
+8c046d78	data pointer, prologue
+8c0475f4	data pointer, prologue
+8c0476e4	run time (rt interp)
+8c0476e8	run time (rt interp)
+8c047c58	data pointer, prologue
+8c049308	data pointer, prologue
+8c04956c	data pointer, prologue
+8c049d2c	data pointer, prologue
+8c04bcb4	data pointer, prologue
+8c04daca	data pointer, prologue
+8c04fb4e	data pointer, prologue
+8c0502b0	data pointer, prologue
+8c0502ea	data pointer, leaf
+8c05520e	data pointer, prologue
+8c057502	run time (rt interp)
+8c057506	setter table at 8c057502 (rts + fmov.s pairs, 4 bytes each; run time)
+8c05750a	setter table at 8c057502 (rts + fmov.s pairs, 4 bytes each; run time)
+8c05750e	setter table at 8c057502 (rts + fmov.s pairs, 4 bytes each; run time)
+8c057512	setter table at 8c057502 (rts + fmov.s pairs, 4 bytes each; run time)
+8c057810	data pointer, prologue
+8c058cdc	data pointer, prologue
+8c05964a	data pointer, prologue
+8c05b4b4	data pointer, prologue
+8c05c054	data pointer, prologue
+8c05ec5a	data pointer, leaf
+8c0600c6	data pointer, leaf
+8c062602	SHC word-copy helper 8c0625fe: entry by word count (run time)
+8c062606	SHC word-copy helper 8c0625fe: entry by word count (run time)
+8c06260a	SHC word-copy helper 8c0625fe: entry by word count (run time)
+8c06260e	SHC word-copy helper 8c0625fe: entry by word count (run time)
+8c062612	SHC word-copy helper 8c0625fe: entry by word count (run time)
+8c062616	SHC word-copy helper 8c0625fe: entry by word count (run time)
+8c06261a	SHC word-copy helper 8c0625fe: entry by word count (run time)
+8c06261e	SHC word-copy helper 8c0625fe: entry by word count (run time)
+8c062622	SHC word-copy helper 8c0625fe: entry by word count (run time)
+8c062626	SHC word-copy helper 8c0625fe: entry by word count (run time)
+8c06262a	SHC word-copy helper 8c0625fe: entry by word count (run time)
+8c06262e	SHC word-copy helper 8c0625fe: entry by word count (run time)
+8c062632	SHC word-copy helper 8c0625fe: entry by word count (run time)
+8c062636	SHC word-copy helper 8c0625fe: entry by word count (run time)

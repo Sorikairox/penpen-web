@@ -13,7 +13,14 @@ the op_* functions of port/sh4/sh4_ops.h with constant operands; control flow is
   * braf / jmp @Rn inside the function use a switch over the function's labels, else rt_call;
   * rts sets c->pc = PR and returns; the caller checks that it came back to the expected address.
 Usage: python3 -I recomp.py --bin 1ST_READ.BIN --funcs functions.tsv --sdk sdk_calls.tsv --out DIR
-       [--ranges game] [--mutant N [--only-affected]]
+       [--ranges game|all|boot] [--entries entries.tsv] [--mutant N [--only-affected]]
+Ranges: game = the game code without the SDK; all = every function, calls direct; boot (S4) = every
+function, but calls to the SDK entry points of sdk_calls.tsv always go through rt_call, so the runtime
+picks HLE or the translated SDK code per function (port/runtime/hle.c).
+Extra entry points (S4): addresses that code enters other than at a function start of functions.tsv are
+given a C function of their own, from the entry to the end of the function containing it (or, in a gap of
+the table, to the next function start): literal-pool call/jump targets inside function bodies are found
+here (bsr/bra targets, literal-pool jsr/jmp targets); the others (reached through data pointers) come from --entries (address, reason).
 """
 import argparse, os, re, struct, sys
 
@@ -200,11 +207,12 @@ def const_reg(img, seen, a, n):
 
 
 class Gen:
-    def __init__(self, img, funcs, mutant):
+    def __init__(self, img, funcs, mutant, via_rt=()):
         self.img = img
         self.funcs = funcs            # addr -> (end, name)
         self.mutant = mutant
         self.affected = 0
+        self.via_rt = set(via_rt)     # translated, but always called through rt_call (HLE may take them)
 
     def fname(self, a):
         return 'f_%08x' % a
@@ -337,7 +345,7 @@ class Gen:
 
     def known(self, t):
         t = norm(t)
-        return t if t in self.funcs else None
+        return t if t in self.funcs and t not in self.via_rt else None
 
     def tail(self, t):
         k = self.known(t)
@@ -380,7 +388,9 @@ def main():
     ap.add_argument('--funcs', required=True)
     ap.add_argument('--sdk', required=True)
     ap.add_argument('--out', required=True)
-    ap.add_argument('--ranges', default='game')
+    ap.add_argument('--ranges', default='game', choices=('game', 'all', 'boot'))
+    ap.add_argument('--entries')
+    ap.add_argument('--also-rt', help='more SDK addresses the runtime may take over (hle_extra.tsv)')
     ap.add_argument('--mutant', type=int, default=0)
     ap.add_argument('--only-affected', action='store_true')
     ap.add_argument('--per-file', type=int, default=150)
@@ -391,18 +401,71 @@ def main():
         if line.startswith('#'):
             continue
         sdk.add(int(line.split('\t')[0], 16))
+    via_rt = set(sdk)
+    if a.also_rt:
+        for line in open(a.also_rt):
+            if not line.startswith('#') and line.strip():
+                via_rt.add(int(line.split('\t')[0], 16))
     funcs = {}
+    table = []  # every code function of the table: (start, end)
     for line in open(a.funcs):
         if line.startswith('#'):
             continue
         f = line.rstrip('\n').split('\t')
         addr, size, region = int(f[0], 16), int(f[1]), f[4]
+        if region != 'data' and size > 0:
+            table.append((addr, addr + size))
         if a.ranges == 'game' and not (0x8C010000 <= addr < 0x8C066900):
             continue
-        if region == 'data' or size <= 0 or (addr in sdk and a.ranges != 'all'):
+        if region == 'data' or size <= 0 or (addr in sdk and a.ranges == 'game'):
             continue
         funcs[addr] = (addr + size, f[3])
-    g = Gen(img, funcs, a.mutant)
+    nmid = nextra = 0
+    if a.entries or a.ranges == 'boot':
+        table.sort()
+        starts = [t[0] for t in table]
+        import bisect
+
+        def extent(e):
+            """End of the C function for an entry at e: the containing function's end, or the next start."""
+            i = bisect.bisect_right(starts, e) - 1
+            if i >= 0 and table[i][0] < e < table[i][1]:
+                return table[i][1]
+            if i + 1 < len(table):
+                return table[i + 1][0]
+            return None
+        cand = {}
+        # bsr/bra targets and literal-pool jsr/jmp targets that are not function starts
+        for addr in list(funcs):
+            end = funcs[addr][0]
+            for b in sorted(analyse(img, addr, end)[0]):
+                op, name = decode(img, b)
+                k = None
+                if name in ('JSR', 'JMP'):
+                    k = const_reg(img, None, b, (op >> 8) & 15)
+                elif name in ('BSR', 'BRA'):
+                    k = target(op, name, b)
+                if k is not None:
+                    k = norm(k)
+                    if k not in funcs and not k & 1 and LOAD <= k < img.end and not (addr <= k < end):
+                        cand[k] = 'static'
+        if a.entries:
+            for line in open(a.entries):
+                if line.startswith('#') or not line.strip():
+                    continue
+                k = norm(int(line.split('\t')[0], 16))
+                if k not in funcs:
+                    cand[k] = 'listed'
+        for k in sorted(cand):
+            if a.ranges == 'game' and not (0x8C010000 <= k < 0x8C066900):
+                continue
+            e = extent(k)
+            if e is None or e <= k:
+                continue
+            funcs[k] = (e, 'entry_%08x' % k)
+            nmid += cand[k] == 'static'
+            nextra += cand[k] == 'listed'
+    g = Gen(img, funcs, a.mutant, via_rt if a.ranges == 'boot' else ())
     os.makedirs(a.out, exist_ok=True)
     for fn in os.listdir(a.out):
         if fn.startswith('g_') and fn.endswith('.c'):
@@ -452,8 +515,8 @@ def main():
             for addr in sorted(funcs):
                 if addr not in es:
                     o.write('void f_%08x(SH4 *c) { rt_call(c, 0x%08xu); }\n' % (addr, addr))
-    print('gen functions %d files %d labels %d indirect %d mutant %d affected %d' % (
-        len(emitted), files, ninsn, nind, a.mutant, naff))
+    print('gen functions %d files %d labels %d indirect %d mutant %d affected %d entries static %d listed %d' % (
+        len(emitted), files, ninsn, nind, a.mutant, naff, nmid, nextra))
 
 
 if __name__ == '__main__':
