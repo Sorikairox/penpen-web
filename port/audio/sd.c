@@ -19,13 +19,16 @@
  *    to -85), sdShotSetPan(h, p, time) (-128..127), sdShotSetPitch(h, cents, time)
  *    (-6399..6399, sent + 0x8000) are port state, applied to the port's sound and kept for the next one. The
  *    game always passes time 0.
- *  - MIDI sequences (SMSB + SMPB): not played yet (one call on the S4 route); logged.
+ *  - MIDI sequences (SMSB + SMPB, S8): sdMidiPlay(h, bank, seq, prio) plays the sequence on the port
+ *    (seq.c), sdMidiStop ends it (key off), sdMidiSetVol/SetPan(h, v, time) set the port's level / pan
+ *    (-128..127, as the shot ports).
  *  - Globals: sd_SetMasterVol(0..15) (the AICA master volume; the wrapper sends v << 4), sd_SetStereoMono
  *    ('STRO'/'MONO'), sd_Cmd53(l, r) = host command 0x35, the CDDA volume per channel 0..127 (negative values
  *    are refused by the wrapper: the game "mutes" with -127, which the SDK rejects), sd_Cmd54(l, r) = 0x36,
  *    the CDDA pan per channel (the game sends -127, 127: left to the left, right to the right). sd_CmdBytes
  *    (0x88), sd_CmdU8U8 (0x84, 0x82) and sd_CmdReset (0x80) are logged only. */
 #include "audio.h"
+#include "seq.h"
 
 #define R(i) c->r[i]
 #define SD_BASE (GUEST_SCRATCH + 0xC00u) /* 16 ports x 8 bytes, then 8 memory blocks x 16 bytes */
@@ -103,6 +106,7 @@ static void h_sdMultiUnitDownload(SH4 *c) {
     aica_stop_range(addr, fsz);
     for (uint32_t j = 0; j < fsz; j++) aica_ram[addr + j] = rd8(p + off + j);
     copied++; bytes += fsz;
+    seq_bank(tag, (int)bank, addr, fsz); /* SMSB / SMPB: MIDI (seq.c) */
     if (tag == 0x42534F53u && bank < 4) { /* SOSB */
       sosb[bank].addr = addr; sosb[bank].size = fsz; sosb[bank].present = 1;
       uint32_t cnt = addr + 12 < ARAM_SIZE ? (uint32_t)aica_ram[addr + 12] | (uint32_t)aica_ram[addr + 13] << 8 : 0;
@@ -203,11 +207,22 @@ static void h_sdMidiPlay(SH4 *c) {
   if (!R(4)) { R(0) = E_NULL; return; }
   int prio = (int8_t)R(7);
   if (prio < 0 || prio > 31) { R(0) = E_RANGE; return; }
-  if (!midi_logged++) rt_log("hle sd midi sequence %u of bank %u requested at frame %u: MIDI sequences are not played yet", R(6) & 0xFF, R(5) & 0xFF, hle_frame());
+  R(0) = 0;
+  int i = port_of(R(4));
+  if (i < 0 || i >= 8) return;
+  if (midi_logged < 64) { midi_logged++; rt_log("hle sd midi port %d sequence %u of bank %u at frame %u", i, R(6) & 0xFF, R(5) & 0xFF, hle_frame()); }
+  seq_play(i, (int)(R(5) & 0xFF), (int)(R(6) & 0xFF));
+}
+static void h_sdMidiStop(SH4 *c) { sd_log(c); if (!R(4)) { R(0) = E_NULL; return; } int i = port_of(R(4)); if (i >= 0 && i < 8) seq_stop(i); R(0) = 0; }
+static void midi_param(SH4 *c, int which) {
+  sd_log(c);
+  if (!R(4)) { R(0) = E_NULL; return; }
+  int i = port_of(R(4));
+  if (i >= 0 && i < 8) seq_port(i, which, (int8_t)R(5));
   R(0) = 0;
 }
-static void h_sdMidiStop(SH4 *c) { sd_log(c); R(0) = R(4) ? 0 : E_NULL; }
-static void h_sdMidiSet(SH4 *c) { sd_log(c); R(0) = R(4) ? 0 : E_NULL; }
+static void h_sdMidiSetVol(SH4 *c) { midi_param(c, 0); }
+static void h_sdMidiSetPan(SH4 *c) { midi_param(c, 1); }
 
 static void h_sd_SetMasterVol(SH4 *c) { sd_log(c); if (!inited) { R(0) = E_INIT; return; } aica_master((int)(R(4) & 15)); R(0) = 0; }
 static void h_sd_SetStereoMono(SH4 *c) {
@@ -242,7 +257,7 @@ const nj_impl_t sd_impls[] = {
   {"sdShotStop", h_sdShotStop}, {"sdShotSetVol", h_sdShotSetVol}, {"sdShotSetPan", h_sdShotSetPan},
   {"sdShotSetPitch", h_sdShotSetPitch},
   {"sdMidiOpenPort", h_sdMidiOpenPort}, {"sdMidiClosePort", h_sdMidiClosePort}, {"sdMidiPlay", h_sdMidiPlay},
-  {"sdMidiStop", h_sdMidiStop}, {"sdMidiSetVol", h_sdMidiSet}, {"sdMidiSetPan", h_sdMidiSet},
+  {"sdMidiStop", h_sdMidiStop}, {"sdMidiSetVol", h_sdMidiSetVol}, {"sdMidiSetPan", h_sdMidiSetPan},
   {"sd_SetMasterVol", h_sd_SetMasterVol}, {"sd_SetStereoMono", h_sd_SetStereoMono},
   {"sd_Cmd53", h_sd_Cmd53}, {"sd_Cmd54", h_sd_Cmd54},
   {"sd_CmdBytes", h_sd_logged}, {"sd_CmdU8U8", h_sd_logged}, {"sd_CmdReset", h_sd_logged},

@@ -7,6 +7,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include "audio.h"
+#include "seq.h"
 
 int audio_enabled = 1;
 void cdda_mix(int32_t *mix, int n) { (void)mix; (void)n; }
@@ -135,6 +136,47 @@ int main(void) {
   check(pk > 5500 && pk <= 6000, "output headroom: a 12000 peak comes out at half", pk);
   check(rtw_audio_drain() == 0, "nothing pending after a drain", 0);
   check(rtw_audio_rate() == 44100, "rate", rtw_audio_rate());
+
+  /* S8: a MIDI sequence on a program of our own: SMPB at 0x100000 (one program, one layer, one split = a looping
+   * PCM16 sample, key 48..72, base 60), SMSB at 0x180000 (tempo 500 ms, CC 7, program 0, a reference to two
+   * notes (key 72 vel 127, gate and delta 480 as 2 bytes; key 60, gate 240, delta 0x300 as 2 bytes), then back
+   * to the end event */
+  aica_key_off(h); for (int i = 0; i < 8; i++) audio_frame(); rtw_audio_drain();
+  {
+    uint8_t *P = aica_ram + 0x100000, *S = aica_ram + 0x180000;
+    memset(P, 0, 0x2000); memset(S, 0, 0x200);
+    memcpy(P, "SMPB", 4); P[4] = 1; P[0x10] = 0x40; P[0x14] = 1;               /* program table at 0x40, 1 program */
+    P[0x40] = 0x50;                                                           /* program 0 at 0x50 */
+    P[0x50] = 0x70;                                                           /* layer 0 at 0x70 */
+    P[0x70] = 1; P[0x74] = 0x80; P[0x7C] = 2;                                 /* 1 split at 0x80, bend 2 */
+    for (int i = 0; i < 1000; i++) { int16_t v = (int16_t)(8000 * sin(2 * M_PI * i / 100.0)); P[0x1000 + 2 * i] = (uint8_t)v; P[0x1001 + 2 * i] = (uint8_t)(v >> 8); }
+    slot(r, 0, 1, 0x1000, 0, 999, 0);
+    memcpy(P + 0x80, r, 36); P[0x80 + 0x24] = 48; P[0x80 + 0x25] = 72; P[0x80 + 0x26] = 60;
+    memcpy(S, "SMSB", 4); S[4] = 1; S[12] = 1; S[16] = 0x20;                  /* 1 sequence at 0x20 */
+    static const uint8_t ev[] = {'S', 'M', 'S', 'D', 0x88, 0, 0, 0, 0xF4, 1, 0, 0,
+      0x84, 0x01, 0xF4, 0, 0xB0, 7, 127, 0, 0xC0, 0, 0, 0x81, 0x00, 0x1C, 2, 0x83,
+      0x30, 72, 127, 0x01, 0xE0, 0x01, 0xE0, 0x10, 60, 127, 0xF0, 0x03, 0x00};
+    memcpy(S + 0x20, ev, sizeof ev);
+    seq_bank(0x42504D53u, 0, 0x100000, 0x2000);
+    seq_bank(0x42534D53u, 0, 0x180000, 0x200);
+    seq_play(0, 0, 0);
+    /* 500 ms per quarter, 480 ticks: the first note lasts 0.5 s, the second starts at 0.5 s for 0.25 s */
+    for (int f = 0; f < 15; f++) audio_frame(); /* 0.25 s */
+    check(aica_voices() == 1, "midi: one note at 0.25 s", aica_voices());
+    int16_t *q = audio_out(); int zc = 0;
+    for (int i = 1; i < 735 * 15; i++) zc += (q[2 * (i - 1)] < 0) != (q[2 * i] < 0);
+    /* key 72 over base 60 = one octave up: the 441 Hz sample cycle (100 samples) plays at 882 Hz */
+    check(zc > 2 * 882 * 0.25 * 0.85 && zc < 2 * 882 * 0.25 * 1.15, "midi: key 72 on base 60 plays an octave up", zc);
+    rtw_audio_drain();
+    for (int f = 0; f < 21; f++) audio_frame(); /* 0.6 s: the second note */
+    check(aica_voices() == 1 && seq_playing(0), "midi: the second note after the first gate", aica_voices());
+    for (int f = 0; f < 15; f++) audio_frame(); /* 0.85 s: past its gate (0.75 s) and the end */
+    check(aica_voices() == 0, "midi: released after the gate", aica_voices());
+    check(seq_playing(0), "midi: still waiting the last delta (768 ticks = 0.8 s from 0.5 s)", 0);
+    for (int f = 0; f < 30; f++) audio_frame(); /* 1.35 s */
+    check(!seq_playing(0), "midi: the sequence ended at 1.3 s", 0);
+    rtw_audio_drain();
+  }
 
   printf("audio %d checks, %d failures\n", checks, fails);
   return fails != 0;

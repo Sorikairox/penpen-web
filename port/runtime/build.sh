@@ -6,7 +6,7 @@ KIND=$1; GEN=$2; OUT=$3; CF=$4; J=$5
 S=/src/port
 RT="$S/runtime/rt.c $S/runtime/disc.c $S/runtime/hle.c $S/runtime/hle_io.c $S/runtime/vmu.c $S/runtime/main.c $S/sh4/sh4_interp.c
     $S/render/rd.c $S/render/pvr.c $S/render/nj_draw.c $S/render/nj_model.c
-    $S/audio/aica.c $S/audio/cdda.c $S/audio/sd.c"
+    $S/audio/aica.c $S/audio/cdda.c $S/audio/sd.c $S/audio/seq.c"
 if [ "$KIND" = native ]; then CC=gcc; EXTRA="-O1"; RT="$RT $S/runtime/disc_native.c"; O=o
 else CC=emcc; EXTRA="-O1"; O=wo; export EM_CACHE=/build/emcache; J=${WASM_JOBS:-3}; fi
 F="$CF -I$S/recomp -I$S/runtime -I$S/render -I$S/audio -I$GEN"

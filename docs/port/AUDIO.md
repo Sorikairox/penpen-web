@@ -11,6 +11,7 @@ sandbox; only behaviour, names and addresses are written down). No emulator code
 | File | What |
 |---|---|
 | `port/audio/sd.c` | the `sd` HLE: memory blocks, `sdMultiUnitDownload` (MLT banks into our sound RAM), ports, one-shots, the global and CDDA commands |
+| `port/audio/seq.c` | S8: the MIDI sequencer (SMSB sequences on SMPB programs) |
 | `port/audio/aica.c` | the mixer (64 voices, 2 MiB sound RAM) and the output buffer + `rtw_audio_rate/drain/buffer` |
 | `port/audio/cdda.c` | CDDA play/pause/stop/release over `rtw_disc_read` on the audio tracks |
 | `port/audio/test_aica.c` | unit checks of the mixer on our own signals (`tools/s7.sh test`) |
@@ -86,11 +87,49 @@ Port state (volume, pan, pitch) persists and applies to the next sound on the po
 | `sd_CmdBytes` (0x88), `sd_CmdU8U8` (0x84 then 0x82), `sd_CmdReset` (0x80) | | logged only |
 | `sdLibInit`, `sdDrvInit`, `sdSysServer`, `sdSysFinish` | | init flag; the SDK's error codes when not initialised |
 
-### 2.4 MIDI: not played yet
+### 2.4 MIDI sequences (S8)
 
-`sdMidiPlay(h, bank, seq, prio)` is called once on the S4 route (sequence 37 of bank 0 at the course selection,
-frame 1501). SMSB holds 51 sequences (`SMSD` records: a compact MIDI-like event stream) and SMPB the programs
-(layers/splits with AICA slot images and velocity tables). Not decoded yet: logged once, silent.
+`sdMidiPlay(h, bank, seq, prio)` plays a sequence of the SMSB unit of that bank on the MIDI port; `sdMidiStop`
+keys its notes off; `sdMidiSetVol/SetPan(h, v, time)` are port level / pan as for the shot ports. `port/audio/seq.c`
+is our sequencer; the formats were read from the disc's banks in the sandbox (structure only) and the grammar was
+checked by walking all 51 sequences of the five MLT banks (all five carry the same SMSB): 50 end with `0x83`, the
+long song 46 runs into filler without an end event (the sequencer stops on the first unknown byte).
+
+**SMSB**: `'SMSB'`, version 1, size, count (51), offsets to **SMSD** sequences: `'SMSD'`, u32 0x88, u32 tempo, the
+events, `0x83`, padding, `'ENDD'`. One track; the channel is the low nibble; 16-bit values big-endian:
+
+| Event | Bytes | Meaning |
+|---|---|---|
+| `0x00–0x7F` | s key vel gate delta | note; s & 0x20: gate is 2 bytes, s & 0x10: delta is 2 bytes (the same layout as Sega's Saturn sequences) |
+| `0x81` | hi lo n | reference: play n events from SMSD offset hi:lo, then return (not nested) |
+| `0x83` | | end |
+| `0x84` | hi lo d | tempo, delta (the header's tempo is repeated here) |
+| `0xBn` | c v d | control change; c & 0x80: the delta is 2 bytes (seen once per long song, before the end) |
+| `0xCn` | p d | program change |
+| `0xDn`, `0xEn` | v d | channel pressure (ignored), pitch bend (one byte, 64 = centre) |
+
+Controllers seen: 32 (bank select = the SMPB bank), 7 (volume), 1 (modulation: ignored), 80 (long ramps up/down
+in the songs, like crossfades: meaning unknown, ignored); 10 (pan) and 11 (expression) are handled if they come.
+
+**SMPB**: `'SMPB'`, version 1, size, 0, program table offset (0x30) and count (18), velocity curve offset (0x78)
+and count (1: 128 bytes, velocity → level, 0x54…0x7F), two more offset/count pairs (unused here), the programs:
+6 layer offsets; a layer is {split count, splits offset, 0, bend range in semitones (2 or 24)}; a **split** is 0x30
+bytes: **18 halfwords of AICA slot registers 0x00–0x44** (as the one-shot bank; sample addresses from the unit
+start), then key low, key high, **base key**, fine tune, 0xFFFF, a flag byte, 0x7F, 0.
+
+A note keys one voice per layer (the split covering the key) at (key − base key) semitones from the split's own
+OCT/FNS, level = velocity curve × volume² × expression² × port volume, pan CC 10 (else the split's DIPAN). Program
+11 is 40 one-key splits of 22 050 Hz ADPCM clips stored at OCT 0 with base = key + 12; **sequences 5–44 are one
+note each (keys 0x24–0x4B) of program 11**: the game plays its sampled clips (2.1 s for sequence 37) through MIDI.
+Sequences 0–4 are short jingles (tempo 400), 45–50 songs (tempo 285–666).
+
+**Timing**: the tempo value is taken as the quarter note in ms and the resolution as **480 ticks per quarter**
+(our reading: the files do not carry it; it makes the jingles' 120-tick steps 16th notes at 150 BPM and sequence
+37's gate (1 914 ticks = 2.99 s) cover its 2.1 s clip). The sequencer steps between 15 blocks of 49 samples per
+game frame, integer arithmetic only.
+
+On the S4 route the game plays **sequence 37 on port 0 at frame 1501** (course selection), level set by
+`sdMidiSetVol` in the same frame: one note, 6 events, heard 1501–1626 (2.1 s clip).
 
 ## 3. The mixer
 
@@ -159,9 +198,18 @@ All guest code ran in `--network none --read-only --cap-drop ALL` containers; th
   0 dropped, 1 and 4 underruns (SwiftShader runs the race at 58.7 frames/s, below the host's 60); VMU, rumble and
   the reload as in S6.
 
+### S8 captures (MIDI)
+
+Mixer unit checks **23 / 0** (6 new: a synthetic SMSB/SMPB pair: note on/off at the tempo, an octave from the
+base key, a reference, the 2-byte delta, the end). S4 route, effects only (`--audio-solo sfx`): the range
+1500–1635 now holds the A press and sequence 37's clip: **RMS −16.7 dBFS, peak −5.1 dBFS** (S7: 1500–1590 at
+−23.4 dBFS, the press alone); the full mix: −20.3 dBFS in the 10 frames before 1501, −12.8 dBFS in the 10 after;
+0 clipped samples; 1 note, 6 events, 0 unknown.
+
 ## 6. Gaps
 
-- MIDI sequences (SMSB/SMPB): one request on the route (2.4), silent.
+- MIDI (2.4): the tick resolution (480) and the tempo unit (ms per quarter) are our reading; CC 80, modulation,
+  channel pressure, the split's flag/0xFFFF fields and the layers' third word are not used.
 - The AICA DSP (SFPB programs: reverb/effects): the four DSP-only loops are heard dry at their send level.
 - The filter envelope and LFOs; the `time` argument of the port commands (always 0 in the game so far).
 - The port volume scale (linear 0..255) and the 6 dB headroom are our choices; the real driver's curve is not known.

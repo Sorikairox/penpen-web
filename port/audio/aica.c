@@ -13,6 +13,7 @@
  * Not modelled: the DSP (ISEL/IMXL sends; a voice with no direct level is sent dry at its IMXL level),
  * the filter (FLV/FEG) and the LFOs. Integer mixing; every table is built with + * / only. */
 #include "audio.h"
+#include "seq.h"
 
 uint8_t aica_ram[ARAM_SIZE];
 
@@ -259,7 +260,11 @@ void audio_frame(void) {
   static int32_t mix[2 * AUDIO_PER_FRAME], mute[2 * AUDIO_PER_FRAME];
   memset(mix, 0, sizeof mix);
   cdda_mix(audio_solo == 2 ? mute : mix, AUDIO_PER_FRAME);
-  aica_mix(audio_solo == 1 ? mute : mix, AUDIO_PER_FRAME);
+  /* the MIDI sequencer steps between blocks of 49 samples (1.1 ms; 15 per frame) */
+  for (int b = 0; b < AUDIO_PER_FRAME; b += 49) {
+    seq_advance(49);
+    aica_mix((audio_solo == 1 ? mute : mix) + 2 * b, 49);
+  }
   if (pending + AUDIO_PER_FRAME > OUT_CAP) {
     uint32_t drop = pending + AUDIO_PER_FRAME - OUT_CAP;
     memmove(out, out + 2 * drop, (size_t)(pending - drop) * 4);

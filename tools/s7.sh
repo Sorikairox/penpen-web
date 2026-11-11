@@ -18,7 +18,7 @@ case "${1:-}" in
   test)
     $D run $SAFE --tmpfs /tmp:exec -v "$REPO/port":/src/port:ro $IMG sh -c 'cd /tmp && gcc -O2 -std=gnu11 -Wall -Wno-unused-function \
       -fwrapv -ffp-contract=off -I/src/port/recomp -I/src/port/runtime -I/src/port/render -I/src/port/audio \
-      -o t /src/port/audio/test_aica.c /src/port/audio/aica.c -lm && ./t' ;;
+      -o t /src/port/audio/test_aica.c /src/port/audio/aica.c /src/port/audio/seq.c -lm && ./t' ;;
   capture)
     shift; prep
     "$REPO/tools/s3.sh" native $ROUTE --wav /build/audio/route.wav "$@"
