@@ -12,7 +12,9 @@ HLE layers (S4–S7) against the real game. Everything here runs in Docker (`too
 | `port/sh4/sh4_ops.h` | semantics of every `OP` instruction, `op_<NAME>(c, op, pc)`; the interpreter calls them with run-time values, the generated C with constants |
 | `port/sh4/sh4_interp.c` | decoder (65 536-entry table, conflict check), `sh4_step`: branches and delay slots, SR/FPSCR bank switches |
 | `port/sh4/tests/test_sh4.c` | 231 checks on hand-encoded vectors (our own encodings from the manual's tables, so the decoder table is checked too) |
-| `port/recomp/recomp.py` | the translator: 1ST_READ.BIN + `functions.tsv` → one C function per guest function, `table.c` (address → function), `meta.tsv` |
+| `port/recomp/recomp.py` | the translator: 1ST_READ.BIN + `functions.tsv` → one C function per guest function, `table.c` (address → function), `meta.tsv`. S4: `--ranges boot` (section 4) and extra entry points (`port/symbols/entries.tsv` + static discovery) |
+| `port/symbols/entries.tsv` | S4: entry points outside the function table's starts (callbacks in data, multi-entry helpers, run-time finds), one C function each |
+| `port/symbols/hle_extra.tsv` | S4: SDK functions outside the census that the runtime takes over because guest SDK code calls them (gdFsReqRd32, gdFsCancel) |
 | `port/recomp/rt_gen.h` | what the generated C expects (`CALL_D`, `CALL_I`, `TAIL_D`, `BACK`, `rt_call`) |
 | `port/recomp/diff_main.c`, `build_diff.sh`, `mutants.sh` | differential harness (section 5) |
 | `port/recomp/check_gen.py` | grammar check of generated C before it leaves a container |
@@ -32,12 +34,24 @@ the other SR bits, GBR VBR SSR SPC SGR DBR MACH MACL PR PC, FPU banks `fr` (curr
 modes are tested at run time in the op functions (the game never leaves FPSCR = 0x00040001; the C runtime's
 double helpers set PR).
 
-Deliberate deviations: host IEEE round-to-nearest (FPSCR.RM round-to-zero and DN not modelled; wasm has no
-rounding modes), no FPU exception flags; NaN results are the SH-4's own qNaN (0x7FBFFFFF / 0x7FF7FFFF_FFFFFFFF),
-which also makes interpreter and recompiled C bit-identical; `fsca`/`fsrra` exact then rounded (hardware:
-table approximations); `fmac` and `fipr`/`ftrv` without fused multiply-add (`-ffp-contract=off` everywhere,
-or GCC fuses differently in each inlining context); cache ops no-ops; `pref` of a store-queue address calls
-`sh4_io_pref` (no-op in the boot); `rte`, `trapa`, `sleep`, `ldtlb` stop the run (never reached).
+**Rounding (S4 decision): FPSCR.RM = 01 (round to zero) and DN (denormals are zero) are modelled**, because
+the game and its SDK run in exactly that mode (0x00040001) and their float logic depends on it: with the
+host's round-to-nearest the first logo's fade ended one frame later (frame 212 instead of 211), the title's
+random picture and the attract demo's course differed. wasm has no rounding modes, so `sh4_ops.h` computes
+each single result exactly (products of singles, conversions) or with its exact error (two-sum for add and
+subtract) in double and rounds toward zero in software; a quotient or square root that lands exactly on a
+single is exact (it cannot come within 2^-53 of one otherwise), so the double result rounded toward zero is
+right. Doubles (the C runtime helpers run with PR = 1 and the same RM): two-sum, Dekker two-product, and the
+residuals x − q·y and x − q² give the sign of the error. DN flushes denormal operands and results to signed
+zero. RM = 00 still uses the host's nearest. 26 unit checks compare both modes on values whose roundings
+differ.
+
+Deliberate deviations: no FPU exception flags; NaN results are the SH-4's own qNaN (0x7FBFFFFF /
+0x7FF7FFFF_FFFFFFFF), which also makes interpreter and recompiled C bit-identical; `fsca`/`fsrra` and
+`fipr`/`ftrv` computed in double, then one rounding (hardware: approximations); `fmac` rounds the product,
+then the sum (`-ffp-contract=off` everywhere, or GCC fuses differently in each inlining context); cache ops
+no-ops; `pref` of a store-queue address calls `sh4_io_pref` (no-op in the boot); `rte`, `trapa`, `sleep`,
+`ldtlb` stop the run (never reached).
 
 ## 3. Memory map
 
@@ -54,7 +68,17 @@ work area, unused without a BIOS: pad structures); IP.BIN at 0x8C008000; stack 0
 ## 4. Translation and call model
 
 Per function (extent from `functions.tsv`; game range 0x8C010000–0x8C066900 minus the SDK entries = 4 148
-functions, 131 392 instructions; `--ranges all`: 7 925 functions):
+functions, 131 392 instructions; `--ranges all`: 7 925 functions). **S4: `--ranges boot`** (the default of
+`tools/s3.sh gen`) translates every function of the image like `all`, but calls to the SDK entry points of
+`sdk_calls.tsv` and `hle_extra.tsv` always go through `rt_call`, never direct, so the runtime decides per
+entry point between its HLE and the SDK's own translated code (section 7). **Extra entry points**: code that
+is entered other than at a table start gets a C function of its own, from the entry to the end of the
+function containing it (or, in a gap of the table, to the next start): bsr/bra and literal-pool jsr/jmp
+targets inside other bodies are found by the translator (90), the rest are listed in
+`port/symbols/entries.tsv` (52: function pointers in data that point into gaps of the table, whose first
+instruction is a prologue or a leaf; the SHC word-copy helper's 14 entries by count; a setter table; and
+entries the run-time fallback log found). Boot translation: **8 067 functions, 526 422 labels, 161 with a
+label switch**.
 
 - **Reachability**: from the entry, following fall-through, both arms of conditional branches, and the return
   point after calls. Delay slots are not instructions of their own unless something branches to them.
@@ -81,10 +105,13 @@ functions, 131 392 instructions; `--ranges all`: 7 925 functions):
 
 `rt_call(c, a)` (runtime): normalise → HLE table (SDK targets + BIOS vectors) → translated function table
 (binary search) → **interpreter fallback**: interpret from `a` until an `rts` comes back to the caller's PR with
-the stack at or above its entry value; calls and jumps that reach HLE or translated code go native. In the boot
-the fallback ran 199 times / 5 674 instructions in 60 frames, at 8 entry points: 3 in the SDK range that are not
-in the census (called through pointers or thunks: 0x8C09CD78, 0x8C09D4F2, 0x8C0A2544) and 5 entries into the
-middle of functions (C-runtime helpers 0x8C06261E–0x8C062636, game 0x8C01A4FE).
+the stack at or above its entry value; calls and jumps that reach HLE or translated code go native. In the S3
+boot the fallback ran 199 times / 5 674 instructions in 60 frames, at 8 entry points: 3 in the SDK range that
+are not in the census (called through pointers or thunks: 0x8C09CD78, 0x8C09D4F2, 0x8C0A2544) and 5 entries
+into the middle of functions (C-runtime helpers 0x8C06261E–0x8C062636, game 0x8C01A4FE). S4: the SDK ones are
+translated (boot range), the others are extra entries; 0x8C01A4FE and 15 more found later were not mid-function
+but **functions missing from the table** (gaps). The fallback stays as the safety net (and logs `rt interp`
+once per new entry); the 6 000-frame boot-to-race run below uses it **0 times**.
 
 ## 5. Differential harness: what it covers
 
@@ -112,6 +139,9 @@ Results (S3):
 | game range, 12 trials / 20 000 steps | 4 148 | 4 131 | 0 | 17 |
 | game range, 40 trials / 100 000 steps | 4 148 | 4 134 | 0 | 14 |
 | whole image (`--ranges all`), 12 / 20 000 | 7 925 | 7 546 | 0 | 379 |
+| S4 boot translation (`--ranges boot` + entries), 12 / 20 000, RZ/DN semantics | 8 067 | 7 686 | 0 | 381 |
+
+The 46 SDK functions the boot runs as guest code (section 7) all pass.
 
 **Mutants** (`tools/s3.sh mutants`; each translates only the functions it touches): the harness must flag them.
 
@@ -130,7 +160,7 @@ fix); `jmp @Rn` to a literal inside the same function was emitted as an external
 local jump); FMA contraction and NaN payloads differing between the two builds (flags + qNaN, section 2);
 random stores overwriting code (code made read-only in the model).
 
-## 6. Boot (S3 result)
+## 6. Boot (S3 result; S4: section 7)
 
 `rtw_start` (port/runtime/main.c): TOC → ISO9660 root (PVD at LBA 45016; 194 files) → IP.BIN (16 sectors at
 LBA 45000) to 0x8C008000 → 1ST_READ.BIN to 0x8C010000 → CPU as the BIOS leaves it (SR 0x600000F0, r15 = VBR =
@@ -160,6 +190,74 @@ families, njGetMatrix/njInvertMatrix, njSetConstantMaterial, **njDrawSprite2D**,
 **njWaitVSync** → V-sync callback (njSetBackColor, njSetBorderColor, sdSysServer). 60 frames: 3 022 HLE calls
 to 83 functions, 5 files read.
 
-The run stops at the frame limit (`--frames N`); in 60 frames the first screen's loop does not move on (not
-yet investigated: likely waiting on stubbed state such as the timer, the pads or SDK maths results). S4
-makes those real.
+The run stops at the frame limit (`--frames N`); in 60 frames the first screen's loop does not move on. S4
+found why (section 7): 60 frames are shorter than the first logo.
+
+## 7. S4: HLE vs guest SDK code, the frame loop, the deterministic test mode
+
+**Why S3's first screen "never advanced".** It did not stall: the S3 run stopped at its 60-frame limit, and
+the first screen (a logo: alpha += a constant per frame up to 1.0, a 90-frame hold, the fade out, then the
+next logo file) needs 211 frames. Run longer with the S3 stubs, the boot went through two logos and the
+title and faulted at frame 2 230 (a call to 0x8036A290, right after the stubbed `njRandom`, whose float
+result the game's random helper scales into its state): the SDK maths stubs returning nothing were the real
+problem, the timer, pads and gdFs status were not.
+
+**Guest SDK code.** `hle.c` keeps one table of the 231 SDK entry points (`sdk_calls.tsv` + `hle_extra.tsv` +
+the BIOS vectors). 46 of them are pure code and run as the SDK's own translated code (`guest[]`): the heap
+(`syMallocInit`/`syMalloc`/`syFree`: 32-byte units, a 32-byte header, blocks cut from the end of the first free
+block that fits, NULL when none fits, coalescing; the log reads its free list), the Ninja matrix stack and
+vector maths (`njInitMatrix`, push/pop, rotate/translate/scale, `njInvertMatrix`, `njCalcPoint`/`Vector`,
+inner/outer products, `njUnitVector`, `njSin`/`njCos`/`njTan` (`fsca`), `njSqrt`, `njRandom`), camera/view/
+screen/aspect, `nj_ReadChunkFile`, `nj_MemCopy4`, two empty functions. They pass the differential harness; the
+S5 renderer will read the matrices they maintain. Everything else is HLE (`impl[]`) or a logging stub.
+
+**Frame loop** (in `njWaitVSync`, one V-blank per call, no wall time): end of render (the `njSetEORFunction`
+callback, then the syChain 0x920 handlers) → per-frame log line → V-blank: TMU time base, completion of
+asynchronous drive requests, pad structures from the script, syChain 0x900 handlers (Kamui's V-blank
+callback slot; the game's handler at 0x8C061DF0), then the `njSetVSyncFunction` callback (which counts
+V-blanks for the game's frame skip). Chains are kept host-side, sorted by priority (`syChainAddHandler`
+returns an id, `syChainDeleteHandler` removes it); other event codes are logged as not fired.
+
+- **Timer**: `syHwInit` programs TMU0 with TCR0 = 2 (P-clock 50 MHz / 64 = 781 250 Hz), counting down from
+  0xFFFFFFFF; `syTmrGetCount` = ~TCNT0. HLE: count = ⌊frame · 781 250 · 1001 / 60 000⌋ (59.94 Hz) + one tick
+  per read within the frame (capped below the next frame); reads of TCNT0 by guest code see the same clock.
+- **gdFs**: handles are guest structures in the work area of `gdFsInit`, with the SDK's layout (+8 first LBA,
+  +0x10 sectors, +0x14 position, +0x18 transferred, +0x4C open, +0x50 status 0 idle/1 complete/2 reading/4
+  busy/5 error), so the SDK's `gdFsTell` (guest) and CRI read them. `gdFsRead` synchronous (clamped to the file,
+  0 or −10), `gdFsReqRd32` asynchronous (−14 unaligned; completes at the next V-blank or the 8th status poll in
+  the frame), `gdFsCancel`, `gdFsGetStat` (−10 bad handle), `gdFs_Api34` (driver slot 0x34: the drive handle)
+  and `gdFs_Api58` (slot 0x58: drive-status request, the drive handle busy until the next frame: the game's
+  10-frame drive watch, 0x8C012DC4), `gdFsGetDrvStat` (1 PAUSE, 3 PLAY while CDDA plays: the game waits for
+  "not 3" after pausing), `gdFsChangeDir` (root only), CDDA play/pause/stop/release logged with the frame.
+  Opened files are logged as directory index + 4-digit group (PLAN 2) + size, not by name.
+- **Pads**: `pdGetPeripheral(port)` returns PDS_PERIPHERAL structures in the BIOS work area (on/off/press/
+  release, r/l, sticks, info → {type}); port A holds a standard controller (support 0x000F06FE, which the
+  game's reader 0x8C01087C requires: analog X and Y), the others are empty. The game reads +0x30 info type
+  (bit 0 controller, bit 7 skipped), +4 support, +8 on, +0x1C/+0x1E sticks (thresholded at ±64).
+
+**Test mode** (native argv; the wasm exports `rt_set_*`, `rt_arg_buf`/`rt_set_pad`, passed by
+`node/run.mjs`): `--frames N`, `--pad "F[+N]:BTN|BTN,..."` (port A holds the buttons for frames F..F+N−1,
+N = 4 by default; A B C X Y Z D START UP DOWN LEFT RIGHT LT RT), `--digest N` (64-bit digest of the 16 MiB of
+guest RAM every N frames), `--frame-log 0|1`, `--watch A,B` (guest words on the frame line), `--verbose N`.
+Per frame: `frame F hle H guest G interp I files N heap FREE/BLOCKS pad BITS ram DIGEST`. `hle new` lines
+give each SDK function's first frame; `hle screen` lines mark a new set of SDK functions per frame held for
+8 frames (the busiest listed): with no renderer yet, screens are told apart by their call pattern and files.
+
+**Results (S4)**, native and wasm32 (node) **identical frame by frame, RAM digests included** (6 000 frames of
+the race script below; 1 600 frames of a menu script), deterministic run to run:
+
+| Frames | What (no input) |
+|---|---|
+| 0 | sound driver (group 9900), container 2000, PVMs 2001/2002, logo 7999: first logo |
+| 211 | logo 8000 |
+| 427–429 | a picture 80xx (random: timer + float), title data 3000–3280, CDDA track 5 |
+| 2 228 | no input for 30 s: attract demo (picture, game container 5000, a course and characters 5xxx; CDDA 11, 12, 13) |
+| 5 828 | back to the title |
+
+With `--pad 600:START,700:A,1100:START,1200:A,1500:A,1700:A,1760:A`: title → Start (607: the menu) → A
+(706: a screen of 167 sprites) → Start (1 102: a picture 80xx, **character select** 5100–5111, CDDA 8) → A
+(1 203) → A (1 563: next select screen, CDDA 9) → A, A (1 762: **a race loads**: 19 files, game container 5000,
+course 58xx/5300/54xx, characters 52xx; CDDA 11 at 1 854, race music CDDA 12 at 2 244) → racing at 6 000
+frames. 42 files opened, 0 interpreter-fallback calls; 150 SDK functions used (39 of them as guest code), 9.5 M SDK calls, 0.95 M of them HLE. Speed: about 300 frames/s
+native and in node (wasm 45 MB: the whole image is translated now; S5+ can translate only what the guest SDK
+functions reach).

@@ -2,6 +2,51 @@
 
 Newest session first. Read `docs/port/PLAN.md` (disc facts, survey, approach, phases, rules) before working.
 
+## S4 — 2026-11-11: HLE files + memory + timers; the boot reaches a race
+
+All runs in `--network none --read-only --cap-drop ALL` containers (`tools/s3.sh`); generated C and logs stay
+in `penpen-build` / gitignored `port/gen/` (`git log --all -- port/gen` empty). Details: `docs/port/RECOMP.md` 2, 4,
+5 and **7**.
+
+- **Root cause of the "stall"**: none. S3's run stopped at its 60-frame limit, and the first logo (alpha += k
+  per frame, 90-frame hold, fade out) needs 211 frames. Run longer with S3's stubs it faulted at frame 2 230:
+  `njRandom` (and the other maths) stubs returned nothing, the game turned the stale float into state and
+  jumped to 0x8036A290. Timer, pads and gdFs status were not the cause.
+- **Guest SDK code instead of maths stubs**: `recomp.py --ranges boot` translates the whole image (8 067
+  functions incl. 142 extra entries) with SDK entry points always called through `rt_call`; `hle.c` runs 46
+  pure SDK functions as their own code (heap, matrix/vector maths, njSin/njCos/njSqrt/njRandom, camera/view,
+  chunk-file parser). All pass the differential harness.
+- **sy**: syMalloc/syFree = the SDK allocator itself; syTmrGetCount/TCNT0 = TMU0 at 781 250 Hz from 59.94 Hz
+  frames (+1 tick per read in a frame); syChain handlers by event/priority, 0x900 fired at V-blank, 0x920 at end
+  of render; syCache no-ops (stubs).
+- **gdFs**: guest handle structures with the SDK layout; sync read, async gdFsReqRd32 (next V-blank or 8th
+  poll), status, drive handle + drive-status request (`gdFs_Api34`/`Api58` = driver slots 0x34/0x58), drive
+  status PLAY while CDDA plays, CDDA calls logged. No directory functions are called (flat disc, root only).
+- **FPSCR decision: round-to-zero + denormals-as-zero modelled in software** (the game's 0x00040001): with
+  nearest the first logo ended a frame later and the random title picture / attract course differed.
+- **Interpreter fallback entries**: the 3 SDK ones are translated, the C-runtime word-copy helper's entries
+  and 16 functions missing from the table (gaps) are extra entries (`port/symbols/entries.tsv`, 52; 90 found
+  statically). The 6 000-frame race run uses the fallback 0 times.
+- **Test mode**: `--pad "F[+N]:BTN|BTN,..."`, `--digest N` (RAM digest), per-frame line with HLE/guest/interp
+  counts, files, heap, pad; `hle screen` lines (call-pattern changes); `--watch`; last-calls ring on a stop.
+- **How far**: no input: logos (0, 211), title (429, CDDA 5), attract demo race (2 228), title again (5 828).
+  With `--pad 600:START,700:A,1100:START,1200:A,1500:A,1700:A,1760:A`: menu (607), a 167-sprite screen (706),
+  character select (1 104, files 5100–5111, CDDA 8), next select (1 563, CDDA 9), **race** (1 762: 19 files,
+  CDDA 11 then race music 12 at 2 244), still racing at 6 000 frames; 42 files, 150 SDK functions.
+- **Native = wasm32 (node), RAM digests identical every frame** (6 000 frames); ~300 frames/s both. wasm now
+  45 MB (whole image translated).
+- **Tests**: sh4 **257 checks, 0 failures** (231 + 26 rounding checks); harness on the boot translation
+  **8 067 functions: 7 686 pass / 0 fail / 381 untested**.
+- New tool: `tools/ghidra.sh decomp ADDR|@PTR...` (read-only pseudo-C, terminal only).
+
+Next (S5 renderer): implement Ninja/Kamui drawing behind the logged stubs (njDrawSprite2D first: the logos and
+title are sprites; then njSetTexture/njLoadTexturePvmMemory with PVR decode, nj_ModelL1 and the chunk
+families, njSetConstantMaterial/njColorBlendingMode/njControl3D state, njClip2D per player), reading the
+matrices the guest Ninja code keeps (njInitMatrix's stack, current matrix pointer 0x8C1EF2B8) and the
+screen/view globals; screenshots per frame index from the test mode (still in the volumes). Also: trim the
+wasm to the SDK code the guest functions reach; keep adding `rt interp` finds to entries.tsv; identify the
+706 screen (167 sprites; Start, not A, moves on) once it can be seen.
+
 ## S3 — 2026-11-11: SH-4 interpreter, recompiler scaffold, boot on wasm
 
 Everything ran in `--network none --read-only --cap-drop ALL` containers of the emsdk image (`tools/s3.sh`);

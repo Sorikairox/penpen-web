@@ -9,7 +9,12 @@ Read this first, then `docs/port/HANDOFF.md`. Method reference: retrowser's spec
 (`~/Code/retrowser/spec/`), the `retrowser-decomp-port` skill, and the Pokémon Snap port
 (`~/Code/pokemonsnap/docs/port/PLAN.md`, `RTW.md`).
 
-Status: **S3 scaffold done (2026-11-11)**: our SH-4 interpreter (231 unit checks), an SH-4 → C recompiler
+Status: **S4 HLE files + memory + timers done (2026-11-11)**: the boot runs the SDK's own pure code (heap,
+maths, camera) as recompiled guest code and HLEs the rest (gdFs on the disc, pads from a script, TMU timer and
+syChain on a 59.94 Hz frame loop, FPU round-to-zero modelled); with no renderer yet it goes through the logos,
+the title, the attract demo and, with scripted presses, character select into a race, identically on native
+and wasm32 (RAM digest per frame); sh4 257 checks, harness 8 067 functions 7 686 pass / 0 fail
+(`docs/port/RECOMP.md` 7). S3 scaffold done (2026-11-11): our SH-4 interpreter (231 unit checks), an SH-4 → C recompiler
 (local-only output) with a differential harness (game range 4 148 functions: 4 134 pass, 0 fail, 14 untested;
 7 mutants), and a boot runtime: the recompiled game boots on wasm32 in node (and natively) through
 `sbInitSystem` into the first screen's frame loop on HLE stubs (`docs/port/RECOMP.md`). S2 census done (2026-11-11): the 224 SDK functions the game calls are named and described in
@@ -286,7 +291,7 @@ sources or libraries.
 | S1 Tooling | analysis tool approved and set up in Docker (Ghidra or rizin); SH-4 loader for 1ST_READ at 0x8C010000; function boundaries; SDK library ranges identified (strings, error messages, call graphs) | done 2026-11-11: `docker/ghidra/`, `tools/ghidra.sh`, `port/symbols/functions.tsv` + `regions.tsv` |
 | S2 Census | SDK API surface the game calls (Ninja/Kamui/sd/pd/bu/gdFs/sy/mw entry points: 224 distinct SDK targets called from game code), the container type map, Kamui list types (modifier volumes?), render-to-texture check, how triggers and VMU are used; refine the S1 region table (gdFs, bu, kd, SJ not yet separated; `unknown` and low rows) | done 2026-11-11: `docs/port/SDK.md`, `port/symbols/sdk_calls.tsv`, `regions_s2.tsv`, `tools/s2_apply.py` |
 | S3 SH-4 interpreter + recompiler scaffold | local tool: interpreter (oracle) and SH-4 → C translator; generated C gitignored (`port/gen/`, volume `penpen-build`) | done 2026-11-11: boots on wasm through sbInitSystem into the frame loop; `docs/port/RECOMP.md` |
-| S4 HLE: files + memory + timers | gdFs on the disc reader, syMalloc, sy timers/interrupt chains as a frame loop | title data loads |
+| S4 HLE: files + memory + timers | gdFs on the disc reader, syMalloc, sy timers/interrupt chains as a frame loop | done 2026-11-11: title, attract demo and (scripted pads) a race load; native = wasm; RECOMP.md 7 |
 | S5 HLE: Ninja + Kamui → WebGL2 | PVR textures (VQ, twiddled, mipmaps), chunk models, TA lists, translucency order | logos and title screen visible (looked at) |
 | S6 Input, VMU, rumble | pd (4 ports, triggers), bu on a VMU image, pdVib | menus by real input; a save survives reload |
 | S7 Audio | Manatee `sd` command HLE + an AICA mixer for MLT banks (ADPCM/PCM, MIDI sequences); CDDA tracks from the disc | music and effects |
@@ -323,6 +328,11 @@ sources or libraries.
 - Downloads of any tool are approved **inside Docker only** (image builds, containers without disc data); never on
   the host (no brew/pip/npm). Derived Docker images are
   built from Dockerfiles in `docker/`; network only during `docker build`, never in a disc container.
+- **Reading disc code** (S4): `tools/ghidra.sh decomp ADDR` prints Ghidra pseudo-C of the game's or the SDK's
+  functions in the terminal (read-only project); it is disc-derived like `port/gen/`: never committed, never
+  pasted into docs (addresses, names, counts and behaviour descriptions only).
+- **Logs**: the boot logs opened files as directory index + 4-digit group + size, not by name; lines that may
+  leave a container are filtered to our log vocabulary (`tools/s3.sh` `filt`).
 - No push, no remote until the user names one; no GitHub.
 - End each session with a `docs/port/HANDOFF.md` entry and a `docs/progress/sessions.tsv` row.
 

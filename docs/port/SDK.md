@@ -52,7 +52,7 @@ Graphics set-up `0x8C010C28`: two heap blocks, `njInitTextureBuffer(0x8CE40000, 
 | `syMallocInit(heap, size)` / `syMallocFinish` | 1 / 1 | heap over a 32-byte-aligned block; finish is empty |
 | `syMalloc(size)` / `syFree(p)` | 266 / 218 | first-fit allocator, 32-byte-aligned blocks, header in front; the game allocates per scene and frees, so a real allocator over a fixed arena is needed (sizes matter: the game checks NULL) |
 | `syHwInit` / `syHwInit2` / `syHwFinish` | 1 each | no-ops in the port (cache, interrupt controller, timer set-up) |
-| `syTmrGetCount` | 3 | free-running TMU0 count (the game measures time with it): derive from the host clock at the TMU rate |
+| `syTmrGetCount` | 3 | free-running TMU0 count (the game measures time with it; also its random seed). S4: `~TCNT0`, TMU0 at P-clock/64 = 781 250 Hz (TCR0 = 2 in `syHwInit`); the port derives it from the frame count, not the host clock |
 | `syCacheOCWB(addr, size)` | 1 | no-op (cache write-back) |
 | `syChainAddHandler(event, fn, prio, arg)` / `syChainDeleteHandler(h)` | 5 / 1 | interrupt event chains on Holly IRQs: the port calls the registered V-blank / end-of-render handlers from its frame loop |
 | `syCfgInit` / `syCfgExit` / `syCfgGetSoundMode(&m)` | 1 each | console settings read from the flash copy in system RAM: sound mode stereo/mono (the game then sends `STRO` or `MONO` to the sound driver) |
@@ -76,7 +76,8 @@ The HLE replaces the whole stack with the disc reader (track 48 files).
 | `gdFsEntryErrFuncAll(fn, obj)` | 1 | fatal-error callback (the game's handler exits to the BIOS) |
 | `gdFsChangeDir(name)` | 1 | root only on this disc (flat directory) |
 | `gdFsDaPlay(start, end, repeat)`, `gdFsDaPause`, `gdFsDaStop`, `gdFsDaRelease` (names low) | 1 each | **CDDA music**: play a range of audio tracks (04–47) with repeat, pause/stop, resume. Port: stream the CDDA tracks from the disc into the mixer (S7) |
-| `gdFs_Api34`, `gdFs_Api58` | 1 each | generic drive commands used only on the fatal-error path: no-ops |
+| `gdFs_Api34`, `gdFs_Api58` | 1 each | driver-table slots 0x34 / 0x58 (S4): the drive's own handle, and a drive-status request on it; the game's 10-frame drive watch (0x8C012DC4) polls `gdFsGetStat(handle) != 4` (busy) and `gdFsGetDrvStat` (6 open / 7 no disc / 9 error → exit) |
+| `gdFsReqRd32` 0x8C09E544, `gdFsCancel` 0x8C09E892 (not called by the game; `hle_extra.tsv`) | — | asynchronous read and cancel, used by `gdFsRead` internally and by CRI's ADX file stream (adxstmf); handle fields +0x4C open, +0x50 status 0/1/2/4/5, +0x14 position |
 
 Game file loading: `0x8C012E40` (open, size, `syMalloc`, read, close: whole file to heap), `0x8C01311C` (the same
 into the fixed buffer at 0x8CE40000), `0x8C0120CA` (load a PVM file and give it to `njLoadTexturePvmMemory`).
