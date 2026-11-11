@@ -6,7 +6,7 @@
  * Manual's descriptions; tested by port/sh4/tests/test_sh4.c.
  *
  * Deviations from the hardware, deliberate: floating point uses the host's IEEE round-to-nearest (FPSCR.RM
- * round-to-zero and DN are not modelled), no FPU exceptions/flags; fsca and fsrra are computed exactly then
+ * round-to-zero and DN are not modelled), no FPU exceptions/flags (NaN results are the SH-4's own qNaN); fsca and fsrra are computed exactly then
  * rounded to single (the hardware's are table approximations); cache and prefetch operations are no-ops,
  * except a prefetch of a store-queue address, which flushes that queue through sh4_io_pref.
  */
@@ -299,6 +299,11 @@ SH4_INLINE void fsetd(sh4_fbank *b, int n, double d) {
   uint64_t v; memcpy(&v, &d, 8);
   b->u[n] = (uint32_t)(v >> 32); b->u[n + 1] = (uint32_t)v;
 }
+/* NaN results: the SH-4 FPU returns its own quiet NaN (0x7FBFFFFF / 0x7FF7FFFF_FFFFFFFF; on the SH-4 a
+ * mantissa MSB of 0 means quiet), whatever the operands' payloads; the host would propagate a payload that
+ * depends on operand order. */
+SH4_INLINE float fq(float x) { if (x != x) { uint32_t u = 0x7FBFFFFFu; memcpy(&x, &u, 4); } return x; }
+SH4_INLINE double dq(double x) { if (x != x) { uint64_t u = 0x7FF7FFFFFFFFFFFFull; memcpy(&x, &u, 8); } return x; }
 SH4_INLINE uint32_t *fpair(SH4 *c, int n) { return (n & 1) ? &c->xf.u[n & 14] : &c->fr.u[n]; }
 #define PR_ON (c->fpscr & FPSCR_PR)
 #define SZ_ON (c->fpscr & FPSCR_SZ)
@@ -353,8 +358,8 @@ OPF(FNEG) { UNUSED; c->fr.u[PR_ON ? (OPN & 14) : OPN] ^= 0x80000000u; }
   OPF(name) {                                                                                  \
     UNUSED;                                                                                    \
     if (PR_ON) { int n = OPN & 14, m = OPM & 14; double x = fgetd(&c->fr, n), y = fgetd(&c->fr, m); \
-      fsetd(&c->fr, n, expr); }                                                                \
-    else { float x = c->fr.f[OPN], y = c->fr.f[OPM]; c->fr.f[OPN] = expr; }                    \
+      fsetd(&c->fr, n, dq(expr)); }                                                            \
+    else { float x = c->fr.f[OPN], y = c->fr.f[OPM]; c->fr.f[OPN] = fq(expr); }                \
   }
 FBIN(FADD, x + y)
 FBIN(FSUB, x - y)
@@ -386,35 +391,35 @@ OPF(FTRC) {
   if (PR_ON) c->fpul = sh4_ftrc(fgetd(&c->fr, OPN & 14));
   else c->fpul = sh4_ftrc((double)c->fr.f[OPN]);
 }
-OPF(FMAC) { UNUSED; c->fr.f[OPN] = c->fr.f[0] * c->fr.f[OPM] + c->fr.f[OPN]; }
+OPF(FMAC) { UNUSED; c->fr.f[OPN] = fq(c->fr.f[0] * c->fr.f[OPM] + c->fr.f[OPN]); }
 OPF(FSQRT) {
   UNUSED;
-  if (PR_ON) fsetd(&c->fr, OPN & 14, sqrt(fgetd(&c->fr, OPN & 14)));
-  else c->fr.f[OPN] = sqrtf(c->fr.f[OPN]);
+  if (PR_ON) fsetd(&c->fr, OPN & 14, dq(sqrt(fgetd(&c->fr, OPN & 14))));
+  else c->fr.f[OPN] = fq(sqrtf(c->fr.f[OPN]));
 }
-OPF(FSRRA) { UNUSED; c->fr.f[OPN] = (float)(1.0 / sqrt((double)c->fr.f[OPN])); }
+OPF(FSRRA) { UNUSED; c->fr.f[OPN] = fq((float)(1.0 / sqrt((double)c->fr.f[OPN]))); }
 OPF(FCNVDS) {
   UNUSED;
-  float f = (float)fgetd(&c->fr, OPN & 14);
+  float f = fq((float)fgetd(&c->fr, OPN & 14));
   memcpy(&c->fpul, &f, 4);
 }
 OPF(FCNVSD) {
   UNUSED;
   float f; memcpy(&f, &c->fpul, 4);
-  fsetd(&c->fr, OPN & 14, (double)f);
+  fsetd(&c->fr, OPN & 14, dq((double)f));
 }
 OPF(FIPR) {
   UNUSED;
   int n = ((op >> 10) & 3) * 4, m = ((op >> 8) & 3) * 4;
   float *f = c->fr.f;
-  f[n + 3] = f[m] * f[n] + f[m + 1] * f[n + 1] + f[m + 2] * f[n + 2] + f[m + 3] * f[n + 3];
+  f[n + 3] = fq(f[m] * f[n] + f[m + 1] * f[n + 1] + f[m + 2] * f[n + 2] + f[m + 3] * f[n + 3]);
 }
 OPF(FTRV) {
   UNUSED;
   int n = ((op >> 10) & 3) * 4;
   float *f = c->fr.f, *x = c->xf.f;
   float v0 = f[n], v1 = f[n + 1], v2 = f[n + 2], v3 = f[n + 3];
-  for (int i = 0; i < 4; i++) f[n + i] = x[i] * v0 + x[i + 4] * v1 + x[i + 8] * v2 + x[i + 12] * v3;
+  for (int i = 0; i < 4; i++) f[n + i] = fq(x[i] * v0 + x[i + 4] * v1 + x[i + 8] * v2 + x[i + 12] * v3);
 }
 OPF(FSCA) {
   UNUSED;
