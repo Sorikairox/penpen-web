@@ -2,6 +2,7 @@
 # Pen Pen S1: Ghidra headless analysis of 1ST_READ.BIN in the sandbox (PLAN 9).
 #   tools/ghidra.sh import        fresh import + auto-analysis into volume penpen-ghidra (overwrites)
 #   tools/ghidra.sh post Script.java [args...]   run a script from tools/ghidra/ on the saved project
+#   tools/ghidra.sh decomp ADDR...   S4: pseudo-C of the functions containing ADDR (terminal only)
 #   tools/ghidra.sh seed          second-pass function discovery (S1Seed) on the code ranges
 #   tools/ghidra.sh export        regions + names (S1Regions) and copy the two TSVs to port/symbols/ (validated)
 #   tools/ghidra.sh all           import, seed, export
@@ -35,6 +36,11 @@ case "${1:-}" in
     run sh -c "mkdir -p /work/s1 && $H -import $BIN -overwrite \
       -loader BinaryLoader -loader-baseAddr 0x8C010000 -processor SuperH4:LE:32:default \
       -scriptPath /scripts -preScript S1Setup.java -postScript S1Stats.java -log /work/s1/import.log" ;;
+  decomp)
+    # pseudo-C of the functions containing the given addresses (disc-derived: terminal only, never commit)
+    shift
+    run sh -c "$H -process 1ST_READ.BIN -noanalysis -readOnly -scriptPath /scripts -postScript S4Decomp.java $*" \
+      | grep -E '^S4D ' | sed 's/^S4D /  /' ;;
   post)
     shift; s=$1; shift
     run sh -c "$H -process 1ST_READ.BIN -noanalysis -scriptPath /scripts -postScript $s $*" ;;
