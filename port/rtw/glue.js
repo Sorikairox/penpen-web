@@ -4,7 +4,8 @@
 // ours: env.penpen_gl_frame(ptr, len), one frame's draw list (port/render/rd.c), drawn here with WebGL2 on
 // the worker's OffscreenCanvas; env.emscripten_notify_memory_growth, a no-op (the memory is read through
 // memory.buffer on every call). The host steps the game with rtw_frame (one frame per call: the game's
-// njWaitVSync loop is unwound and rewound around it, port/recomp/rt_gen.h). No audio yet (S7).
+// njWaitVSync loop is unwound and rewound around it, port/recomp/rt_gen.h). S7: sound needs no glue: the host drains
+// the module's rtw_audio_rate / rtw_audio_drain / rtw_audio_buffer exports (passed through below with every rtw_*).
 var createPenpen = async function (opts) {
   if (!opts || !opts.wasmBinary) throw new Error('createPenpen: no wasmBinary');
   var gl = null, memory = null, glError = false;

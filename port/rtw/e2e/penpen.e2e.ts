@@ -4,7 +4,8 @@
 // player's disc archive (/raw/archive.7z) is picked on the disc screen exactly as a player would, the host
 // unpacks it into OPFS and boots the game. Keyboard input (the host's Dreamcast defaults: Enter = Start,
 // X = A, arrows = stick) goes through the menus into a race. Checked: frames run, no errors, the VMU save is
-// stored by the host and read back after a reload, rumble reaches the page. Screenshots of the game screen go to
+// stored by the host and read back after a reload, rumble reaches the page; S7: the host plays the module's sound
+// (its audio state: AudioWorklet running, queue filled, frames played; Chromium runs with --mute-audio). Screenshots of the game screen go to
 // /build/e2e (looked at with tools/rtw.sh look). Only our own log lines and counts are printed ("e2e ...").
 // Args: --skip-reload (one boot only), --race-seconds N (default 40).
 import { mkdirSync, writeFileSync } from 'node:fs';
@@ -111,7 +112,15 @@ async function storedSave(p: Page) {
     });
   });
 }
-const ourLog = (s: string) => s.split('\n').filter((l) => /^(hle (vmu|rumble|vib|last)|boot |rt |penpen)/.test(l));
+const ourLog = (s: string) => s.split('\n').filter((l) => /^(hle (vmu|rumble|vib|last|cdda|sd download)|boot |rt |penpen)/.test(l));
+// the host's audio state (retrowser: data-audio on the playing view): state, kind, queuedMs, played, underruns
+interface AudioAttr { state: string; kind?: string; queuedMs?: number; played?: number; underruns?: number; dropped?: number; deviceRate?: number }
+const audioOf = async (p: Page): Promise<AudioAttr> => JSON.parse((await p.getAttribute('[data-state=playing]', 'data-audio').catch(() => null)) ?? '{"state":"none"}');
+const sayAudio = async (p: Page, at: string) => {
+  const a = await audioOf(p);
+  say(`audio at ${at}: state ${a.state} kind ${a.kind ?? '-'} device ${a.deviceRate ?? 0} Hz queued ${a.queuedMs?.toFixed?.(0) ?? '-'} ms played ${a.played ?? '-'} underruns ${a.underruns ?? '-'} dropped ${a.dropped ?? '-'}`);
+  return a;
+};
 
 try {
   // ---- first boot: pick the archive on the disc screen ----
@@ -134,6 +143,7 @@ try {
   await untilFrame(page, 520); await shot(page, 'b1-title');
   await press(page, 'Enter', 600);
   await untilFrame(page, 660); await shot(page, 'b1-menu');
+  await sayAudio(page, 'the mode menu (title music, the first key press started the host audio)');
   await press(page, 'KeyX', 700);
   await untilFrame(page, 900); await shot(page, 'b1-house');
   // the save made at the mode menu reaches the host's storage
@@ -164,6 +174,8 @@ try {
   }
   await page.keyboard.up('KeyX');
   const fB = await frames(page), tB = Date.now();
+  const ar = await sayAudio(page, 'the race');
+  say(ar.state === 'running' && (ar.played ?? 0) > 0 ? 'audio: the host is playing the module\'s sound' : 'FAIL audio: the host is not playing');
   say(`race frame rate: ${((fB - fA) * 1000 / (tB - tA)).toFixed(1)} game frames/s over ${((tB - tA) / 1000).toFixed(0)} s (frames ${fA}..${fB})`);
   await shot(page, 'b1-race-late');
   const vib = await page.evaluate(() => (window as unknown as { __vib: number[] }).__vib.length);
