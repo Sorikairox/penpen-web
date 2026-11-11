@@ -23,7 +23,7 @@ box() { # sandboxed container: repo read-only at /src, volumes as given by the c
     -v "$REPO/port":/src/port:ro -v "$REPO/tools":/src/tools:ro "$@"
 }
 # What may be printed from a container that read disc-derived data: our own log vocabulary only.
-filt() { grep -E '^(S3 |check_gen |sh4 |diff |mut |hle |boot |rt |io |gen |build |frame |  )[ -~]*$' || true; }
+filt() { grep -E '^(S3 |check_gen |sh4 |diff |mut |hle |boot |rt |io |gen |build |frame |render |shot |  )[ -~]*$' || true; }
 CF="-O2 -std=gnu11 -Wall -Wno-unused-label -Wno-unused-function -fwrapv -fno-strict-aliasing -ffp-contract=off"
 case "${1:-}" in
   test)

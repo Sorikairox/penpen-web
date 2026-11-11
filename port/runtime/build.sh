@@ -4,10 +4,11 @@
 set -eu
 KIND=$1; GEN=$2; OUT=$3; CF=$4; J=$5
 S=/src/port
-RT="$S/runtime/rt.c $S/runtime/disc.c $S/runtime/hle.c $S/runtime/main.c $S/sh4/sh4_interp.c"
+RT="$S/runtime/rt.c $S/runtime/disc.c $S/runtime/hle.c $S/runtime/main.c $S/sh4/sh4_interp.c
+    $S/render/rd.c $S/render/pvr.c $S/render/nj_draw.c $S/render/nj_model.c"
 if [ "$KIND" = native ]; then CC=gcc; EXTRA="-O1"; RT="$RT $S/runtime/disc_native.c"; O=o
 else CC=emcc; EXTRA="-O1"; O=wo; export EM_CACHE=/build/emcache; J=${WASM_JOBS:-3}; fi
-F="$CF -I$S/recomp -I$S/runtime -I$GEN"
+F="$CF -I$S/recomp -I$S/runtime -I$S/render -I$GEN"
 STAMP="$KIND $F $(cat $S/sh4/sh4.h $S/sh4/sh4_ops.h $S/recomp/rt_gen.h | md5sum)"
 if [ "$(cat "$OUT/flags" 2>/dev/null)" != "$STAMP" ]; then rm -rf "$OUT/obj"; fi
 mkdir -p "$OUT/obj"; echo "$STAMP" > "$OUT/flags"
@@ -16,7 +17,7 @@ for f in $RT; do $CC $F -c $f -o "$OUT/obj/rt_$(basename $f .c).$O"; done
 if [ "$KIND" = native ]; then
   gcc -o "$OUT/penpen" "$OUT"/obj/*.o -lm
 else
-  emcc -O2 -sSTANDALONE_WASM --no-entry -sINITIAL_MEMORY=67108864 -sSTACK_SIZE=4194304 -sERROR_ON_UNDEFINED_SYMBOLS=0 \
+  emcc -O2 -sSTANDALONE_WASM --no-entry -sINITIAL_MEMORY=67108864 -sALLOW_MEMORY_GROWTH=1 -sSTACK_SIZE=4194304 -sERROR_ON_UNDEFINED_SYMBOLS=0 \
     -o "$OUT/penpen.wasm" "$OUT"/obj/*.wo
 fi
 echo "build $KIND ok"

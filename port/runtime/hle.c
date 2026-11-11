@@ -9,6 +9,7 @@
  * timer, pads, drive) is driven from njWaitVSync: one V-blank per call, no wall time anywhere, so a run is
  * a deterministic function of the disc and the pad script. Semantics: docs/port/SDK.md 2, RECOMP.md 7. */
 #include "rt.h"
+#include "../render/nj.h"
 
 typedef struct { uint32_t a; const char *name, *lib; hle_fn fn; uint32_t calls, fcalls, first; } hle_ent;
 static void h_default(SH4 *c);
@@ -83,6 +84,8 @@ static void logcall(SH4 *c, const char *extra) {
     rt_log("hle %u %s(%x, %x, %x, %x)%s from %08x", seq, cur->name, R(4), R(5), R(6), R(7), extra, c->pr);
 }
 static void h_default(SH4 *c) { logcall(c, ""); R(0) = 0; }
+void hle_logcall(SH4 *c, const char *extra) { logcall(c, extra); }
+uint32_t hle_frame(void) { return frame; }
 static void h_true(SH4 *c) { logcall(c, ""); R(0) = 1; }
 
 /* ---- guest SDK functions: pure code, run as recompiled SDK code (not HLE) ----
@@ -99,6 +102,8 @@ static const char *const guest[] = {
   "njScalor", "njScalor2", "njUnitVector", "njSin", "njCos", "njTan", "njSqrt", "njRandom", "njProjectScreen",
   "njCalcScreen", "njInitView", "njSetView", "njSetAspect", "njSetScreen", "nj_InitCamera", "nj_SetCamera",
   "nj_ReadChunkFile", "nj_MemCopy4",
+  /* S5: pure setters of the Ninja render state; the draw HLE reads their globals (render/nj.h) */
+  "njSetTexture", "njControl3D", "njSetConstantAttr", "njSetConstantMaterial", "njInitTextureBuffer",
 };
 /* the heap's free list (SDK globals of syMalloc, for the per-frame log): rover -> circular list of
  * {next, size in 32-byte units} */
@@ -506,11 +511,13 @@ static void h_njWaitVSync(SH4 *c) {
   /* end of render: the EOR callback, then the type-2 chain */
   if (eor_fn) rt_guest_call(c, eor_fn, 0, 0, 0, 0);
   chain_fire(c, 0x920);
+  nj_frame_end();
   frame_log();
   for (int i = 0; i < NTAB; i++) tab[i].fcalls = 0;
   f_hle = f_guest = 0; f_interp0 = rt_interp_calls();
   frame++;
   if (frame >= (uint32_t)hle_max_frames) rt_stop("frame limit");
+  nj_frame_begin(frame);
   /* V-blank: time, drive, pads, the V-blank chain, Ninja's V-sync function */
   tmr_intra = 0;
   gd_vblank();
@@ -554,6 +561,17 @@ void hle_init(SH4 *c) {
         if (!rt_lookup(tab[j].a)) { rt_log("hle %s: no translated code, stays a stub", guest[i]); continue; }
         tab[j].fn = 0; ng++;
       }
+  /* S5: the Ninja drawing HLE (port/render) */
+  const nj_impl_t *lists[2] = {nj_impls, nj_model_impls};
+  const int counts[2] = {nj_nimpls, nj_model_nimpls};
+  for (int l = 0; l < 2; l++)
+    for (int i = 0; i < counts[l]; i++) {
+      int hit = 0;
+      for (int j = 0; j < NTAB; j++)
+        if (!strcmp(tab[j].name, lists[l][i].name)) { tab[j].fn = lists[l][i].fn; hit = 1; }
+      if (!hit) rt_log("hle no table entry for %s", lists[l][i].name);
+    }
+  nj_frame_begin(0);
   rt_log("hle %d entries, %d run as guest SDK code", NTAB, ng);
   /* the BIOS syscall vectors read by the game's syscall stubs */
   static const uint32_t vec[][2] = {{0x8C0000B0u, 0x8C000F10u}, {0x8C0000B4u, 0x8C000F18u}, {0x8C0000B8u, 0x8C000F20u},
