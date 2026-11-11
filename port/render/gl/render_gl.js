@@ -137,32 +137,62 @@ void main() {
       gl.enable(gl.DEPTH_TEST); gl.enable(gl.SCISSOR_TEST);
       const C = new Uint32Array(buffer, ptr + cmdOff, ncmd * 8);
       let draws = 0;
-      for (let i = 0; i < ncmd; i++) {
-        const list = C[8 * i], first = C[8 * i + 1], count = C[8 * i + 2], tid = C[8 * i + 3], m = C[8 * i + 4];
-        const x0 = C[8 * i + 5] & 0xFFFF, y0 = C[8 * i + 5] >>> 16, x1 = C[8 * i + 6] & 0xFFFF, y1 = C[8 * i + 6] >>> 16;
-        if (x1 <= x0 || y1 <= y0 || !count || !((listMask >> list) & 1)) continue;
-        gl.scissor(x0, H - y1, x1 - x0, y1 - y0);
-        gl.depthFunc(ZF[(m >>> 7) & 7]);
-        gl.depthMask(list === 2 ? ((m >>> 6) & 1) === 1 : true);
-        if (list === 2) { gl.enable(gl.BLEND); gl.blendFunc(SRC[m & 7], DST[(m >>> 3) & 7]); } else gl.disable(gl.BLEND);
-        const t = tid ? textures.get(tid) : null;
-        gl.uniform1i(U.u_hastex, t ? 1 : 0);
-        if (t) {
-          gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, t.t);
-          const bil = (m >>> 10) & 1;
-          gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, bil ? gl.LINEAR : gl.NEAREST);
-          gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, t.pot ? (bil ? gl.LINEAR_MIPMAP_NEAREST : gl.NEAREST_MIPMAP_NEAREST) : (bil ? gl.LINEAR : gl.NEAREST));
-          const wrap = (clamp, flip) => clamp || !t.pot ? gl.CLAMP_TO_EDGE : flip ? gl.MIRRORED_REPEAT : gl.REPEAT;
-          gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, wrap((m >>> 11) & 1, (m >>> 13) & 1));
-          gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, wrap((m >>> 12) & 1, (m >>> 14) & 1));
+      const shadow = u32[22] ? (u32[22] & 255) / 256 : 160 / 256; // cheap shadow intensity (njSetCheapShadowMode)
+      // pass 0: opaque + punch-through; pass 1: opaque modifier volumes (stencil parity) and the darkening;
+      // pass 2: translucent (already sorted back to front)
+      for (let pass = 0; pass < 3; pass++) {
+        let vols = 0;
+        if (pass === 1) {
+          gl.enable(gl.STENCIL_TEST); gl.colorMask(false, false, false, false); gl.depthMask(false);
+          gl.stencilFunc(gl.ALWAYS, 0, 1); gl.stencilOp(gl.KEEP, gl.KEEP, gl.INVERT); gl.depthFunc(gl.LESS);
+          gl.disable(gl.BLEND); gl.uniform1i(U.u_hastex, 0); gl.uniform1i(U.u_punch, 0);
         }
-        gl.uniform1i(U.u_shade, (m >>> 15) & 3);
-        gl.uniform1i(U.u_alpha, (m >>> 17) & 1);
-        gl.uniform1i(U.u_notexa, (m >>> 18) & 1);
-        gl.uniform1i(U.u_offset, (m >>> 19) & 1);
-        gl.uniform1i(U.u_punch, list === 3 ? 1 : 0);
-        gl.drawArrays(gl.TRIANGLES, first, count);
-        draws++;
+        for (let i = 0; i < ncmd; i++) {
+          const list = C[8 * i], first = C[8 * i + 1], count = C[8 * i + 2], tid = C[8 * i + 3], m = C[8 * i + 4];
+          if ((pass === 0 && list !== 0 && list !== 3) || (pass === 1 && list !== 1) || (pass === 2 && list !== 2)) continue;
+          const x0 = C[8 * i + 5] & 0xFFFF, y0 = C[8 * i + 5] >>> 16, x1 = C[8 * i + 6] & 0xFFFF, y1 = C[8 * i + 6] >>> 16;
+          if (x1 <= x0 || y1 <= y0 || !count || !((listMask >> list) & 1)) continue;
+          gl.scissor(x0, H - y1, x1 - x0, y1 - y0);
+          if (pass === 1) { gl.drawArrays(gl.TRIANGLES, first, count); vols++; draws++; continue; }
+          gl.depthFunc(ZF[(m >>> 7) & 7]);
+          gl.depthMask(list === 2 ? ((m >>> 6) & 1) === 1 : true);
+          if (list === 2) { gl.enable(gl.BLEND); gl.blendFunc(SRC[m & 7], DST[(m >>> 3) & 7]); } else gl.disable(gl.BLEND);
+          const t = tid ? textures.get(tid) : null;
+          gl.uniform1i(U.u_hastex, t ? 1 : 0);
+          if (t) {
+            gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, t.t);
+            const bil = (m >>> 10) & 1;
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, bil ? gl.LINEAR : gl.NEAREST);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, t.pot ? (bil ? gl.LINEAR_MIPMAP_NEAREST : gl.NEAREST_MIPMAP_NEAREST) : (bil ? gl.LINEAR : gl.NEAREST));
+            const wrap = (clamp, flip) => clamp || !t.pot ? gl.CLAMP_TO_EDGE : flip ? gl.MIRRORED_REPEAT : gl.REPEAT;
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, wrap((m >>> 11) & 1, (m >>> 13) & 1));
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, wrap((m >>> 12) & 1, (m >>> 14) & 1));
+          }
+          gl.uniform1i(U.u_shade, (m >>> 15) & 3);
+          gl.uniform1i(U.u_alpha, (m >>> 17) & 1);
+          gl.uniform1i(U.u_notexa, (m >>> 18) & 1);
+          gl.uniform1i(U.u_offset, (m >>> 19) & 1);
+          gl.uniform1i(U.u_punch, list === 3 ? 1 : 0);
+          gl.drawArrays(gl.TRIANGLES, first, count);
+          draws++;
+        }
+        if (pass === 1) {
+          gl.colorMask(true, true, true, true);
+          if (vols) { // darken where the parity is odd: the opaque surface is inside a volume
+            gl.disable(gl.SCISSOR_TEST); gl.disable(gl.DEPTH_TEST);
+            gl.stencilFunc(gl.EQUAL, 1, 1); gl.stencilOp(gl.KEEP, gl.KEEP, gl.KEEP);
+            gl.enable(gl.BLEND); gl.blendFunc(gl.ZERO, gl.SRC_COLOR);
+            const b = new ArrayBuffer(28 * 6), f = new Float32Array(b), w = new Uint32Array(b);
+            const k = Math.round(shadow * 255), col = (0xFF000000 | (k << 16) | (k << 8) | k) >>> 0;
+            [[0, 0], [W, 0], [0, H], [W, 0], [W, H], [0, H]].forEach((q, j) => { f[7 * j] = q[0]; f[7 * j + 1] = q[1]; f[7 * j + 2] = 1; w[7 * j + 5] = col; });
+            gl.bindVertexArray(bgvao); gl.bindBuffer(gl.ARRAY_BUFFER, bgvbo); gl.bufferData(gl.ARRAY_BUFFER, b, gl.STREAM_DRAW);
+            gl.uniform1i(U.u_hastex, 0); gl.uniform1i(U.u_alpha, 0); gl.uniform1i(U.u_offset, 0);
+            gl.drawArrays(gl.TRIANGLES, 0, 6);
+            gl.bindVertexArray(vao); gl.bindBuffer(gl.ARRAY_BUFFER, vbo);
+            gl.enable(gl.SCISSOR_TEST); gl.enable(gl.DEPTH_TEST);
+          }
+          gl.disable(gl.STENCIL_TEST);
+        }
       }
       gl.disable(gl.SCISSOR_TEST);
       r.stats = { frame: u32[2], cmds: ncmd, verts: nvert, uploads: nup, textures: textures.size, draws, op: u32[18], trTris: u32[19], omTris: u32[20], culled: u32[21] };

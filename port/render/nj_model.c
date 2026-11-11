@@ -389,8 +389,101 @@ static void h_shapemotion(SH4 *c) {
   anim_t an = {R(5), R(6), c->fr.f[4], 0};
   mat_reset(); draw_object(c, R(4), &an, 0); R(0) = 0;
 }
+/* ---- modifier volumes (cheap shadow): njCnkModDrawModel draws a closed volume into the opaque modifier
+ * volume list; volume chunks 56 (triangles), 57 (quads), 58 (strips): {nb | user count << 14}, then the
+ * polygons' vertex indices, each followed by its user flags ---- */
+static void volume_tri(uint32_t a, uint32_t b, uint32_t c) {
+  if (a >= NVB || b >= NVB || c >= NVB) return;
+  rd_state s;
+  nj_state(&s, RD_OM, 0, 0);
+  cv_t v[3];
+  const uint32_t ix[3] = {a, b, c};
+  for (int k = 0; k < 3; k++) { memcpy(v[k].p, vb[ix[k]].p, 12); v[k].u = v[k].v = 0; v[k].c[0] = v[k].c[1] = v[k].c[2] = v[k].c[3] = 0; }
+  tri3(&s, &v[0], &v[1], &v[2], 0);
+}
+static void volume_plist(uint32_t a) {
+  for (int guard = 0; guard < 10000; guard++) {
+    uint32_t h = rd16(a), t = h & 0xFF;
+    if (t == 0xFF) return;
+    if (t == 0) { a += 2; continue; }
+    if (t <= 7) { a += 2; continue; }
+    if (t <= 15) { a += 4; continue; }
+    uint32_t size = rd16(a + 2);
+    if (t >= 56 && t <= 58) {
+      uint32_t w = rd16(a + 4), nb = w & 0x3FFF, uf = w >> 14, q = a + 6;
+      for (uint32_t i = 0; i < nb; i++) {
+        if (t == 56) { volume_tri(rd16(q), rd16(q + 2), rd16(q + 4)); q += 6 + uf * 2; }
+        else if (t == 57) { uint32_t i0 = rd16(q), i1 = rd16(q + 2), i2 = rd16(q + 4), i3 = rd16(q + 6);
+          volume_tri(i0, i1, i2); volume_tri(i1, i3, i2); q += 8 + uf * 2; }
+        else { int16_t len = (int16_t)rd16(q); int n = len < 0 ? -len : len; q += 2;
+          uint32_t w0 = 0, w1 = 0;
+          for (int j = 0; j < n; j++) { uint32_t ix = rd16(q); q += 2; if (j >= 2) { volume_tri(w0, w1, ix); q += uf * 2; } w0 = w1; w1 = ix; } }
+      }
+    }
+    a += 4 + size * 2;
+  }
+}
+static uint32_t n_volumes;
+static void h_njCnkModDrawModel(SH4 *c) {
+  hle_logcall(c, ""); cpu_now = c;
+  uint32_t m = R(4);
+  int obj = !sh4_is_ram(rd32(m)) && sh4_is_ram(rd32(m + 4)); /* the game passes an object (eval flags first) */
+  uint32_t ev = obj ? rd32(m) : 7u;
+  if (obj) {
+    gcall(c, G_PUSH, 0, 0, 0, 0, 0, 0, 0);
+    if (!(ev & EV_UNIT_POS)) gcall(c, G_TRANSLATE, 0, 0, 0, 0, nj_f(m + 8), nj_f(m + 12), nj_f(m + 16));
+    if (!(ev & EV_UNIT_ANG)) gcall(c, (ev & EV_ZXY) ? G_ROTZXY : G_ROTXYZ, 0, rd32(m + 20), rd32(m + 24), rd32(m + 28), 0, 0, 0);
+    if (!(ev & EV_UNIT_SCL)) gcall(c, G_SCALE, 0, 0, 0, 0, nj_f(m + 32), nj_f(m + 36), nj_f(m + 40));
+    m = rd32(m + 4);
+  }
+  if (sh4_is_ram(m)) {
+    load_matrix();
+    if (sh4_is_ram(rd32(m))) vlist(rd32(m));
+    if (sh4_is_ram(rd32(m + 4))) volume_plist(rd32(m + 4));
+    n_volumes++;
+  }
+  if (obj) gcall(c, G_POP, 1, 0, 0, 0, 0, 0, 0);
+  R(0) = 0;
+}
+static void h_njSetCheapShadowMode(SH4 *c) { hle_logcall(c, ""); rd_shadow(R(4)); R(0) = 0; }
+
+/* njDrawSprite3D(sprite, n, attr): the sprite's quad in the model's xy plane at sprite->p (y down as in
+ * 2D, scaled by sx, sy; attr 1 rotates it by ang), through the current matrix, projected like a model */
+static void h_njDrawSprite3D(SH4 *c) {
+  hle_logcall(c, "");
+  uint32_t sp = R(4), n = R(5), attr = R(6);
+  uint32_t tl = rd32(sp + 0x18), ta = rd32(sp + 0x1C) + n * 20;
+  if (tl) wr32(NJG_TEXLIST, tl);
+  int16_t tsx = (int16_t)rd16(ta), tsy = (int16_t)rd16(ta + 2), cx = (int16_t)rd16(ta + 4), cy = (int16_t)rd16(ta + 6);
+  float u1 = (float)(int16_t)rd16(ta + 8) / 256.0f, v1 = (float)(int16_t)rd16(ta + 10) / 256.0f;
+  float u2 = (float)(int16_t)rd16(ta + 12) / 256.0f, v2 = (float)(int16_t)rd16(ta + 14) / 256.0f;
+  uint32_t texid = (uint32_t)(int32_t)(int16_t)rd16(ta + 16);
+  if (attr & 4) { float t = u1; u1 = u2; u2 = t; }
+  if (attr & 8) { float t = v1; v1 = v2; v2 = t; }
+  float px = nj_f(sp), py = nj_f(sp + 4), pz = nj_f(sp + 8), sx = nj_f(sp + 0xC), sy = nj_f(sp + 0x10);
+  float x0 = (float)-cx * sx, y0 = (float)-cy * sy, x1 = (float)(tsx - cx) * sx, y1 = (float)(tsy - cy) * sy;
+  float qx[4] = {x0, x1, x0, x1}, qy[4] = {y0, y0, y1, y1}, qu[4] = {u1, u2, u1, u2}, qv[4] = {v1, v1, v2, v2};
+  float cs = 1, sn = 0;
+  if (attr & 1) { float a = (float)(int32_t)rd32(sp + 0x14) * (6.28318530718f / 65536.0f); cs = cosf(a); sn = sinf(a); }
+  float col[4] = {1, 1, 1, 1};
+  if (attr & 2) argb4(nj_argb_f(NJG_CMAT), col);
+  load_matrix();
+  cv_t v[4];
+  for (int k = 0; k < 4; k++) {
+    float m[3] = {px + qx[k] * cs - qy[k] * sn, py + qx[k] * sn + qy[k] * cs, pz};
+    xform(m, v[k].p);
+    v[k].u = qu[k]; v[k].v = qv[k];
+    for (int j = 0; j < 4; j++) v[k].c[j] = col[j];
+  }
+  rd_state s;
+  nj_state(&s, (attr & 0x20) ? RD_TR : RD_OP, nj_tex_of(tl ? tl : rd32(NJG_TEXLIST), texid), (attr & 0x20) != 0);
+  tri3(&s, &v[0], &v[1], &v[2], 0);
+  tri3(&s, &v[1], &v[3], &v[2], 0);
+  R(0) = 0;
+}
+
 void nj_model_log(void) {
-  rt_log("render 3d models %u triangles %u near-clipped-out %u unknown vlist %u plist %u", n_models, n_tris3d, n_clipped, n_unknown_v, n_unknown_p);
+  rt_log("render 3d models %u triangles %u near-clipped-out %u unknown vlist %u plist %u volumes %u", n_models, n_tris3d, n_clipped, n_unknown_v, n_unknown_p, n_volumes);
 }
 
 const nj_impl_t nj_model_impls[] = {
@@ -400,6 +493,8 @@ const nj_impl_t nj_model_impls[] = {
   {"nj_ShapeMotionL1", h_shapemotion}, {"nj_ShapeMotionL1b", h_shapemotion}, {"nj_ShapeMotionL2", h_shapemotion},
   {"nj_ShapeMotionL2b", h_shapemotion}, {"nj_ShapeMotionL3", h_shapemotion}, {"nj_ShapeMotionL3b", h_shapemotion},
   {"nj_ShapeMotionL4", h_shapemotion},
+  {"njDrawSprite3D", h_njDrawSprite3D}, {"njCnkModDrawModel", h_njCnkModDrawModel},
+  {"njSetCheapShadowMode", h_njSetCheapShadowMode},
   {"nj_LightL1Dir", h_lightdir}, {"nj_LightL1Intensity", h_lightint}, {"nj_LightL1Color", h_lightcol},
 };
 const int nj_model_nimpls = (int)(sizeof nj_model_impls / sizeof nj_model_impls[0]);

@@ -46,6 +46,7 @@ typedef struct {
 void rd_begin(uint32_t frame);
 void rd_back_color(uint32_t c0, uint32_t c1, uint32_t c2);
 void rd_fog(uint32_t color, const float *table128, int n); /* the PVR fog table (128 entries, 0..1 density) */
+void rd_shadow(uint32_t intensity);  /* opaque modifier volumes darken by intensity/256 (cheap shadow) */
 void rd_end(void);                    /* closes the frame: sort, pack, submit (penpen_gl_frame) */
 /* primitives: n vertices as a strip (PVR order: v0 v1 v2, v1 v2 v3 ...) or a triangle list */
 void rd_strip(const rd_state *s, const rd_vtx *v, int n, int cull); /* cull: 0 none, 1 cw, 2 ccw (screen) */
