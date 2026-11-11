@@ -9,7 +9,10 @@ Read this first, then `docs/port/HANDOFF.md`. Method reference: retrowser's spec
 (`~/Code/retrowser/spec/`), the `retrowser-decomp-port` skill, and the Pokémon Snap port
 (`~/Code/pokemonsnap/docs/port/PLAN.md`, `RTW.md`).
 
-Status: **S5 renderer done (2026-11-11)**: Ninja/Kamui drawing is HLE that builds a per-frame draw list (our
+Status: **S7 audio done (2026-11-11)**: CDDA music from the disc's audio tracks and the Manatee `sd` one-shot
+effects as HLE on our own AICA-like mixer, through retrowser's `rtw_audio_*` exports (44.1 kHz, 735 frames per
+game frame, native = wasm); MIDI sequences and the AICA DSP not yet (`docs/port/AUDIO.md`). S6 input, VMU, rumble
+and the retrowser module (`docs/port/RTW.md`). S5 renderer done (2026-11-11): Ninja/Kamui drawing is HLE that builds a per-frame draw list (our
 format) for a WebGL2 backend (retrowser worker / headless Chromium capture); PVR textures, sprites, chunk models
 with motions, fog, cheap shadows; logos, title, menus, PenPen House, course map and a race are visible and were
 looked at (`docs/port/RENDER.md`). S4 HLE files + memory + timers done (2026-11-11): the boot runs the SDK's own pure code (heap,
@@ -297,7 +300,7 @@ sources or libraries.
 | S4 HLE: files + memory + timers | gdFs on the disc reader, syMalloc, sy timers/interrupt chains as a frame loop | done 2026-11-11: title, attract demo and (scripted pads) a race load; native = wasm; RECOMP.md 7 |
 | S5 HLE: Ninja + Kamui → WebGL2 | PVR textures (VQ, twiddled, mipmaps), chunk models, TA lists, translucency order | done 2026-11-11: logos, title, menus, house, race visible (looked at); `docs/port/RENDER.md` |
 | S6 Input, VMU, rumble + retrowser module | pd (4 ports, triggers), bu on a VMU image, pdVib; the module (stepped `rtw_frame`, WebGL glue, manifest) | done 2026-11-11: resumable frames; menus to a race by keyboard in the containerised retrowser host + headless Chromium; the VMU save survives a reload; rumble; `docs/port/RTW.md` |
-| S7 Audio | Manatee `sd` command HLE + an AICA mixer for MLT banks (ADPCM/PCM, MIDI sequences); CDDA tracks from the disc | music and effects |
+| S7 Audio | Manatee `sd` command HLE + an AICA mixer for MLT banks (ADPCM/PCM, MIDI sequences); CDDA tracks from the disc | done 2026-11-11: CDDA + one-shots through `rtw_audio_*`; captures measured in the volume; MIDI and DSP left; `docs/port/AUDIO.md` |
 | S8 First race | a full race, 1 player, then 4-player split screen | race finishes |
 | S9 retrowser `dreamcast` | the host work of section 6 (retrowser repo, separate approval), local host e2e | boots from a local retrowser host |
 | S10… Decomp | hand-written C replaces recompiled code region by region, each function differential-tested | shipped build has no recompiled code |
@@ -343,6 +346,9 @@ sources or libraries.
   host and headless Chromium in `--network none` containers of `penpen-rtw:1`, with the disc archive from
   `penpen-raw`; e2e PNGs stay in `/build/e2e` (`tools/rtw.sh look`). Never run it in the host's browser: the user
   decides when to try it (RTW.md 6).
+- **Audio** (S7): WAV captures (`tools/s7.sh capture`) are decoded disc audio: they stay in
+  `penpen-build:/build/audio` and are only measured there (`tools/s7.sh report`: numbers); never copied to the
+  host, never committed. The e2e's Chromium runs muted.
 - No push, no remote until the user names one; no GitHub.
 - End each session with a `docs/port/HANDOFF.md` entry and a `docs/progress/sessions.tsv` row.
 

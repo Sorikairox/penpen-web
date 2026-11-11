@@ -3,7 +3,7 @@
 The port runs as a [retrowser](../../../retrowser/spec/retrowser.md) module, platform `dreamcast`: the host hands it
 the player's disc (`rtw_disc_toc` / `rtw_disc_read`), steps it once per frame (`rtw_frame`), gives it the pads
 (`rtw_input`, `rtw_triggers`), stores the VMU (`rtw_save_*`) and relays rumble (`rtw_rumble`). The module draws
-with WebGL2 on the worker's OffscreenCanvas through our glue. No audio yet (S7). Everything here is our own code
+with WebGL2 on the worker's OffscreenCanvas through our glue; S7: it makes sound (`rtw_audio_*`, `docs/port/AUDIO.md`). Everything here is our own code
 (MIT); the module's wasm contains the translated game code (the recompiled C of `port/gen/`), so the built module
 directory is disc-derived: it stays in the Docker volume `penpen-build:/build/rtw` and is never committed or
 published (PLAN 9).
@@ -13,7 +13,7 @@ published (PLAN 9).
 | File | What |
 |---|---|
 | `port/recomp/recomp.py`, `rt_gen.h` | resumable frames: every call in the translated C is a numbered site (2) |
-| `port/runtime/main.c` | exports: `rtw_start` (load IP.BIN + 1ST_READ.BIN, set the CPU up), `rtw_frame`, `rtw_input`, `rtw_triggers`, `rtw_save_ptr/size/generation/load` |
+| `port/runtime/main.c` | exports: `rtw_start` (load IP.BIN + 1ST_READ.BIN, set the CPU up), `rtw_frame`, `rtw_input`, `rtw_triggers`, `rtw_save_ptr/size/generation/load`; S7: `port/audio/aica.c` exports `rtw_audio_rate/drain/buffer` |
 | `port/runtime/hle_io.c` | pd (4 ports), pdVib → `rtw_rumble`, pdLcd (dropped), bu (the VMU API) |
 | `port/runtime/vmu.c` | the VMU flash file system on the 128 KiB image |
 | `port/rtw/glue.js` | `files.js` factory `createPenpen`: instantiates the wasm with the host's `env.rtw_*` plus `penpen_gl_frame` (→ `PenpenGL.frame`) and `emscripten_notify_memory_growth` (no-op) |

@@ -2,6 +2,36 @@
 
 Newest session first. Read `docs/port/PLAN.md` (disc facts, survey, approach, phases, rules) before working.
 
+## S7 — 2026-11-11: audio: CDDA music and Manatee one-shot effects through the retrowser audio exports
+
+Design and numbers: `docs/port/AUDIO.md`. All guest code ran in `--network none --read-only --cap-drop ALL`
+containers; the WAV captures stay in `penpen-build:/build/audio` (measured there only); `git log --all -- port/gen`
+stays empty.
+
+- **CDDA**: `gdFsDaPlay(first, last, repeat)` by track (15 = for ever), pause/release/stop, audio sectors read
+  with `rtw_disc_read` in runs of 16, 44.1 kHz = the output rate. The drive status follows the real play.
+- **Manatee HLE** (`port/audio/sd.c`): MLT banks (SMLT unit records → our 2 MiB sound RAM), the SOSB one-shot bank
+  (SOSP = 24 halfwords of AICA slot registers), 8 + 8 ports with guest handles, shot play/stop/vol/pan/pitch,
+  master volume, stereo/mono; **`sd_Cmd53` = CDDA volume, `sd_Cmd54` = CDDA pan** (from the game's own CDDA
+  logic). **S2 had the port open/close names swapped** (fixed in the TSVs and `hle_names.h`).
+- **Mixer** (`port/audio/aica.c`): 64 voices, PCM16/PCM8/Yamaha ADPCM (low nibble first: checked on the disc's
+  banks), loops, OCT/FNS pitch + cents, envelope, TL/DISDL/DIPAN, master; integer mixing, 6 dB headroom; 735
+  frames per game frame; `rtw_audio_rate` 44100 / `drain` / `buffer`. No manifest field exists for audio in
+  retrowser's schema: the exports are the declaration.
+- **Captures** (3 000-frame S4 route): music 420–1770 (tracks 5, 6, 9), 1860–2190 (11), 2235–3000 (12), RMS −17 to
+  −20 dBFS; effects on every press (600, 700, 1200, 1500, 1700) and at the race start (2244–2355), +5 to +12 dB
+  over the music; **0 clipped samples**, DC offset 0.09 / −0.62. **Native = wasm** (audio digests and WAV SHA-256).
+- **RAM**: `--audio 0` = S6 digests; with sound only 95 bytes differ (HLE records + the game's 16 port handles,
+  which the stubs left at 0); same screens/files/CDDA calls at the same frames.
+- Tests: mixer unit checks **17 / 0**; sh4 **257 / 0**; harness **8 068: 7 687 pass / 0 fail / 381 untested**;
+  `rtw.mjs check --disc` **OK**; e2e: the host's AudioWorklet plays (44 100 Hz, queue 88–109 ms, 3.5 M frames,
+  0 dropped, 1–4 underruns at SwiftShader's 58.7 frames/s), VMU reload and rumble as in S6.
+- Gaps: MIDI sequences (one request on the route: course selection), the AICA DSP (four DSP-only loops heard dry),
+  filter/LFO, the port volume curve (a linear guess).
+
+Next: MIDI sequences (SMSB `SMSD` event streams + SMPB programs/layers) if the game uses more than the one jingle;
+the DSP (SFPB) or at least a reverb send; S8 first race (full race, 4 players); the RTC; renderer follow-ups (S5).
+
 ## S6 — 2026-11-11: input, VMU, rumble; the retrowser module runs end to end
 
 Design and details: `docs/port/RTW.md`; pd/bu semantics read in the SDK's code: `docs/port/SDK.md` 2.3/2.4. All guest

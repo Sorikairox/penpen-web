@@ -75,7 +75,7 @@ The HLE replaces the whole stack with the disc reader (track 48 files).
 | `gdFsGetDrvStat()` | 9 | drive state polled every frame (tray open, no disc → the game's error screen): always "ready" |
 | `gdFsEntryErrFuncAll(fn, obj)` | 1 | fatal-error callback (the game's handler exits to the BIOS) |
 | `gdFsChangeDir(name)` | 1 | root only on this disc (flat directory) |
-| `gdFsDaPlay(start, end, repeat)`, `gdFsDaPause`, `gdFsDaStop`, `gdFsDaRelease` (names low) | 1 each | **CDDA music**: play a range of audio tracks (04–47) with repeat, pause/stop, resume. Port: stream the CDDA tracks from the disc into the mixer (S7) |
+| `gdFsDaPlay(start, end, repeat)`, `gdFsDaPause`, `gdFsDaStop`, `gdFsDaRelease` (names low) | 1 each | **CDDA music**: play a range of audio tracks (04–47) with repeat (15 = for ever), pause/stop, resume. S7: streamed from the disc into the mixer (`port/audio/cdda.c`) |
 | `gdFs_Api34`, `gdFs_Api58` | 1 each | driver-table slots 0x34 / 0x58 (S4): the drive's own handle, and a drive-status request on it; the game's 10-frame drive watch (0x8C012DC4) polls `gdFsGetStat(handle) != 4` (busy) and `gdFsGetDrvStat` (6 open / 7 no disc / 9 error → exit) |
 | `gdFsReqRd32` 0x8C09E544, `gdFsCancel` 0x8C09E892 (not called by the game; `hle_extra.tsv`) | — | asynchronous read and cancel, used by `gdFsRead` internally and by CRI's ADX file stream (adxstmf); handle fields +0x4C open, +0x50 status 0/1/2/4/5, +0x14 position |
 
@@ -151,8 +151,11 @@ posts it; most check an "initialised" flag and report errors through one functio
 - Global: `sd_SetStereoMono('STRO'|'MONO')`, `sd_SetMasterVol(0..15)`, and four commands we have not named
   (`sd_Cmd53`, `sd_Cmd54`, `sd_CmdBytes`, `sd_CmdU8U8`, `sd_CmdReset`).
 
-HLE (S7): implement the command semantics on our mixer (MLT banks: MIDI sequence + program banks, one-shot bank,
-DSP effect programs) rather than emulating the ARM7 driver; music itself is CDDA (2.2).
+HLE (S7, done for all but MIDI: `port/audio/sd.c`, `docs/port/AUDIO.md` 2): the command semantics on our mixer
+rather than the ARM7 driver; music itself is CDDA (2.2). S7 findings: `sd_Cmd53(l, r)` = host command 0x35, the
+**CDDA volume** per channel (0..127; negatives refused by the wrapper), `sd_Cmd54(l, r)` = 0x36, the **CDDA pan**
+per channel; `sd_SetMasterVol` = 0x81; `sd_CmdU8U8` sends 0x84 then 0x82, `sd_CmdBytes` 0x88 (7 bytes),
+`sd_CmdReset` 0x80; shot volume/pan are sent + 0x80, pitch (±6399) + 0x8000.
 
 ### 2.6 Ninja (and the two direct Kamui calls) — S5
 
