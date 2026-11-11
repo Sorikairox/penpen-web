@@ -2,6 +2,46 @@
 
 Newest session first. Read `docs/port/PLAN.md` (disc facts, survey, approach, phases, rules) before working.
 
+## S3 — 2026-11-11: SH-4 interpreter, recompiler scaffold, boot on wasm
+
+Everything ran in `--network none --read-only --cap-drop ALL` containers of the emsdk image (`tools/s3.sh`);
+disc-derived output (generated C, objects, native binary, wasm, logs) stays in the new volume `penpen-build`
+and the gitignored `port/gen/`. Design and numbers: `docs/port/RECOMP.md`.
+
+- **Interpreter** (`port/sh4/`): integer + FPU (single/double, PR/SZ/FR banks, pair moves, fipr/ftrv/fsca/
+  fsrra), delay slots, T/S/Q/M, MAC with saturation, banked registers. One instruction table
+  (`sh4_insns.def`) for the C decoder and the recompiler; semantics in `sh4_ops.h`, shared by both.
+  `tools/s3.sh test`: **231 checks, 0 failures** on our own encodings (incl. the manual's div0u/div0s+div1
+  sequences vs C, 2 000 random cases each).
+- **Recompiler** (`port/recomp/recomp.py`): one C function per guest function, labels + gotos, delay slots
+  inline, direct calls / literal-pool calls with a run-time check / `rt_call`, tail calls, one label switch per
+  function with computed jumps (all cycles through it: clang's wasm backend died on the irreducible form). Game
+  range: **4 148 functions, 131 392 instructions**, 47 with computed jumps.
+- **Differential harness** (`diff_main.c`): interpreter vs recompiled C from the same random state and memory
+  model, compares registers, written bytes, calls and the ending. Game: **4 134 pass / 0 fail / 14 untested**
+  (40 trials, 100 000 steps); whole image 7 925: 7 546 / 0 / 379. 7 mutants: 5 caught in hundreds to thousands
+  of functions each; the two slot-hazard mutants have 0 (rts/PR) and 30 (bt/s/T, whole image: 5 flagged) sites.
+- **Runtime + HLE** (`port/runtime/`): dispatch HLE → recompiled → interpreter fallback; I/O register file;
+  disc layer on retrowser's `rtw_disc_toc/rtw_disc_read` + ISO9660; IP.BIN and 1ST_READ.BIN loaded from the disc
+  at run time. 223 SDK targets + 6 BIOS vectors as logging stubs; heap, gdFs, pads, V-sync, timer behave.
+- **Boot: native and wasm32-in-node give the same log**: start-up → region check → `sbInitSystem` (syHwInit,
+  syMallocInit, nj_SetWorkSize, njInitSystem, syHwInit2, pdInitPeripheral, gdFsInit) → graphics, sound and
+  VMU set-up, 5 files read (sound driver, a container, 3 PVMs) → the first screen's frame loop (camera, lights,
+  njDrawSprite2D, njWaitVSync + V-sync callback): 60 frames, 3 022 HLE calls to 83 functions. The wasm is 6.9 MB
+  and imports only `env.rtw_*`.
+- User decisions during the session: the recompiled C is **gitignored, never committed** (`port/gen/`, a
+  briefly made commit of it was removed from history and the objects pruned; `git log --all -- port/gen` is
+  empty); execution stays Docker-only. PLAN 9 updated.
+- Files: `port/sh4/*`, `port/recomp/*`, `port/runtime/*`, `tools/s3.sh`, `tools/s3_hle_names.py`,
+  `docs/port/RECOMP.md`.
+
+Next (S4 HLE: files + memory + timers): find why the first screen does not advance (timer: syTmrGetCount
+rate and the V-blank chain from syChainAddHandler(0x900, ...); pads all zero; SDK maths stubs returning 0:
+translate or implement njSin/njCos/matrix functions, which are pure code); gdFs status/async semantics
+(gdFsGetStat, gdFs_Api34 polled each frame); real syChain event calls; give the 8 interpreter-fallback entries
+(3 SDK functions outside the census, 5 mid-function entries) proper handling; FPSCR rounding (round-to-zero)
+decision; then the S5 renderer behind njDrawSprite2D etc.
+
 ## S2 — 2026-11-11: census of the SDK surface
 
 All analysis in the S1 sandbox (`tools/ghidra.sh`, containers `--network none --read-only --cap-drop ALL`); the
