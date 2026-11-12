@@ -98,10 +98,17 @@ def read_routes(p):
     return routes
 
 
+# S14: a frame line's interpreter-call count is not program state: the pure translation runs code it lacks (a
+# function Ghidra cut short) in the interpreter, a hand-written function replaces it: the count is left out
+_INTERP = re.compile(r' interp \d+ ')
+def no_interp(line):
+    return _INTERP.sub(' interp - ', line, 1)
+
+
 def reference(r, digest):
     p = subprocess.run([PURE] + route_args(r, digest, None), stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True,
                        errors='replace')
-    lines = [l for l in p.stdout.split('\n') if l.startswith('frame ') or l.startswith('audio frame ')]
+    lines = [no_interp(l) for l in p.stdout.split('\n') if l.startswith('frame ') or l.startswith('audio frame ')]
     ok = any(l.startswith('boot stopped at frame %d: frame limit' % r['frames']) for l in p.stdout.split('\n'))
     return lines, ok
 
@@ -130,7 +137,7 @@ def gate_run(binary, r, ref, digest, hwtest, timeout, env=None):
             last[0] = time.time()
             line = line.rstrip('\n')
             if line.startswith('frame ') or line.startswith('audio frame '):
-                if k >= len(ref) or line != ref[k]:
+                if k >= len(ref) or no_interp(line) != ref[k]:
                     verdict, gate = 'killed', 'audio' if line.startswith('audio') else 'frame'
                     detail = 'f' + line.split()[1 if gate == 'frame' else 2]
                     break

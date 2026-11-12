@@ -51,4 +51,11 @@ int32_t race_scene_find_cell(gaddr scene, gaddr pos, int32_t hint);
 
 int32_t race_scene_view_focus(gaddr scene, int32_t i);
 
+/* S14 b11: game/actor_motes.c (exported there, no header yet) */
+gaddr motes_construct(gaddr obj, int32_t count);
+gaddr motes_destroy(gaddr obj);
+void motes_setup(gaddr obj, gaddr origin, int32_t mode, f32 top);
+void motes_restart(gaddr obj);
+int32_t motes_update(gaddr obj);
+
 #endif

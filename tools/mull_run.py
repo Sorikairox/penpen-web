@@ -121,6 +121,9 @@ def main():
         env = dict(os.environ, GCOV_PREFIX=pre, GCOV_PREFIX_STRIP='0')
         v, g, d, dt = mw.gate_run(M + '/cov', r, refs[r['name']][0], digest, budget, 3600, env)
         d = pre + M + '/cov_obj'
+        if v != 'pass':
+            say('coverage-run', r['name'], v, g)
+        os.makedirs(d, exist_ok=True)  # S14: a route whose run wrote no profile (said above) has no coverage
         for o in os.listdir(M + '/cov_obj'):
             if o.endswith('.gcno'):
                 shutil.copy(os.path.join(M, 'cov_obj', o), d)

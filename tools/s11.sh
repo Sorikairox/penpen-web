@@ -65,8 +65,9 @@ case "${1:-}" in
     routes | while IFS='	' read -r r f p x; do
       "$REPO/tools/s3.sh" $k --frames "$f" $(padarg "$p") $(extra "$x") $RUN > "$LOGS/${k}_${r}_pure.log" 2>&1 || true
       GEN=genhand "$REPO/tools/s3.sh" $k --frames "$f" $(padarg "$p") $(extra "$x") $RUN > "$LOGS/${k}_${r}_hand.log" 2>&1 || true
-      grep '^frame ' "$LOGS/${k}_${r}_pure.log" > "$LOGS/${k}_${r}_pure.frames" || true
-      grep '^frame ' "$LOGS/${k}_${r}_hand.log" > "$LOGS/${k}_${r}_hand.frames" || true
+      # S14: the interpreter-call count is left out (the pure translation interprets code that hand-written C replaces)
+      grep '^frame ' "$LOGS/${k}_${r}_pure.log" | sed 's/ interp [0-9]* / interp - /' > "$LOGS/${k}_${r}_pure.frames" || true
+      grep '^frame ' "$LOGS/${k}_${r}_hand.log" | sed 's/ interp [0-9]* / interp - /' > "$LOGS/${k}_${r}_hand.frames" || true
       n=$(wc -l < "$LOGS/${k}_${r}_pure.frames" | tr -d ' ')
       if [ "$n" != "$f" ]; then
         echo "compare $k $r: the pure run has $n frame lines of $f"

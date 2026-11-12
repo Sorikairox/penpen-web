@@ -98,7 +98,8 @@ typedef struct RaceScene {
   Body1 values1[5];             /* 0xC50 */
   f32 sprite_fade;              /* 0xCA0: the results' / ending's sprites' alpha (> 0: drawn) */
   int32_t pause_delay;          /* 0xCA4: frames before the pause menu reads the pad again (30 after a choice) */
-  uint8_t pad_ca8[0xCC0 - 0xCA8];
+  int32_t word_ca8;             /* 0xCA8: S14 b11: the type-0x22 actor's mode 6 stops at 2 */
+  uint8_t pad_cac[0xCC0 - 0xCAC];
   int16_t scores[RACE_PLAYERS]; /* 0xCC0: shown with the results */
 } RaceScene;
 HW_OFFSET(RaceScene, setup, 0x028);
@@ -134,6 +135,7 @@ HW_OFFSET(RaceScene, bodies, 0xB60);
 HW_OFFSET(RaceScene, values1, 0xC50);
 HW_OFFSET(RaceScene, sprite_fade, 0xCA0);
 HW_OFFSET(RaceScene, pause_delay, 0xCA4);
+HW_OFFSET(RaceScene, word_ca8, 0xCA8);
 HW_OFFSET(RaceScene, scores, 0xCC0);
 
 enum { RACE_STATE_RESULTS = 3, RACE_STATE_ENDING = 4 };
