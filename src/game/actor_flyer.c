@@ -124,7 +124,9 @@ void flyer_pose(gaddr obj) {
   else
     positions = (const f32 *)hw_ptr(g_flyer_positions[f->kind] + 6 * sizeof(Vec3));
   gaddr node = actor_model(&f->base, 0);
-  gaddr parents[64];
+  /* the original keeps the walk's parents in its 0x14-byte frame: 5 words. A deeper tree would write over its saved
+   * r14 and its caller's frame; the game's flyer models stay within it, and here a deeper one ends the walk */
+  gaddr parents[5];
   int32_t depth = 0;
   for (int32_t i = 0;; i++) {
     NjObjectPose *n = (NjObjectPose *)hw_ptr(node);
@@ -143,6 +145,7 @@ void flyer_pose(gaddr obj) {
       angles += 3;
     }
     if (n->child != 0) {
+      if (depth == 5) return;
       parents[depth++] = node;
       node = n->child;
     } else if (n->sibling != 0) {

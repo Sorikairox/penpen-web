@@ -50,6 +50,7 @@ typedef struct SlotList {
 HW_SIZE(SlotList, 12);
 
 #define RACE_PLAYERS 4
+#define RACE_RACERS  8 /* S15: the scene's racer slots (its construction clears 8: players[] and player_view[]) */
 
 typedef struct RaceScene {
   Task task;                    /* 0x000 */
@@ -61,18 +62,18 @@ typedef struct RaceScene {
   gaddr course;                 /* 0x038: Course */
   SlotList slots;               /* 0x03C: 0x40 slots */
   gaddr actors;                 /* 0x048: ActorGroup */
-  gaddr players[RACE_PLAYERS];  /* 0x04C: Racer */
-  uint8_t pad_05c[0x06C - 0x05C];
+  gaddr players[RACE_RACERS];   /* 0x04C: Racer (0 = an empty slot) */
   uint32_t word6c;              /* 0x06C */
   uint8_t pad_070[0x074 - 0x070];
   f32 f74;                      /* 0x074 */
   f32 f78;                      /* 0x078: (func_8C02DF96 tests it against 0) */
-  int32_t ending_kind;          /* 0x07C: which result drawer the ending's third step uses (0 / else) */
-  uint8_t pad_080[0x09C - 0x080];
+  union {
+    int32_t ending_kind;        /* 0x07C: which result drawer the ending's third step uses (0 / else) */
+    int32_t words7c[8];         /* 0x07C: S15 b04: cleared together when a race starts (race_scene_start) */
+  };
   int32_t view_player[4];       /* 0x09C: the player a view shows (-1: none) */
   int32_t view_cell[4];         /* 0x0AC: the course cell under the view's camera */
-  int32_t player_view[RACE_PLAYERS]; /* 0x0BC: the view a player is shown on */
-  uint8_t pad_0cc[0x0DC - 0x0CC];
+  int32_t player_view[RACE_RACERS]; /* 0x0BC: the view a player is shown on (-1: none) */
   int32_t focus[4];             /* 0x0DC: per view, the player its camera follows (focus[0]: the one the sounds
                                  * and the ending go by) */
   uint8_t pad_0ec[0x0FC - 0x0EC];
@@ -99,8 +100,16 @@ typedef struct RaceScene {
   f32 sprite_fade;              /* 0xCA0: the results' / ending's sprites' alpha (> 0: drawn) */
   int32_t pause_delay;          /* 0xCA4: frames before the pause menu reads the pad again (30 after a choice) */
   int32_t word_ca8;             /* 0xCA8: S14 b11: the type-0x22 actor's mode 6 stops at 2 */
-  uint8_t pad_cac[0xCC0 - 0xCAC];
+  int32_t word_cac;             /* 0xCAC: S15 b04: 0 when a race starts */
+  gaddr marks_a;                /* 0xCB0: S15: a halfword per entry of g_race_mark_count, cleared at construction */
+  gaddr marks_b;                /* 0xCB4: the same */
+  int32_t word_cb8;             /* 0xCB8: S15 b04: 0 when a race starts */
+  int32_t word_cbc;             /* 0xCBC: the same */
   int16_t scores[RACE_PLAYERS]; /* 0xCC0: shown with the results */
+  uint8_t pad_cc8[0xCCC - 0xCC8];
+  gaddr vec_lists_a[RACE_RACERS]; /* 0xCCC: S15: per racer slot, g_race_mark_count / 8 + 1 Vec3s */
+  gaddr vec_lists_b[RACE_RACERS]; /* 0xCEC: the same */
+  gaddr word_lists[RACE_RACERS];  /* 0xD0C: the same number of words */
 } RaceScene;
 HW_OFFSET(RaceScene, setup, 0x028);
 HW_OFFSET(RaceScene, course, 0x038);
@@ -136,7 +145,15 @@ HW_OFFSET(RaceScene, values1, 0xC50);
 HW_OFFSET(RaceScene, sprite_fade, 0xCA0);
 HW_OFFSET(RaceScene, pause_delay, 0xCA4);
 HW_OFFSET(RaceScene, word_ca8, 0xCA8);
+HW_OFFSET(RaceScene, words7c, 0x07C);
+HW_OFFSET(RaceScene, word_cac, 0xCAC);
+HW_OFFSET(RaceScene, word_cb8, 0xCB8);
+HW_OFFSET(RaceScene, word_cbc, 0xCBC);
 HW_OFFSET(RaceScene, scores, 0xCC0);
+HW_OFFSET(RaceScene, marks_a, 0xCB0);
+HW_OFFSET(RaceScene, vec_lists_a, 0xCCC);
+HW_OFFSET(RaceScene, word_lists, 0xD0C);
+HW_SIZE(RaceScene, 0xD2C);
 
 enum { RACE_STATE_RESULTS = 3, RACE_STATE_ENDING = 4 };
 /* the substate of RACE_STATE_ENDING whose sprites / result are drawn */
@@ -149,6 +166,12 @@ static inline RaceSetup *race_setup_at(gaddr a) { return (RaceSetup *)hw_ptr(a);
 
 /* game/camera.c */
 int32_t race_scene_view_cell(gaddr scene, int32_t view);
+
+/* core/accessors.c (S15) */
+void race_setup_set_variant(gaddr setup, int32_t value);
+void race_setup_set_course(gaddr setup, int32_t value);
+void race_setup_set_word68(gaddr setup, int32_t i, uint32_t value);
+void race_setup_set_word88(gaddr setup, int32_t i, uint32_t value);
 
 /* game/race_scene.c, game/stage.c */
 gaddr race_setup_get(void);
@@ -184,5 +207,43 @@ void race_pause_draw_b(gaddr scene);
 
 /* game/slot_collide.c */
 void slot_list_collide(gaddr scene);
+
+/* S15 b04: the rest of game/race_hud.c's drawers (exported there; declared for game/race_draw.c) */
+void race_pause_draw_overlay(gaddr scene);
+void race_results_draw_full(gaddr scene);
+void race_results_draw_two(gaddr scene);
+void race_results_draw_four(gaddr scene);
+void race_ending_draw_full(gaddr scene);
+void race_ending_draw_other(gaddr scene);
+void race_item_draw_full(gaddr scene, int32_t i);
+void race_item_draw_two(gaddr scene, int32_t i);
+void race_item_draw_four(gaddr scene, int32_t i);
+void race_results_draw_banner(gaddr scene, int32_t i);
+/* game/race_scene.c */
+void race_ending_draw_a(gaddr scene);
+void race_ending_draw_b(gaddr scene);
+/* core/accessors.c */
+int32_t race_scene_view_player(gaddr scene, int32_t view);
+/* game/save.c: the record time of a course (by course and variant) */
+f32 save_time_a(int32_t cup, int32_t course);
+/* game/race_scene_methods.c */
+void race_scene_course_camera(gaddr scene, uint32_t a, uint32_t b, uint32_t c, gaddr out);
+
+/* S15 b04: game/race_draw.c (the scene's drawing over each view) */
+void race_draw_time(gaddr scene);
+void race_draw_record(gaddr scene);
+void race_draw_view_full(gaddr scene);
+void race_draw_view_two(gaddr scene);
+void race_draw_view_four(gaddr scene);
+void race_draw_view_trial(gaddr scene);
+void race_draw_view_demo(gaddr scene);
+void race_draw_views(gaddr scene);
+/* S15 b04: game/race_players.c (the players at the start of a race, by the game's mode) */
+void race_start_versus_computer(gaddr scene);
+void race_start_two(gaddr scene);
+void race_start_four(gaddr scene);
+void race_start_trial(gaddr scene);
+void race_start_demo(gaddr scene);
+void race_scene_start(gaddr scene);
 
 #endif

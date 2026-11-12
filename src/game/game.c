@@ -57,6 +57,8 @@ HW_EXPORT_RESUMABLE(8c01a0d4, game_start_mode_scene(0x8C01A0D4u, ARG0, 1, 0x38, 
 HW_EXPORT_RESUMABLE(8c01a154, game_start_mode_scene(0x8C01A154u, ARG0, 1, 0x1C4, 0x8C01B77Au, 2, 1))
 /* was func_8C01A188 */
 HW_EXPORT_RESUMABLE(8c01a188, game_start_mode_scene(0x8C01A188u, ARG0, 1, 0x28, 0x8C01DDE2u, 1, 0))
+/* was func_8C01A1B8: mode 4 (GOOD NIGHT; S15) */
+HW_EXPORT_RESUMABLE(8c01a1b8, game_start_mode_scene(0x8C01A1B8u, ARG0, 0, 0x88, 0x8C01D4CAu, 1, 0))
 /* was func_8C01A1F2: mode 7, with the argument the previous mode left */
 HW_EXPORT_RESUMABLE(8c01a1f2, game_start_mode_scene(0x8C01A1F2u, ARG0, 0, 0xA8, 0x8C01A8DEu, 2, ARG1))
 /* was func_8C01A248: the demo, the same scene as mode 7 with argument 5 */

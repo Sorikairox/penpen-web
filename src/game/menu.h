@@ -23,10 +23,7 @@ typedef struct SetupMenu {
   };
   int32_t state;            /* 0x02C: b02: 0 the house, 1 and 2 two selections, 3, 4; 5-8 leave (setup_menu_update) */
   uint32_t word30;          /* 0x030 */
-  union {
-    uint32_t word34;        /* 0x034 (S13's name) */
-    int32_t phase;          /* 0x034: b02: 0 = the state was just entered (cleared with each new state) */
-  };
+  int32_t phase;            /* 0x034: b02: 0 = the state was just entered (cleared with each new state) */
   uint32_t pressed[6];      /* 0x038: buttons 4, 2 (repeat-locked), 0x40, 0x80, 0x10, 0x20 (MENU_PRESS_*) */
   int32_t repeat_lock;      /* 0x050 */
   int32_t cursor;           /* 0x054: b02: the house's choice (0 to cursor_count - 1) */
@@ -34,34 +31,44 @@ typedef struct SetupMenu {
   int32_t course;           /* 0x05C: b02: handed to the set-up's course on leaving */
   uint32_t word60;          /* 0x060 */
   int32_t variant;          /* 0x064: b02: handed to the set-up's variant */
-  union {
-    struct {
-      uint32_t words68[8];  /* 0x068 (S13's names: core/accessors.c's setters of these, func_8C0229EE / func_8C0229FA,
-                             * and of word30 / word34, are called with menu->setup: they are RaceSetup's fields) */
-      uint32_t words88[8];  /* 0x088 */
-    };
-    struct {
-      uint32_t word68;      /* 0x068 */
-      int32_t order[8];     /* 0x06C: b02: i at the selection's start */
-      int32_t picked[8];    /* 0x08C: b02: 0 at the selection's start */
-      uint32_t player_a[8]; /* 0x0AC: b02: the set-up's words68, copied back on leaving; each passed to the VMU picture */
-      uint32_t player_b[8]; /* 0x0CC: b02: the set-up's words88 */
-    };
-  };
+  uint32_t word68;          /* 0x068 */
+  int32_t order[8];         /* 0x06C: b02: i at the selection's start */
+  int32_t picked[8];        /* 0x08C: b02: 0 at the selection's start */
+  uint32_t player_a[8];     /* 0x0AC: b02: the set-up's words68, copied back on leaving; each passed to the VMU picture */
+  uint32_t player_b[8];     /* 0x0CC: b02: the set-up's words88 */
   gaddr penguin_file;       /* 0x0EC: b02: the penguins' model file ("house_pen.bin") */
   gaddr penguins[8][2];     /* 0x0F0: b02: MotionPlayer (game/motion.h) per character and variant, or 0 */
-  uint8_t pad_130[0x158 - 0x130];
+  gaddr held_actions[3];    /* 0x130: S15 b03: what penguin 2 holds, three motions played in turn (HeldAction) */
+  int32_t held_index;       /* 0x13C: S15 b03: the one playing; 0 when the penguins are reset */
+  f32 held_frame;           /* 0x140: S15 b03: its frame; 0 when the penguins are reset, +1 each penguin update */
+  uint8_t pad_144[0x158 - 0x144];
   gaddr select_file;        /* 0x158: b02: "select.dat" */
   gaddr map_texlist;        /* 0x15C: b02: the course map's textures (the file's first texture list) */
   gaddr texlist;            /* 0x160: the backdrop's texture list (b02: the house's, "penhouse.pvm") */
-  uint8_t pad_164[0x17C - 0x164];
+  uint8_t pad_164[0x168 - 0x164];
+  gaddr character_models;   /* 0x168: S15 b03: an array of a model per character, drawn after its penguin */
+  uint8_t pad_16c[0x17C - 0x16C];
   NjSprite sprite;          /* 0x17C */
-  uint8_t pad_19c[0x1B0 - 0x19C];
+  uint8_t pad_19c[0x1A4 - 0x19C];
+  int32_t word1a4;          /* 0x1A4: S15 b09: 0 with the grid cursor (setup_menu_grid_reset) */
+  int32_t grid_column;      /* 0x1A8: S15 b09: a cursor in a 12-column grid (the table at 0x8C073C0C) */
+  int32_t grid_row;         /* 0x1AC: S15 b09 */
   gaddr owner_file;         /* 0x1B0: b02: "Owner.bin" */
   gaddr owner_texlist;      /* 0x1B4: b02: its texture list */
-  uint8_t pad_1b8[0x1E0 - 0x1B8];
-  f32 f1e0;                 /* 0x1E0: b02: 0 when state 2 starts */
-  uint8_t pad_1e4[0x220 - 0x1E4];
+  /* S15 b03: the course's mascot model (MenuModel's fields, the same object): per course a model and a motion
+   * table (MotionEntry), the motion playing and the one before, its frame, loop flag, angle and a Body */
+  gaddr models[4];          /* 0x1B8 */
+  gaddr motion_tables[4];   /* 0x1C8 */
+  int32_t motion;           /* 0x1D8 */
+  int32_t prev_motion;      /* 0x1DC: a new random motion is never the previous one */
+  union {
+    f32 f1e0;               /* 0x1E0: b02: 0 when state 2 starts */
+    f32 model_frame;        /* 0x1E0: S15 b03: +1 per update; the next motion past the motion's last frame */
+  };
+  uint8_t pad_1e4[0x1E8 - 0x1E4];
+  int32_t model_loop;       /* 0x1E8 */
+  f32 model_angle;          /* 0x1EC */
+  Body model_body;          /* 0x1F0: its position is where the model is drawn */
   Body place_a;             /* 0x220: placed from the table (icon_place) */
   Body place_b;             /* 0x250 */
   Body icon_position;       /* 0x280: the sprite's position (x, y) and priority (z) */
@@ -79,8 +86,8 @@ HW_OFFSET(SetupMenu, repeat_lock, 0x050);
 HW_OFFSET(SetupMenu, cursor, 0x054);
 HW_OFFSET(SetupMenu, course, 0x05C);
 HW_OFFSET(SetupMenu, variant, 0x064);
-HW_OFFSET(SetupMenu, words68, 0x068);
-HW_OFFSET(SetupMenu, words88, 0x088);
+HW_OFFSET(SetupMenu, word68, 0x068);
+HW_OFFSET(SetupMenu, picked, 0x08C);
 HW_OFFSET(SetupMenu, order, 0x06C);
 HW_OFFSET(SetupMenu, picked, 0x08C);
 HW_OFFSET(SetupMenu, player_a, 0x0AC);
@@ -90,9 +97,24 @@ HW_OFFSET(SetupMenu, penguins, 0x0F0);
 HW_OFFSET(SetupMenu, select_file, 0x158);
 HW_OFFSET(SetupMenu, texlist, 0x160);
 HW_OFFSET(SetupMenu, sprite, 0x17C);
+HW_OFFSET(SetupMenu, word1a4, 0x1A4);
+HW_OFFSET(SetupMenu, grid_column, 0x1A8);
+HW_OFFSET(SetupMenu, grid_row, 0x1AC);
 HW_OFFSET(SetupMenu, owner_file, 0x1B0);
 HW_OFFSET(SetupMenu, owner_texlist, 0x1B4);
 HW_OFFSET(SetupMenu, f1e0, 0x1E0);
+HW_OFFSET(SetupMenu, held_actions, 0x130);
+HW_OFFSET(SetupMenu, character_models, 0x168);
+HW_OFFSET(SetupMenu, held_index, 0x13C);
+HW_OFFSET(SetupMenu, held_frame, 0x140);
+HW_OFFSET(SetupMenu, models, 0x1B8);
+HW_OFFSET(SetupMenu, motion_tables, 0x1C8);
+HW_OFFSET(SetupMenu, motion, 0x1D8);
+HW_OFFSET(SetupMenu, prev_motion, 0x1DC);
+HW_OFFSET(SetupMenu, model_frame, 0x1E0);
+HW_OFFSET(SetupMenu, model_loop, 0x1E8);
+HW_OFFSET(SetupMenu, model_angle, 0x1EC);
+HW_OFFSET(SetupMenu, model_body, 0x1F0);
 HW_OFFSET(SetupMenu, place_a, 0x220);
 HW_OFFSET(SetupMenu, icon_position, 0x280);
 HW_OFFSET(SetupMenu, icon_scale, 0x2B0);
@@ -154,5 +176,19 @@ void selection2_enter(gaddr menu);
 f32 rt_floor(f32 x);
 
 int32_t shape_motion_pair_draw(gaddr object, gaddr pair, gaddr frame, int32_t loop);
+
+/* S15 b03, game/menu_screens.c */
+void icon_follow(gaddr menu, int32_t n);
+void place_follow(gaddr menu, int32_t n, int32_t k);
+void place_frame_draw(gaddr menu);
+void menu_penguins_reset(gaddr menu, int32_t posing);
+void menu_penguins_advance(gaddr menu);
+void mascot_reset(gaddr menu, int32_t play);
+void mascot_update(gaddr menu);
+void menu_number_draw(gaddr unused, int32_t x, int32_t y, int32_t value);
+void material_set_2(f32 r, f32 g, f32 b, f32 a);
+void penguin_look_update(gaddr menu);
+void menu_penguins_draw(gaddr menu);
+void penguin_profile_draw(gaddr menu, int32_t character);
 
 #endif

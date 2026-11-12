@@ -346,11 +346,11 @@ void setup_menu_update(gaddr menu) {
   case MENU_LEAVE_8: menu_setup(m)->requested = 4; break;
   case MENU_LEAVE_TO_RACE:
     for (int32_t i = 0; i < setup_menu_at(menu)->player_count; i++) {
-      menu_setup(m)->words68[i] = m->player_a[i];
-      menu_setup(m)->words88[i] = m->player_b[i];
+      race_setup_set_word68(m->setup, i, m->player_a[i]);
+      race_setup_set_word88(m->setup, i, m->player_b[i]);
     }
-    menu_setup(m)->course = m->course;
-    menu_setup(m)->variant = m->variant;
+    race_setup_set_course(m->setup, m->course);
+    race_setup_set_variant(m->setup, m->variant);
     menu_setup(m)->requested = 1;
     break;
   default:

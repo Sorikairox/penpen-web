@@ -15,19 +15,20 @@
  * of tasktree_set_pause (core/task.c) */
 HW_EXPORT(8c010508, tasktree_set_pause(tasktree_at(ARG0), (int32_t)ARG1))
 
-/* ---- the set-up menu (SetupMenu, game/menu.h) ---- */
+/* ---- the RaceSetup's setters (game/race_scene.h; S14 had named them for the SetupMenu, which calls them on its
+ * RaceSetup when it leaves for the race: game/house.c) ---- */
 
-/* was func_8C0229E6 / func_8C0229EA: its words at 0x34 / 0x30 */
-void setup_menu_set_word34(gaddr menu, uint32_t value) { setup_menu_at(menu)->word34 = value; }
-void setup_menu_set_word30(gaddr menu, uint32_t value) { setup_menu_at(menu)->word30 = value; }
-/* not exported (S14 difftest: untested: since the menu code that called it is hand-written, it is entered only from C, and no passing sample of its callers covered it): HW_EXPORT(8c0229e6, setup_menu_set_word34(ARG0, ARG1)) */
-/* not exported (S14 difftest: untested: since the menu code that called it is hand-written, it is entered only from C, and no passing sample of its callers covered it): HW_EXPORT(8c0229ea, setup_menu_set_word30(ARG0, ARG1)) */
+/* was func_8C0229E6 / func_8C0229EA: the variant (0x34) / the course (0x30) */
+void race_setup_set_variant(gaddr setup, int32_t value) { race_setup_at(setup)->variant = value; }
+void race_setup_set_course(gaddr setup, int32_t value) { race_setup_at(setup)->course = value; }
+/* not exported (S15 difftest: untested: only game/house.c calls it, from C, and no passing sample of its caller covered it): HW_EXPORT(8c0229e6, race_setup_set_variant(ARG0, (int32_t)ARG1)) */
+/* not exported (S15 difftest: untested: only game/house.c calls it, from C, and no passing sample of its caller covered it): HW_EXPORT(8c0229ea, race_setup_set_course(ARG0, (int32_t)ARG1)) */
 
-/* was func_8C0229EE / func_8C0229FA: its word i of the arrays at 0x68 / 0x88 = value (inline.c has the getters) */
-void setup_menu_set_word68(gaddr menu, int32_t i, uint32_t value) { setup_menu_at(menu)->words68[i] = value; }
-void setup_menu_set_word88(gaddr menu, int32_t i, uint32_t value) { setup_menu_at(menu)->words88[i] = value; }
-/* not exported (S14 difftest: untested: since the menu code that called it is hand-written, it is entered only from C, and no passing sample of its callers covered it): HW_EXPORT(8c0229ee, setup_menu_set_word68(ARG0, (int32_t)ARG1, ARG2)) */
-/* not exported (S14 difftest: untested: since the menu code that called it is hand-written, it is entered only from C, and no passing sample of its callers covered it): HW_EXPORT(8c0229fa, setup_menu_set_word88(ARG0, (int32_t)ARG1, ARG2)) */
+/* was func_8C0229EE / func_8C0229FA: player i's words at 0x68 / 0x88 (inline.c has the getters) */
+void race_setup_set_word68(gaddr setup, int32_t i, uint32_t value) { race_setup_at(setup)->words68[i] = value; }
+void race_setup_set_word88(gaddr setup, int32_t i, uint32_t value) { race_setup_at(setup)->words88[i] = value; }
+/* not exported (S15 difftest: untested: only game/house.c calls it, from C, and no passing sample of its caller covered it): HW_EXPORT(8c0229ee, race_setup_set_word68(ARG0, (int32_t)ARG1, ARG2)) */
+/* not exported (S15 difftest: untested: only game/house.c calls it, from C, and no passing sample of its caller covered it): HW_EXPORT(8c0229fa, race_setup_set_word88(ARG0, (int32_t)ARG1, ARG2)) */
 
 /* was func_8C0292AA: the player view i shows (RaceScene) */
 int32_t race_scene_view_player(gaddr scene, int32_t view) { return race_scene_at(scene)->view_player[view]; }

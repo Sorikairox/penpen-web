@@ -296,6 +296,138 @@ HW_EXPORT(8c02f2c4, race_music_update(ARG0))
 gaddr race_setup_get(void) { return g_race_setup; }
 HW_EXPORT(8c02f734, RET(race_setup_get()))
 
+/* ---- the RaceScene's construction (S15) ---- */
+
+/* functions of other files (no header yet) */
+void loading_screen_show(int32_t picture);                    /* game/loading.c */
+void texture_load(gaddr name, gaddr texlist, gaddr dir_name); /* core/texture.c */
+int32_t game_language(void);                                  /* game/save.c */
+gaddr slot_list_init(gaddr list, int32_t size);               /* game/stage.c */
+gaddr operator_new(uint32_t size);                            /* core/accessors.c */
+void soft_reset_clear(void);                                  /* core/accessors.c */
+
+#define g_race_mark_count GUEST_VAR(int32_t, 0x8C07FBF8u) /* 0x8000 */
+#define RACE_PANEL_TEXLIST 0x8C096070u /* the scene sprite's textures (the race's labels, by language) */
+#define RACE_PANEL_TEXANIM 0x8C096078u
+/* the labels' texture files per language (0-6; 0 and 1 share English) */
+static const gaddr race_label_textures[7] = {0x8C07FD64u, 0x8C07FD64u, 0x8C07FD74u, 0x8C07FD84u,
+                                             0x8C07FD94u, 0x8C07FDA4u, 0x8C07FDB4u};
+/* constructors the arrays are built with (SHC's array new) */
+#define CTOR_EMPTY        0x8C028E68u /* does nothing (Vec3) */
+#define CTOR_BODY_RESET   0x8C029368u /* body_reset */
+#define CTOR_QUAT         0x8C0293A8u /* quat_identity (Body1) */
+/* SHC runtime: construct `count` elements of `size` bytes at `base` (func_8C062800); the same on memory just
+ * allocated, returning it (func_8C062790) */
+static void array_construct(int32_t count, uint32_t size, gaddr base, gaddr ctor) {
+  CALL4(0x8C062800u, count, size, base, ctor);
+}
+static gaddr array_construct_new(int32_t count, uint32_t size, gaddr base, gaddr ctor) {
+  return CALL4(0x8C062790u, count, size, base, ctor);
+}
+
+/* was func_8C0293F0: the RaceScene's construction (argument: the RaceSetup): the Task, the pause pad (port 0), the
+ * slot list of 0x40, its arrays, the scene kept as g_panel, state 0; the loading screen (picture 1 for one player,
+ * 2 else: it ends frames, so this is resumable); the V-sync work stopped, a pending soft reset dropped; it stops on
+ * pause except in the demo (mode 5); the racer slots emptied; the mark tables and the per-slot lists allocated and
+ * cleared; the labels' textures in the console's language; the course's sound set; no views assigned; video on */
+gaddr race_scene_init(gaddr scene, gaddr setup) {
+  HW_RESUMABLE(0x8C0293F0u, scene);
+  HW_RESUME_AT(0);
+  {
+    RaceScene *s = race_scene_at(scene);
+    task_construct(scene, 0);
+    word_construct(member_addr(scene, RaceScene, pad), 0);
+    s->setup = setup;
+    slot_list_init(member_addr(scene, RaceScene, slots), 0x40);
+    s->word6c = 0;
+    array_construct(64, sizeof(Vec3), member_addr(scene, RaceScene, vec15c), CTOR_EMPTY);
+    array_construct(64, sizeof(Vec3), member_addr(scene, RaceScene, points), CTOR_EMPTY);
+    s->music_cue = 0;
+    array_construct(16, sizeof(Vec3), member_addr(scene, RaceScene, vecA80), CTOR_EMPTY);
+    s->keep_course = 0;
+    array_construct(5, sizeof(Body), member_addr(scene, RaceScene, bodies), CTOR_BODY_RESET);
+    array_construct(5, sizeof(Body1), member_addr(scene, RaceScene, values1), CTOR_QUAT);
+    g_panel = scene;
+    s->state = 0;
+    s->substate = 0;
+  }
+  HW_YIELDING_RET(0, loading_screen_show(race_setup_at(race_scene_at(scene)->setup)->mode == 0 ? 1 : 2), 0);
+  video_pause();
+  soft_reset_clear();
+  RaceScene *s = race_scene_at(scene);
+  if (race_setup_at(s->setup)->mode != 5)
+    s->task.stops_on_pause = 0;
+  for (int32_t i = 0; i < RACE_RACERS; i++)
+    s->players[i] = 0;
+  s->marks_a = operator_new((uint32_t)g_race_mark_count * 2);
+  s->marks_b = operator_new((uint32_t)g_race_mark_count * 2);
+  for (int32_t i = 0; i < g_race_mark_count; i++) {
+    ((int16_t *)hw_ptr(s->marks_a))[i] = 0;
+    ((int16_t *)hw_ptr(s->marks_b))[i] = 0;
+  }
+  for (int32_t i = 0; i < RACE_PLAYERS; i++)
+    s->scores[i] = 0;
+  int32_t n = g_race_mark_count / 8 + 1;
+  uint32_t alloc_n = n != 0 ? (uint32_t)n : 1; /* (array new of 0 elements allocates one) */
+  for (int32_t i = 0; i < RACE_RACERS; i++) {
+    gaddr m = syMalloc(alloc_n * sizeof(Vec3));
+    s->vec_lists_a[i] = m ? array_construct_new(n, sizeof(Vec3), m, CTOR_EMPTY) : 0;
+    m = syMalloc(alloc_n * sizeof(Vec3));
+    s->vec_lists_b[i] = m ? array_construct_new(n, sizeof(Vec3), m, CTOR_EMPTY) : 0;
+    s->word_lists[i] = syMalloc(alloc_n * 4);
+  }
+  int32_t language = game_language();
+  if (language >= 0 && language <= 6)
+    texture_load(race_label_textures[language], RACE_PANEL_TEXLIST, 0);
+  s->sprite.tlist = RACE_PANEL_TEXLIST;
+  s->sprite.tanim = RACE_PANEL_TEXANIM;
+  int32_t course = race_setup_at(s->setup)->course;
+  if (course >= 0 && course <= 3)
+    sound_select_set(course + 1);
+  for (int32_t i = 0; i < 4; i++) {
+    s->view_player[i] = -1;
+    s->view_cell[i] = -1;
+  }
+  for (int32_t i = 0; i < RACE_RACERS; i++)
+    s->player_view[i] = -1;
+  s->pad_removed = 0;
+  video_resume();
+  return scene;
+}
+HW_EXPORT_RESUMABLE(8c0293f0, RET(race_scene_init(ARG0, ARG1)))
+
+void slot_list_free(gaddr list); /* game/stage.c */
+static inline void sdCmdReset(void) { CALL0(0x8C09A524u); } /* SDK (sound driver): drop the queued commands */
+
+/* was func_8C0297D4: the RaceScene's destructor body: the mark tables and the per-slot lists freed, the labels'
+ * textures released, g_panel cleared, the sounds stopped (requests, the driver's queue, the music), a wait while the
+ * drive is busy (status 3), and the slot list's memory freed */
+void race_scene_destroy(gaddr scene) {
+  RaceScene *s = race_scene_at(scene);
+  if (s->marks_a) {
+    syFree(s->marks_a);
+    s->marks_a = 0;
+  }
+  if (s->marks_b) {
+    syFree(s->marks_b);
+    s->marks_b = 0;
+  }
+  for (int32_t i = 0; i < RACE_RACERS; i++) {
+    if (s->vec_lists_a[i]) syFree(s->vec_lists_a[i]);
+    if (s->vec_lists_b[i]) syFree(s->vec_lists_b[i]);
+    if (s->word_lists[i]) syFree(s->word_lists[i]);
+  }
+  njReleaseTexture(RACE_PANEL_TEXLIST);
+  g_panel = 0;
+  sound_reset_requests();
+  sdCmdReset();
+  music_stop();
+  while (gdFsGetDrvStat() == 3) {
+  }
+  slot_list_free(member_addr(scene, RaceScene, slots));
+}
+HW_EXPORT(8c0297d4, race_scene_destroy(ARG0))
+
 /* ---- scene constructors ----
  * Each stores its class's vtable in the Task, then runs the class's construction (still translated: it loads files
  * and can end frames, so these are resumable), and returns the scene. */
