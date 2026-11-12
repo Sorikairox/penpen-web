@@ -177,16 +177,35 @@ def main():
         say('error no report (the control failed?)')
         return 1
     rep = json.load(open(M + '/report.json'))
-    gate = {}
-    if os.path.exists(M + '/gate.log'):
-        for line in open(M + '/gate.log'):
-            f = line.rstrip('\n').split('\t')
-            gate[f[0]] = f[1:]
+    def read_gate():
+        g = {}
+        if os.path.exists(M + '/gate.log'):
+            for line in open(M + '/gate.log'):
+                f = line.rstrip('\n').split('\t')
+                g[f[0]] = f[1:]  # the last line of a mutant wins (the final pass comes after Mull's)
+        return g
+    gate = read_gate()
+    # S15: the final pass: every "survived-partial" mutant (it survived the file pass on its best 3 routes) through
+    # both passes on every covering route, the same build with the mutant switched on as Mull does it
+    t_final = time.time()
+    part = [k for k, g in gate.items() if g and g[0] == 'survived-partial']
+    def final(k):
+        env = dict(os.environ, PENPEN_GATE_FINAL='1')
+        env[k] = '1'
+        subprocess.run(['python3', '-I', M + '/tools/mull_gate.py', routep, M + '/penpen'], cwd=M, env=env,
+                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    with concurrent.futures.ThreadPoolExecutor(int(workers)) as ex:
+        list(ex.map(final, part))
+    say('final', len(part), 'partial survivors', '%ds' % (time.time() - t_final))
+    gate = read_gate()
     n = 0
     for path, fr in rep['files'].items():
         for mu in fr['mutants']:
             g = gate.get(mu['id'], ['-', '-', '-', '-'])
-            say('mutant', mu['id'].replace(M + '/', ''), mu['status'], mu['mutatorName'], *g)
+            st = mu['status']
+            if g and g[0] == 'killed' and st == 'Survived':  # killed by the final pass
+                st = 'Killed'
+            say('mutant', mu['id'].replace(M + '/', ''), st, mu['mutatorName'], *g)
             n += 1
     # timings: build, setup (references + coverage), the runner (control + mutants), per mutant by verdict
     per = {}

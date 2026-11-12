@@ -691,6 +691,7 @@ def main_report_mull(argv):
     per, surv = {}, []
     tot = {'mutants': 0, 'stillborn': 0, 'killed': 0, 'equivalent': 0, 'unreached': 0, 'survived': 0, 'missing': 0}
     gates, ops = {}, {}
+    dup_skipped = 0
     for line in open(res, errors='replace'):
         f = line.split()
         if len(f) < 5 or f[0] != 'mull' or f[1] != 'mutant':
@@ -698,6 +699,9 @@ def main_report_mull(argv):
         mid, status, mutator = f[2], f[3], f[4]
         verdict, gate, detail, routes = (f[5:9] + ['-'] * 4)[:4]
         if verdict == 'skipped':  # a pilot (mull_run.py --sample): not run, not counted
+            continue
+        if verdict == 'skipped-dup':  # S15: the other call-replacement mutant of this call was killed: not run
+            dup_skipped += 1
             continue
         parts = mid.split(':')
         rel, ln = parts[1], int(parts[2])
@@ -735,6 +739,7 @@ def main_report_mull(argv):
         if key != 'killed':
             surv.append((m, key, status, reason or ('(no note)' if key == 'survived' else ''), routes))
     write_reports(repo, per, surv, tot, gates, session, 'Mull 0.37.0 (LLVM 18)')
+    print('mutate report-mull skipped (the other call replacement of a killed call, not run, not counted): %d' % dup_skipped)
     print('mutate report-mull operators: ' + ' '.join('%s %d' % kv for kv in sorted(ops.items())))
 
 
