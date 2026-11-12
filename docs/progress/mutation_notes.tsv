@@ -267,3 +267,7 @@ cxx_eq_to_ne:src/game/sound.c:196:16:196:18	unreachable	a second MIDI request on
 cxx_gt_to_ge:src/game/sound.c:196:33:196:34	unreachable	a MIDI request with a non-zero priority (every one on the routes has priority 0)
 cxx_gt_to_le:src/game/sound.c:196:33:196:34	unreachable	a MIDI request with a non-zero priority (every one on the routes has priority 0)
 cxx_remove_void_call:src/game/game.c:97:5:97:39	unreachable	a soft reset while the task tree is paused: the root is paused only through func_8C010508 (translated), which no route calls; the route pauses the race at 5850 and resets at 5900 from its pause menu, which does not pause the tree (the mutant survives it)
+cxx_init_const:src/game/title.c:108:16:108:17	equivalent	title_init: skipping angle[0]'s first constructor changes nothing: the same function initialises the three angles again (quat_identity + damping) before anything reads them
+cxx_lt_to_le:src/game/title.c:108:21:108:22	equivalent	title_init: a fourth quat_identity writes (0, 0, 0, 1) over goal and goal_angle[0] (0x1AC-0x1BB), which the same function sets to zero later, before anything reads them
+cxx_replace_scalar_call_nz:src/game/title.c:110:3:110:34	equivalent	title_init: method_self is Vec3's empty constructor (returns its argument); its result is not used
+cxx_replace_scalar_call_zr:src/game/title.c:107:3:107:33	equivalent	title_init: the mover's first body_init is overwritten by body_reset and the damping fill later in the same function, before anything reads it

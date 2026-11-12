@@ -2,6 +2,52 @@
 
 Newest session first. Read `docs/port/PLAN.md` (disc facts, survey, approach, phases, rules) before working.
 
+## S13 — 2026-11-12: float helpers, identical copies, function coverage, the title scene, two delegated batches
+
+The user's goal: "Don't stop until all the code is ported". All guest code ran in `--network none --read-only
+--cap-drop ALL --security-opt no-new-privileges --tmpfs /tmp` containers; `git log --all -- port/gen` stays empty;
+Ghidra output and disassembly stayed in the terminal and the gitignored `port_work/`. Design and numbers:
+`docs/port/DECOMP.md` 13 (S13) and 14 (the plan for the whole game).
+
+1. **Float helpers** (DECOMP.md 13.1): `src/include/fpu.h` (`f32`, one function per FPU instruction under FPSCR
+   0x00040001, built on `sh4_ops.h`), FARG/RETF/FARGS/hw_fret in `hw.h`, the difftest compares FR0 and declared FR
+   arguments of HLE calls. `tools/s3.sh fputest`: **8 999 782 checks against the interpreter, 0 failures**;
+   `tools/s3.sh fpu-mull`: **118 mutants, 118 killed**.
+2. **Tools** (13.2, 13.3): `tools/s3.sh fncover` / `s11.sh cover` (function coverage per route:
+   `docs/progress/fn_coverage.tsv`: 1 228 game functions run on the 8 routes), `tools/s3.sh dupes` (groups of
+   identical functions: `port/symbols/copies.tsv`, **202 groups, 2 598 functions**), `tools/copies.py` /
+   `s11.sh copies` (the copies' exports in `src/copies/`), `s11.sh status` (`tools/hand_status.py`: untested exports
+   by copy group), `tools/ghidra.sh decomp2` (pool constants folded; `+ADDR` disassembles code Ghidra left as data,
+   `~ADDR` clears a wrong no-return, `!ADDR:LEN` prints instructions), `S13Calls.java` (call graph), `rt crash`
+   native stacks.
+3. **Hand-written by the lead**: the vector / Body (damped motion) / Ninja stub / accessor inline methods with their
+   ~2 000 identical copies, View light/fog, pad/file/sound/video helpers, the title scene's struct, construction
+   (resumable), update and logo (13.4). Found: a method that takes its port in r5 (host crash), Ghidra cutting
+   functions short (a copy group fell into the next bytes: the frame lines' interpreter count differed; such
+   functions are now never grouped), the title's two phase lengths are two globals.
+4. **Delegated batches** (13.5): two subagents wrote 231 leaf functions into `port_work/s13/stage/`; after the
+   difftest 7 exports were commented out with the reason, one never exported.
+
+**Progress: 2 468 of 4 010 game functions (61.55 %), 57 508 of 301 130 bytes (19.10 %)** (S12: 70 / 7 474).
+
+Tests (end of S13): difftest over 8 routes: **0 FAIL**, every export passes or is a copy of a passing one (main
+excepted: whole-run only); pure vs hand **identical frame lines on all 8 routes, native**; **wasm identical on all 8 routes too; native = wasm**; sh4 **257 / 0**;
+mixer **26 / 0**; harness (pure translation) **5 736 / 0 / 207**; `GEN=genhand tools/rtw.sh build` + `check` **OK**; screenshots from the hand build (title f500, PenPen House f900, race f3000 of the route) look right. Mutation: `fpu.h` **118 / 118 killed**; Mull on the lead-written S13 code (`core/{vec,inline,ninja,view}.c`,
+`game/title.c`, `--only`, 62 min): **355 mutants, 319 killed, 4 equivalent (title_init: values set twice, an unused
+result; reasons by id in `mutation_notes.tsv`), 32 unreached, 0 survived: 90.9 %, reach score 100 %**. A Mull run of
+all S13 files was stopped after 140 mutants (133 killed, 7 unreached, 0 survived): with 2 468 exports the control is
+207-314 s and a mutant costs up to ~5-12 min, so the whole set would take many hours.
+
+Not verified: **Mull on the delegated batches** (`core/{transform,random,pad_analog,gfx_init,motion,view_setup,
+texture,contact,model_build,sprite_text,accessors,system}.c`, `game/{save,vmu,menu_sprites,race_scene,racer,model,
+stage,course,camera,actor}.c`) and on the S13 additions to pad/file/task/main/sound.c: the gate is open for them
+(first step of S14, per file with `--only`, budget 60); the browser e2e; the copies of a group are tested by identity
+(13.2), not each by its own samples. Agent-written helpers still call two runtime helpers through registers
+(`sprite_text.c`: 0x8C062518 with r0/r1 set by hand): to rewrite as C `%` once its semantics are pinned.
+
+Next: DECOMP.md 14 (step 1: the 343 reached functions left, the race region first, in delegated batches; step 2:
+routes for the unreached 1 199 functions).
+
 ## S12 — 2026-11-11/12: mutation testing with Mull, six more routes, the file loader / container fix-ups / title destructor
 
 The user's instruction: "Don't forget mutation testing". All guest code ran in `--network none --read-only --cap-drop
