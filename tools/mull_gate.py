@@ -1,21 +1,27 @@
 #!/usr/bin/python3 -I
-"""Pen Pen S12: the test program mull-runner runs (tools/mull_run.py; only inside the penpen-mull sandbox).
+"""Pen Pen S12/S16: the test program mull-runner runs (tools/mull_run.py; only inside the penpen-mull sandbox).
 
   mull_gate.py ROUTES.tsv BINARY
 
-Mull switches one mutant on through an environment variable named after it (mutator:file:line:col:line:col). The
-gate finds which, takes the routes whose coverage (tools/mull_run.py, gcov) includes that line, cheapest first, and
-runs BINARY on each with our gates (tools/mut_worker.py gate_run: difftest FAIL, frame lines with the RAM digest,
-audio lines, an early stop, a crash, a stall). Exit 1 at the first failure (Mull: killed), 0 when every route passes
-(survived). A mutant on a line no route runs exits 0 without running (the report classes it unreached). Without a
-mutant (Mull's baseline) every route runs: the control. One line per run goes to /tmp/mull/gate.log.
+Mull switches one mutant on through an environment variable named after it (mutator:file:line:col:line:col).
+S16 (DECOMP.md 17): the gate first REPLAYS the corpus samples that ran the mutated function's original code
+(/tmp/mull/replay.json, made by mull_run.py from the volume penpen-corpus): BINARY --hwreplay runs side B of each
+with the mutant switched on against the recorded side A (no route, no boot): a FAIL or a crash is a kill (gate
+"replay" / "replay-crash"). Only a mutant the replay does not kill runs the whole-route gate (tools/mut_worker.py
+gate_run: the file's exports sampled by the difftest, frame lines with the RAM digest, audio lines, an early stop, a
+crash, a stall) on the 1-3 cheapest routes whose coverage includes the line; exit 1 at the first failure (killed), 0
+when all pass (survived). A mutant on a line no route runs exits 0 (the report classes it unreached). Without a
+mutant (Mull's baseline) every route runs with the full difftest: the control. One line per run goes to
+/tmp/mull/gate.log.
 """
-import fcntl, hashlib, json, os, re, sys, time
+import fcntl, hashlib, json, os, re, subprocess, sys, time
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import mut_worker as mw  # noqa: E402
 
 M = '/tmp/mull'
+REPLAY_TIMEOUT = 120  # s: the replay of one mutant's samples (~1 s unloaded)
+FALLBACK_ROUTES = 3   # the cheapest covering routes run for a mutant the replay did not kill
 
 
 def log(key, *fields):
@@ -35,87 +41,93 @@ def main():
     ctl = M + '/control.json'
     if os.path.exists(ctl):
         times = json.load(open(ctl))
-    final = os.environ.get('PENPEN_GATE_FINAL') == '1'
     order = sorted(routes, key=lambda r: times[r['name']])
     mutant = [k for k in os.environ if re.match(r'^[a-z_]+:' + re.escape(M) + r'/src/', k)]
     t0 = time.time()
-    if mutant:
-        key = mutant[0]
-        k = info.get('sample', 1)
-        if k > 1 and int(hashlib.sha1(key.encode()).hexdigest(), 16) % k:
-            log(key, 'skipped', '-', '-', '-', '0s')
-            return 0
-        f = key.split(':')
-        rel = os.path.relpath(f[1], M + '/src')
-        line = '%s:%s' % (rel, f[2])
-        executable = any(line in cov[r['name']] for r in routes)
-        runs = [r for r in order if cov[r['name']].get(line, 0) > 0] if executable else order
-        if not runs:
-            log(key, 'uncovered', '-', '-', '-', '0s')
-            return 0
-        # S15: the routes by expected kills per second: the most executions of the line per second of route first
-        runs.sort(key=lambda r: -cov[r['name']].get(line, 0) / max(times[r['name']], 0.1))
-        # S15: of the two call-replacement mutants of one call (result 0 / result 42), the second is skipped once
-        # the first is killed (counted apart as "skipped-dup", never as killed)
-        loc = ':'.join(f[1:])
-        if f[0] in ('cxx_replace_scalar_call_zr', 'cxx_replace_scalar_call_nz') and not final:
-            kp = M + '/killed_calls.txt'
-            if os.path.exists(kp) and loc in open(kp).read().split('\n'):
-                log(key, 'skipped-dup', '-', '-', '-', '0s')
-                return 0
-    else:
+    if not mutant:
         # Mull runs the program twice without a mutant (warm-up, then baseline): the first is the control, every
-        # route through every gate; the second would repeat it (41 s): skipped once the first has passed
+        # route through every gate; the second would repeat it: skipped once the first has passed
         if os.path.exists(ctl):
             log('control', 'again', 'skipped: the first control passed', '-', '-', '0s')
             return 0
-        key, runs = 'control', order
-    took = {}
-    # S14: a mutant first runs with the difftest sampling only the exports of its own file (and their copies): with
-    # ~2 500 exports the full difftest makes every route ~5x slower; a mutant that survives this pass runs the full
-    # gate (every export sampled), so the verdict is the full gate's
-    passes = [budget]
-    if key != 'control':
-        ex = info.get('exports', {}).get(rel)
-        if ex is not None:
-            passes = ['%s:50:%s' % (budget.split(':')[0], ','.join(ex) or '0')] + passes
-    # S15: during Mull's run a mutant gets the file pass on at most 3 routes; one that survives them is
-    # "survived-partial": mull_run.py's final pass (PENPEN_GATE_FINAL=1) runs it through both passes on every
-    # covering route, and only that verdict counts
-    partial = key != 'control' and not final
-    # S15: a stall (no frame line) ends a partial-pass run after 10 s (no kill: the final pass decides), a final or
-    # control run after 20 s (a kill), as before
-    mw.STALL = 10 if partial else 20
-    if partial:
-        passes, runs = passes[:1], runs[:3]
-    for i, hw in enumerate(passes):
-        for r in runs:
+        took = {}
+        for r in order:
             ref = open(M + '/ref/' + r['name']).read().split('\n')[:-1]
-            # S15: the partial pass has a tighter time-out (2x the control + 20 s), but a time-out there is not a kill:
-            # the mutant goes to the final pass, whose time-out is the generous one (3x + 30 s: a loaded machine must
-            # never kill a slow but good run; the first measurement with 1.5x + 15 s in the final pass made 35 false
-            # time-out kills of 209)
-            limit = 2 * times[r['name']] + 20 if partial else 3 * times[r['name']] + 30
-            v, g, d, dt = mw.gate_run(binary, r, ref, digest, hw, limit)
-            if partial and v == 'killed' and g == 'timeout':
-                break
-            if i == len(passes) - 1:
-                took[r['name']] = round(dt, 2)
+            v, g, d, dt = mw.gate_run(binary, r, ref, digest, budget, 3 * times[r['name']] + 30)
+            took[r['name']] = round(dt, 2)
             if v == 'killed':
-                if key != 'control' and f[0] in ('cxx_replace_scalar_call_zr', 'cxx_replace_scalar_call_nz'):
-                    with open(M + '/killed_calls.txt', 'a') as kf:
-                        fcntl.flock(kf, fcntl.LOCK_EX)
-                        kf.write(loc + '\n')
-                last = i == len(passes) - 1 and not partial
-                log(key, 'killed', g + ('' if last else '-file'), d, r['name'], '%ds' % (time.time() - t0))
+                log('control', 'killed', g, d, r['name'], '%ds' % (time.time() - t0))
                 return 1
-    if partial:
-        log(key, 'survived-partial', '-', '-', ','.join(r['name'] for r in runs), '%ds' % (time.time() - t0))
-        return 0
-    if key == 'control':
         json.dump(took, open(ctl, 'w'))
-        log(key, 'times', ' '.join('%s=%.1fs' % kv for kv in sorted(took.items())), '-', '-', '-')
-    log(key, 'survived', '-', '-', ','.join(r['name'] for r in runs), '%ds' % (time.time() - t0))
+        log('control', 'times', ' '.join('%s=%.1fs' % kv for kv in sorted(took.items())), '-', '-', '-')
+        return 0
+    key = mutant[0]
+    k = info.get('sample', 1)
+    if k > 1 and int(hashlib.sha1(key.encode()).hexdigest(), 16) % k:
+        log(key, 'skipped', '-', '-', '-', '0s')
+        return 0
+    f = key.split(':')
+    rel = os.path.relpath(f[1], M + '/src')
+    line = '%s:%s' % (rel, f[2])
+
+    # S16, 1: the offline replay (DECOMP.md 17): the corpus samples that ran this function's original code, side B
+    # with the mutant against the recorded side A. A FAIL or a crash of the replay is a kill; a time-out is not
+    # (the mutant goes on to the routes)
+    rp = json.load(open(M + '/replay.json'))
+    samples = rp['sel'].get(rp['keys'].get(line, ''), [])
+    replay_note = 'replay-none'
+    if samples:
+        lp = '%s/rl_%s.txt' % (M, hashlib.sha1(key.encode()).hexdigest()[:16])
+        open(lp, 'w').write('\n'.join(samples) + '\n')
+        try:
+            r = subprocess.run([binary, '--disc', mw.DISC, '--verbose', '0', '--frame-log', '0', '--hwreplay', lp],
+                               stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True, errors='replace',
+                               timeout=REPLAY_TIMEOUT)
+            out = r.stdout.split('\n')
+            fl = [l for l in out if l.startswith('hw replay FAIL ')]
+            if fl:
+                w = fl[0].split()
+                log(key, 'killed', 'replay', w[4].rstrip(':') + '@' + w[3].split('/')[-2], '-', '%ds' % (time.time() - t0))
+                return 1
+            if not any(l.startswith('hw replay done ') for l in out):
+                log(key, 'killed', 'replay-crash', 'rc%d' % r.returncode, '-', '%ds' % (time.time() - t0))
+                return 1
+            replay_note = 'replay-%d' % len(samples)
+        except subprocess.TimeoutExpired:
+            replay_note = 'replay-timeout'
+        finally:
+            try:
+                os.unlink(lp)
+            except OSError:
+                pass
+
+    # S16, 2: the fallback, only for what the replay did not kill: the whole-route gate (the file's exports sampled
+    # by the difftest, frame lines with the RAM digest, audio lines, the run's end) on the 1-3 routes that run the line
+    # most per second. A stall (no frame line for 20 s: a loop made endless) is a kill; the overall time-out (3x the
+    # control + 30 s) is not (a loaded machine)
+    executable = any(line in cov[r['name']] for r in routes)
+    runs = [r for r in order if cov[r['name']].get(line, 0) > 0] if executable else order
+    if not runs:
+        log(key, 'uncovered', '-', replay_note, '-', '%ds' % (time.time() - t0))
+        return 0
+    # the routes by expected kills per second (the line's executions per second of route, S15), the best 1-3
+    runs.sort(key=lambda r: -cov[r['name']].get(line, 0) / max(times[r['name']], 0.1))
+    runs = runs[:FALLBACK_ROUTES]
+    hw = budget
+    ex = info.get('exports', {}).get(rel)
+    if ex is not None:
+        hw = '%s:50:%s' % (budget.split(':')[0], ','.join(ex) or '0')
+    mw.STALL = 20
+    for r in runs:
+        ref = open(M + '/ref/' + r['name']).read().split('\n')[:-1]
+        limit = 3 * times[r['name']] + 30
+        v, g, d, dt = mw.gate_run(binary, r, ref, digest, hw, limit)
+        if v == 'killed' and g == 'timeout' and dt >= limit - 2:
+            continue  # the overall time-out: not a kill
+        if v == 'killed':
+            log(key, 'killed', g + '-file', d, r['name'], '%ds' % (time.time() - t0), replay_note)
+            return 1
+    log(key, 'survived', '-', replay_note, ','.join(r['name'] for r in runs), '%ds' % (time.time() - t0))
     return 0
 
 

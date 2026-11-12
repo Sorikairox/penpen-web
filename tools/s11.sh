@@ -9,6 +9,7 @@
 #                                 route of tools/routes.tsv (S12; S11: the boot and the S4 route); B samples per
 #                                 function, one sample per S frames after the first calls; a merged verdict per
 #                                 function over all routes (tools/hwtest_merge.py)
+#   tools/s11.sh corpus [TAG [K]]  S16: the replay gate's sample corpus (volume penpen-corpus, /corpus/TAG/ROUTE)
 #   tools/s11.sh compare [native|wasm]   pure vs hand: frame lines (RAM digest every frame, stack area left out) over
 #                                 every route; prints the first difference, if any (ROUTES="a b": some routes)
 #   tools/s11.sh progress         docs/progress/decomp.tsv + decomp_functions.tsv (tools/decomp_progress.py)
@@ -60,6 +61,38 @@ case "${1:-}" in
       grep -E '^boot stopped' "$LOGS/test_$r.log" || true
     done
     python3 -I "$REPO/tools/hwtest_merge.py" "$LOGS" $(routes | cut -f1) ;;
+  corpus)
+    # S16: the offline replay gate's sample corpus (DECOMP.md 17): every route of the hand build with the difftest and
+    # --hwcorpus: up to K (default 8) passing samples per function into the volume penpen-corpus (/corpus/TAG/ROUTE;
+    # TAG default c1; guest RAM: never in git). PAR routes at a time (2)
+    tag=${2:-c1}; k=${3:-8}
+    GEN=genhand "$REPO/tools/s3.sh" native --frames 1 > "$LOGS/corpus_build.log" 2>&1 || true
+    grep -q 'build FAILED' "$LOGS/corpus_build.log" && { echo "corpus: build FAILED"; exit 1; }
+    i=0
+    for r in $(routes | cut -f1); do
+      routes | awk -F'\t' -v r="$r" '$1 == r' | { IFS='	' read -r r f p x
+        CORPUS=rw NOBUILD=1 GEN=genhand "$REPO/tools/s3.sh" native --frames "$f" $(padarg "$p") $(extra "$x") --verbose 0 --frame-log 0 --hwtest 160 --hwcorpus "/corpus/$tag/$r:$k" > "$LOGS/corpus_$r.log" 2>&1 || true; } &
+      i=$((i + 1))
+      [ $((i % ${PAR:-2})) -ne 0 ] || wait
+    done
+    wait
+    # pass 2: the functions the first pass entered but never sampled (their calls fell inside another function's
+    # sample: one sample at a time), sampled alone (--hwtest B:S:list) into /corpus/TAG/ROUTE_nested
+    i=0
+    for r in $(routes | cut -f1); do
+      only=$(grep -E '^hw test 8c[0-9a-f]{6} calls [1-9][0-9]* samples 0 ' "$LOGS/corpus_$r.log" | awk '{print $3}' | paste -sd, -)
+      [ -n "$only" ] || continue
+      routes | awk -F'\t' -v r="$r" '$1 == r' | { IFS='	' read -r r f p x
+        CORPUS=rw NOBUILD=1 GEN=genhand "$REPO/tools/s3.sh" native --frames "$f" $(padarg "$p") $(extra "$x") --verbose 0 --frame-log 0 --hwtest "160:50:$only" --hwcorpus "/corpus/$tag/${r}_nested:$k" > "$LOGS/corpus_${r}_nested.log" 2>&1 || true; } &
+      i=$((i + 1))
+      [ $((i % ${PAR:-2})) -ne 0 ] || wait
+    done
+    wait
+    routes | while IFS='	' read -r r f p x; do
+      printf '%s: ' "$r"; grep -E '^hw test hand-written' "$LOGS/corpus_$r.log" || echo "no summary"
+      printf '%s nested: ' "$r"; grep -E '^hw test hand-written' "$LOGS/corpus_${r}_nested.log" 2>/dev/null || echo "-"
+      grep -E '^(hw FAIL|hw corpus)' "$LOGS/corpus_$r.log" | head -3 || true
+    done ;;
   compare)
     k=${2:-native}
     routes | while IFS='	' read -r r f p x; do

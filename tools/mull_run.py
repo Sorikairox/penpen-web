@@ -20,6 +20,9 @@ container of tools/s3.sh mull (it runs the disc's code): --network none, --read-
    mutant's line, cheapest first, and exits non-zero at the first difftest FAIL / frame line / audio line / early stop
    / crash / stall: Mull counts the mutant killed. A mutant on a line no route runs exits 0 at once (Mull says
    survived; the report classes it "unreached" from the coverage).
+S16: before Mull, the corpus samples each mutated function needs are chosen (tools/replay_corpus.py, --corpus DIR,
+default /corpus/c1) and replayed once on the unmutated build (a sample that fails there is left out); the S15 final
+pass is gone (the gate's verdict is final: replay, then 1-3 routes).
 Prints only our vocabulary: "mull ..." lines (ids are Mull's: mutator:file:line:col:line:col; gate names, routes).
 """
 import json, os, shutil, subprocess, sys, time
@@ -67,7 +70,7 @@ def main():
     # 2. src/ with Mull, once (src/ and the gate's code snapshotted: later edits do not touch a running job)
     shutil.copytree(mw.SRC, M + '/src')
     os.makedirs(M + '/tools', exist_ok=True)
-    for t in ('mull_gate.py', 'mut_worker.py'):
+    for t in ('mull_gate.py', 'mut_worker.py', 'replay_corpus.py', 'mutate.py'):
         shutil.copy(os.path.join(os.path.dirname(os.path.abspath(__file__)), t), M + '/tools/' + t)
     # S14: the routes too (the gate reads them for every mutant: an edit of tools/routes.tsv during a run must not
     # reach it)
@@ -108,7 +111,7 @@ def main():
     for r in routes:
         open(M + '/ref/' + r['name'], 'w').write('\n'.join(refs[r['name']][0]) + '\n')
 
-    shutil.copytree(mw.SRC, M + '/cov_src')
+    shutil.copytree(M + '/src', M + '/cov_src')  # S16: the snapshot (src/ edited meanwhile must not reach the coverage)
     if not mw.compile_tree(M + '/cov_src', rels, M + '/cov_obj', ['-O0', '--coverage']):
         say('error coverage compile')
         return 1
@@ -155,6 +158,37 @@ def main():
               open(M + '/cov.json', 'w'))
     for k in sorted({k for c in cov.values() for k in c}):
         say('cov', 'src/' + k, ' '.join('%s=%d' % (r['name'], cov[r['name']].get(k, 0)) for r in routes))
+    # S16: the offline replay gate (DECOMP.md 17): the corpus samples of each mutated function, checked first on the
+    # unmutated build (the control: a sample that fails without a mutant is left out and counted)
+    import replay_corpus as rc
+    corpus = opts.get('--corpus', '/corpus/c1')
+    index = rc.load_index(corpus)
+    keys, sets = rc.owner_keys(M, None if only == '.*' else only)
+    sel = {k: rc.select(index, a) for k, a in sets.items()}
+    needed = sorted({p for v in sel.values() for p in v})
+    t_rc = time.time()
+    chunks = [needed[i::int(workers)] for i in range(int(workers))]
+    def ctl_replay(i):
+        lp = '%s/replay_ctl_%d.txt' % (M, i)
+        open(lp, 'w').write('#all\n' + '\n'.join(chunks[i]) + '\n')
+        r = subprocess.run([M + '/penpen', '--disc', mw.DISC, '--verbose', '0', '--frame-log', '0', '--hwreplay', lp],
+                           stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True, errors='replace')
+        bad = [l.split()[3] for l in r.stdout.split('\n') if l.startswith('hw replay FAIL ')]
+        bad += [l.split()[3] for l in r.stdout.split('\n') if l.startswith('hw replay unreadable ')]
+        done = any(l.startswith('hw replay done ') for l in r.stdout.split('\n'))
+        return bad, done
+    with concurrent.futures.ThreadPoolExecutor(int(workers)) as ex:
+        res_rc = list(ex.map(ctl_replay, range(len(chunks))))
+    excluded = {p for b, _ in res_rc for p in b}
+    if not all(d for _, d in res_rc):
+        say('replay control did not finish (a crash?): the replay gate is off')
+        sel, excluded = {}, set(needed)
+    elif excluded:
+        sel = {k: rc.select(index, a, excluded) for k, a in sets.items()}
+    json.dump({'keys': keys, 'sel': sel}, open(M + '/replay.json', 'w'))
+    say('replay corpus', corpus, len(index), 'samples;', len(needed), 'selected for', len(sets), 'functions;',
+        len(excluded), 'failing without a mutant (left out);', sum(1 for v in sel.values() if not v),
+        'functions without samples', '%ds' % (time.time() - t_rc))
     say('setup done', '%ds' % (time.time() - t0))
     t_setup = time.time() - t0
 
@@ -185,26 +219,11 @@ def main():
                 g[f[0]] = f[1:]  # the last line of a mutant wins (the final pass comes after Mull's)
         return g
     gate = read_gate()
-    # S15: the final pass: every "survived-partial" mutant (it survived the file pass on its best 3 routes) through
-    # both passes on every covering route, the same build with the mutant switched on as Mull does it
-    t_final = time.time()
-    part = [k for k, g in gate.items() if g and g[0] == 'survived-partial']
-    def final(k):
-        env = dict(os.environ, PENPEN_GATE_FINAL='1')
-        env[k] = '1'
-        subprocess.run(['python3', '-I', M + '/tools/mull_gate.py', routep, M + '/penpen'], cwd=M, env=env,
-                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-    with concurrent.futures.ThreadPoolExecutor(int(workers)) as ex:
-        list(ex.map(final, part))
-    say('final', len(part), 'partial survivors', '%ds' % (time.time() - t_final))
-    gate = read_gate()
     n = 0
     for path, fr in rep['files'].items():
         for mu in fr['mutants']:
             g = gate.get(mu['id'], ['-', '-', '-', '-'])
             st = mu['status']
-            if g and g[0] == 'killed' and st == 'Survived':  # killed by the final pass
-                st = 'Killed'
             say('mutant', mu['id'].replace(M + '/', ''), st, mu['mutatorName'], *g)
             n += 1
     # timings: build, setup (references + coverage), the runner (control + mutants), per mutant by verdict

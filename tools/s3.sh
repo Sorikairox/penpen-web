@@ -95,7 +95,7 @@ case "${1:-}" in
   mull)
     # S12: Mull (tools/mull_run.py, image penpen-mull:1 from docker/mull): every mutant of src/ in one build
     shift
-    box -v penpen-disc:/disc:ro -v penpen-build:/build:ro -e CF="$CF" -v "${MUTSRC:-$REPO/src}":/mutsrc:ro -e SRC=/mutsrc \
+    box -v penpen-disc:/disc:ro -v penpen-build:/build:ro -v penpen-corpus:/corpus:ro -e CF="$CF" -v "${MUTSRC:-$REPO/src}":/mutsrc:ro -e SRC=/mutsrc \
       ${MULL_IMAGE:-penpen-mull:1} python3 -I /src/tools/mull_run.py /src/tools/routes.tsv "$@" 2>&1 | filt ;;
   native)
     # S14: NOBUILD=1 runs the build that is there (several runs in parallel after one build: tools/s11.sh test)
@@ -103,7 +103,8 @@ case "${1:-}" in
     BUILD="sh /src/port/runtime/build.sh native /build/$G /build/native$SFX '$CF' $J"
     BMODE=rw
     [ -z "${NOBUILD:-}" ] || { BUILD=true; BMODE=ro; }
-    box -v penpen-disc:/disc:ro -v penpen-build:/build:$BMODE $IMG sh -c "{ $BUILD || { echo 'build FAILED (compiler messages are not shown: they may quote generated code)'; exit 1; }; } && /build/native$SFX/penpen --disc /disc $(qargs "$@")" 2>&1 | filt ;;
+    # S16: CORPUS=rw|ro mounts the sample corpus volume (penpen-corpus: guest RAM snapshots, never in git) at /corpus
+    box -v penpen-disc:/disc:ro -v penpen-build:/build:$BMODE ${CORPUS:+-v penpen-corpus:/corpus:$CORPUS} $IMG sh -c "{ $BUILD || { echo 'build FAILED (compiler messages are not shown: they may quote generated code)'; exit 1; }; } && /build/native$SFX/penpen --disc /disc $(qargs "$@")" 2>&1 | filt ;;
   wasm)
     shift
     box -v penpen-disc:/disc:ro -v penpen-build:/build $IMG sh -c "{ sh /src/port/runtime/build.sh wasm /build/$G /build/wasm$SFX '$CF' $J || { echo 'build FAILED (compiler messages are not shown: they may quote generated code)'; exit 1; }; } && /emsdk/node/22.16.0_64bit/bin/node /src/port/runtime/node/run.mjs /build/wasm$SFX/penpen.wasm /disc $(qargs "$@")" 2>&1 | filt ;;

@@ -70,6 +70,8 @@ void hwt_end(int sample);
 void hwt_abandon(void);
 void hwt_summary(void);
 int hwt_set(const char *opt);
+int hwt_corpus(const char *opt); /* S16: --hwcorpus DIR:K */
+int hwt_replay(const char *list); /* S16: --hwreplay LIST */
 extern int hle_digest_nostack;
 /* S11: the argument registers the running HLE function touched (bits 4-7); the difftest compares only those */
 extern uint32_t hle_arg_mask;
