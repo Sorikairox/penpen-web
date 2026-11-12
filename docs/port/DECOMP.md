@@ -326,7 +326,7 @@ pipeline's ids; they are the starting point for the Mull run's classification.
   destroy. Update and draw are float code: they stay translated (no FPU helpers yet, section 3).
 
 
-## 12. Next
+## 12. Next (as S12 left it)
 
 1. **Float helpers** before any float code: the scenes' update and draw methods (the title's 0x8C01BB52..., the house,
    the course map, the race) compute in round-to-zero / denormals-are-zero single precision; hand-written C needs
@@ -343,3 +343,146 @@ pipeline's ids; they are the starting point for the Mull run's classification.
 4. The race scene and the menus (house, course map) once floats are possible; the remaining translated pieces of the
    loader (directory change, error callback, CDDA play/stop/release) when a route reaches them.
 
+
+## 13. S13: float helpers, identical copies, function coverage, the title scene
+
+### 13.1 Float helpers (`src/include/fpu.h`)
+
+The game runs the FPU with FPSCR = 0x00040001 (round toward zero, denormals are zero, single precision); the host
+rounds to nearest. Hand-written float code therefore never uses host float arithmetic: its floats have the type
+**`f32`**, a struct holding the bits, so `a + b` does not compile, and every operation is a function that is exactly
+one SH-4 instruction as the interpreter and the translation compute it (built on the same `sh4_ops.h` primitives
+`rz_fadd`, `rz_fmul`, `rz_fdiv`, `rz_fsqrt`, `f_rz`, `f_dz`, `fq`): `fadd fsub fmul fdiv fsqrt fmac fneg fabs_ fgt feq
+f32_from_int f32_from_uint f32_to_int fsca fsrra fipr`. Denormal operands and results are flushed (DN), NaN results
+are the SH-4's own qNaN, `fmac` rounds the product then the sum (as `sh4_ops.h` models it), `f32_from_uint` is SHC's
+`float` + 2^32 fix-up, `f32_to_int` is `ftrc` (saturating). Constants: `F32(1.5f)` for exact values, `F32_BITS(...)`
+for the binary's patterns. Comparisons the compiler builds: a < b is `fgt(b, a)`, a <= b is `!fgt(a, b)`.
+
+- **Interface** (`hw.h`): float arguments in FR4, FR5, ... (SHC's convention, independent of r4-r7): `FARG0..FARG5`
+  in an adapter, `RETF(v)` for a result in FR0, `FARGS1..FARGS4` before a `CALLn` and `hw_fret()` after it for calls
+  out. `U32_AT` / `F32_AT` reach one field of an object whose class is not declared yet.
+- **Difftest** (`difftest.c`): with `RETF` the sample compares FR0 (as `RET` compares r0); the float arguments a
+  hand-written call declares with `FARGS` are compared for HLE calls (FR4-FR7, bit for bit).
+- **Tests** (`port/sh4/tests/test_fpu.c`, `tools/s3.sh fputest [N]`): every operation against the instruction it stands
+  for, executed by the interpreter (`sh4_step` on the instruction word) with FPSCR 0x00040001: 49 edge operands
+  (signed zeros, denormals, the smallest and largest normals, infinities, quiet and signalling NaNs, one ulp around
+  1 and 2^24, 2^-24, 1/3, 0.1, pi, 2^32, products near both ends) crossed with each other, 200 000 random operand
+  pairs per operation (random bits, nearby exponents where sums cancel, ordinary game magnitudes), edge and random
+  integers for the conversions, all 65 536 FSCA angles, random FIPR vectors: **8 999 782 checks, 0 failures** (0.9 s).
+- **Mull** (`tools/s3.sh fpu-mull`, `tools/mull_fpu.py`, image `penpen-mull:1`): `fpu.h` mutated, `test_fpu.c` as
+  the test program (the interpreter and `sh4_ops.h` are the reference, not mutated): **118 mutants, 118 killed (100 %)**;
+  the one first survivor (`i < 4` -> `i <= 4` in `fipr`) was killed by giving the test vectors a fifth element that
+  must not count. The game-route Mull run excludes `fpu.h` (and `hw.h`).
+
+### 13.2 Identical copies (`port/symbols/copies.tsv`, `tools/dupes.py`, `tools/copies.py`, `src/copies/`)
+
+The game is C++: SHC compiled each inline method (vector helpers, accessors, constructors, thunks to the SDK) into
+every unit that uses it. `tools/s3.sh dupes` (`tools/dupes.py`, in the sandbox: it reads 1ST_READ.BIN, prints
+addresses only) groups the game's functions whose bytes are the same once outside branches are absolute and
+literal-pool loads are their values: **204 groups, 2 606 functions** (65 % of the game's functions, 12 % of its bytes);
+the groups are `port/symbols/copies.tsv`. One hand-written function stands for its whole group: `tools/copies.py`
+(`tools/s11.sh copies`) writes an `HW_EXPORT` line with the same statement for every other copy that the translation
+has (the pure translation's `meta.tsv`; a copy the trim dropped can never run) into `src/copies/<path of the source
+file>`, which includes that file's headers. The statement repeated is the first export of the group in address order,
+except that one in `core/inline.c` wins (class-neutral accessor names: two classes' getters of the same offset compile
+to the same bytes).
+
+**Rule for testing copies**: identical machine code behaves identically for every input, so a group is tested when
+one of its copies passes the difftest (own samples or inside a passing caller); its unreached copies count as tested
+by identity. `tools/s11.sh status` (`tools/hand_status.py`) lists, after a test, the groups with no passing copy and
+the single exports that are untested: they are removed (S13: 14 groups and the title's fade-in, never reached). Mull
+excludes `src/copies/` (their adapters are the same statement; the function bodies are mutated where they are
+written). Fragments (the shared epilogue tails that SHC jumps into: `jsr @r3` on a frame the caller built) are not
+functions: never hand-written.
+
+### 13.3 Function coverage, call graph, Ghidra dumps
+
+- `tools/s3.sh fncover` / `tools/s11.sh cover` (`tools/fncover.py`): the pure translation compiled with gcc
+  `--coverage`, every route run once with its own profile directory, gcov's JSON call counts per translated function:
+  `docs/progress/fn_coverage.tsv` (address, route:calls). S13: **1 228 game functions (155 780 bytes) run on the 8
+  routes**; the other 2 782 game functions are reached by no route (other modes, menus, error paths).
+- `tools/ghidra.sh decomp2 ADDR...` (`S13Decomp.java`): the pseudo-C with the code range read-only (the
+  decompiler folds literal-pool constants: `0xbc` instead of `DAT_8c01b2d8`) and FPSCR.SZ/PR known as 0 (the 64-bit
+  fmov ghosts become dead `cVar == '\0'` branches: take that side). Float arguments still show as CONCAT44 pairs:
+  read the disassembly (`tools/ghidra.sh asm`) for anything with floats.
+- `tools/ghidra.sh post S13Calls.java LO HI`: the direct call graph ("call FROM TO..."), used to order the work
+  leaves first. Both dumps are disc-derived: they stay in `port_work/` (gitignored), never in docs or commits.
+- A host crash in hand-written C prints the native call stack as `rt crash` lines (`port/runtime/main.c`; S13 found
+  a method that takes its port in r5, not r4, this way).
+
+### 13.4 The motion classes and the title scene
+
+- `src/core/vec.{h,c}`: **Vec3**, **Quat** (0, 0, 0, 1), **Matrix** (4x4), and the game's damped-motion model:
+  **Body** (position, velocity, force, damping; `body_step`: velocity += force, velocity *= damping, position +=
+  velocity, force = 0; `body_pull`: force += (target - position) * k) and **Body1**, its one-dimensional twin
+  (`body1_step`, `body1_pull`, `body1_pull_angle` for an angle taken the short way round as a 16-bit Ninja angle).
+  The title's camera eye, target, logo and the "mover" are Bodies; its three angles are Body1s.
+- `src/core/ninja.{h,c}`: the game's stubs to Ninja (jumps with every register passed on), matrix helpers on the
+  current matrix (float angles truncated to Ninja units), the njControl3D flags stack, fog on/off.
+- `src/core/inline.{h,c}`: class-neutral accessors (`field_get`, `field_set_f32`, ...), the empty method, `return
+  this`.
+- `src/core/view.{h,c}`: View fields 0xF0-0x11B (fog, light direction, intensity, colour) and their setters.
+- `src/game/title.c`: **TitleScene** (0x1C4) declared field by field: the pad, the state (0 fade-in, 1 logo, 2 the
+  intro of variant 0, 3 the VMU save check, 4 leaving), the buttons pressed with a 15-frame lock, the logo phases
+  (wait 300 frames, the logo's motion with a 50-frame fade-in, then two layers that scroll and cross-fade along a sine
+  every 16 frames), the attract time-out (1 800 frames: the demo and mode 3 alternate), the texture archive per
+  language, seven model files read with nj_ReadChunkFile, the camera bodies and goals. Hand-written: the
+  construction (`title_init`, was func_8C01B23C, resumable: the fade it starts ends frames), the update (state
+  machine and the camera pulls), the logo. Still translated: variant 0's intro (func_8C01BEF8, 1 714 bytes), the draw
+  (func_8C01BB0C: not in functions.tsv, only the vtable points to it), the VMU save check (func_8C018E10 /
+  func_8C018E7C); the fade-in (func_8C01BB52) is written but not exported: only mode 1 (never visited) starts at
+  state 0.
+
+### 13.5 Delegated batches (the S13 workflow for throughput)
+
+`port_work/s13/regions/BRIEF.md` (gitignored, with the dumps) is the brief: the covered, not-yet-written functions
+whose direct callees are all written or outside the game ("leaves", from `S13Calls`), split by address into batches;
+for each batch the `decomp2` pseudo-C and the disassembly are dumped once into `port_work/`; a writer (S13: two
+subagents in parallel, no Docker, no git) writes C files into `port_work/s13/stage/<batch>/` (never `src/`: a build
+compiles every file of `src/`, and a half-written file breaks the gates running meanwhile) and syntax-checks them on
+the host (`clang -fsyntax-only` with `-Isrc/include`: `src/` is our code, no disc data); the lead copies them into
+`src/`, runs `tools/s11.sh copies`, `gen`, the difftest route by route, `tools/s11.sh status`, and comments out
+(`/* not exported (S13 difftest: reason): HW_EXPORT(...) */`) every export that fails or is unreached; then the
+whole-run comparison. S13: batch a 87 of 99 written (12 skipped: fragments, functions cut short, one that waits for
+a V-blank, one that changes SR), batch b 144 of 163 (19 skipped); after the difftest, 7 exports commented out
+(different stack or float behaviour, different HLE calls, unreached) and 1 (a read of the caller's r13) never
+exported. **Never edit `src/` while a gate runs** (S13 lost one comparison that way).
+
+## 14. The plan for the whole game (S13)
+
+Every game function becomes hand-written C. 4 010 functions, 301 130 bytes; done after S13: see section 1 and
+`docs/progress/decomp.tsv`. By region (address ranges of the game code; "left, reached" = no export yet but some route
+runs it, from `docs/progress/fn_coverage.tsv`; "left, unreached" = no route runs it yet):
+
+| range | what lives there | functions | done | left, reached | left, unreached |
+|---|---|---|---|---|---|
+| 8C010000-8C012FFF | engine core: tasks, pads, views, files | 113 | 61 | 6 (1 582 B) | 46 (5 704 B) |
+| 8C013000-8C015FFF | data fix-ups, contacts, model builders, text | 92 | 60 | 8 (3 358 B) | 24 (3 626 B) |
+| 8C016000-8C018FFF | main loop, start-up, sound, VMU | 101 | 52 | 11 (2 578 B) | 38 (5 778 B) |
+| 8C019000-8C01A3FF | Game modes, save data | 96 | 52 | 9 (464 B) | 35 (1 540 B) |
+| 8C01A400-8C01B1FF | mode 0 (logos), race-scene wrapper | 69 | 55 | 9 (1 924 B) | 5 (80 B) |
+| 8C01B200-8C01CFFF | title | 19 | 13 | 2 (2 586 B) | 4 (140 B) |
+| 8C01D000-8C021FFF | menus: modes 3, 4, 9, 11, 12 | 201 | 100 | 4 (512 B) | 97 (17 184 B) |
+| 8C022000-8C02FFFF | PenPen House, course select, race scene | 405 | 206 | 101 (39 478 B) | 98 (9 240 B) |
+| 8C030000-8C03FFFF | racers, motion, stage objects | 460 | 277 | 87 (42 322 B) | 96 (11 498 B) |
+| 8C040000-8C04CFFF | course, camera, lights, actors, effects | 914 | 593 | 104 (21 978 B) | 217 (11 312 B) |
+| 8C04D000-8C06243F | other modes and objects (mostly unreached) | 1 540 | 999 | 22 (3 490 B) | 519 (57 248 B) |
+
+(The "done" column counts copies: most of the bytes are left.) The order, each step leaves first (`S13Calls`):
+
+1. **Reached code, by region, in delegated batches** (13.5): the 343 reached functions left (~120 KB): the race
+   scene, racers, course, camera and actors (8C022000-8C04CFFF) are 85 % of it; their big functions (500-2 600
+   bytes: motion players, the race update, collision) need the asm, not the pseudo-C. ~3-4 sessions at S13's rate
+   (231 written by two batches in ~25 minutes each, ~10 % failing the first difftest).
+2. **Routes before unreached code**: no function is exported untested, so the 1 199 unreached functions (~180 KB)
+   wait for routes: the title's other menu entries (OPTIONS: up then A from the menu; VS with 3 players), the
+   other characters and courses in the race select, time trial, the house's other rooms, results/rankings, the
+   game's ending (mode 9), modes 1, 4, 11, 12, the VMU menus (save/load/delete with and without a VMU), an
+   unplugged controller, the drive lid. The `--watch` frame column on the Game's mode (`Game` at 0x8CE16B00 in the
+   pure run: mode +0x0C, next_mode +0x10, mode_arg +0x14) finds the inputs cheaply; screenshots confirm them.
+   Then `tools/s11.sh cover` again, and step 1 on what the new routes reach. ~4-6 sessions.
+3. **Resumable chain and yields**: the functions on the yield chain (`rt yield-chain`) and those that wait for a
+   V-blank are written with `HW_RESUMABLE` by hand (not delegated).
+4. **Mutation** on every batch (`tools/s11.sh mutate --only`), the report classified, then the final gates.
+5. The translated SDK and HLE stay as they are (PLAN 7.2); the end state is a build where every game function in
+   `functions.tsv` (and the vtable-only ones like the title's draw at 0x8C01BB0C) is hand-written.
