@@ -205,4 +205,12 @@ f32 course_value(gaddr course, int32_t i);
 
 f32 race_scene_start_value(gaddr scene);
 
+/* game/course.c (S13; S14 b08 declares them for their callers) */
+gaddr course_env_construct(gaddr env);
+void course_release(gaddr course);
+/* game/stage.c */
+gaddr course_models(gaddr course);     /* &models: CourseModelSet[4][2] */
+gaddr course_words(gaddr course);      /* &course_words */
+gaddr course_env_words(gaddr course);  /* &env_word */
+
 #endif

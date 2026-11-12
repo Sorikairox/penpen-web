@@ -10,6 +10,7 @@
 
 #include "../core/task.h"
 #include "../core/vec.h"
+#include "../core/ninja.h" /* b07: NjSprite */
 
 typedef struct RacerEffects {
   Task task;       /* 0x00: vtable 0x8C23DB1C */
@@ -22,9 +23,10 @@ typedef struct RacerEffects {
 } RacerEffects;
 HW_SIZE(RacerEffects, 0x3C);
 
-/* the ribbon: its first word points to an object whose first word is the array of 4 * g_ribbon_length points */
+/* the ribbon: its first word points to an object whose first word is the array of 4 * g_ribbon_length points
+ * (b07: a Ninja basic model, NJS_MODEL, that the constructor func_8C038D94 builds: a quad per pair) */
 typedef struct Ribbon {
-  gaddr points_holder; /* 0x00 */
+  gaddr points_holder; /* 0x00: b07: the NJS_MODEL (core/file.h NjModel, 0x28 bytes) */
   uint32_t word4;      /* 0x04 */
 } Ribbon;
 HW_SIZE(Ribbon, 8);
@@ -33,14 +35,16 @@ HW_SIZE(Ribbon, 8);
  * racer's update, func_8C0351C8) */
 typedef struct RibbonFrame {
   Matrix m;            /* 0x00 */
-  uint8_t pad_40[0x70 - 0x40];
+  Vec3 position;       /* 0x40: b07: where set C's particles start (effect_set_c_emit) */
+  uint8_t pad_4c[0x70 - 0x4C];
   f32 low;             /* 0x70 */
   f32 high;            /* 0x74 */
 } RibbonFrame;
+HW_OFFSET(RibbonFrame, position, 0x40);
 HW_OFFSET(RibbonFrame, low, 0x70);
 HW_OFFSET(RibbonFrame, high, 0x74);
 
-/* a 0x18-byte record of the ribbon's (func_8C038788 clears one) */
+/* a 0x18-byte record of the ribbon's (func_8C038788 clears one; b07: the first 0x18 bytes of the ribbon's NJS_MODEL) */
 typedef struct RibbonRecord {
   uint32_t words[5];   /* 0x00 */
   uint16_t half14;     /* 0x14 */
@@ -57,61 +61,126 @@ typedef struct RibbonKind {
 HW_SIZE(RibbonKind, 12);
 
 #define RIBBON_SET_ARRAYS 8
+/* b07: every set starts with the NJS_SPRITE it draws its particles with (position, scale, angle, texture list =
+ * the shared data's word, texture animation = a static record): the three words at 0x14 are its ang, tlist and tanim.
+ * A particle has a kind (the sprite's texture-animation entry, or 8/10 / 12-15: a motion model), a state (0 = off,
+ * 1 = waiting out its counter / playing, 2 = growing, 3 = ending), a size counted up to a limit (its alpha falls with
+ * it), a scale and a Body. */
 typedef struct RibbonSet {
-  uint8_t pad_00[0x14];
-  uint32_t word14;     /* 0x14: 0 */
-  uint32_t shared_word; /* 0x18 */
-  gaddr data;          /* 0x1C: RIBBON_SET_DATA */
-  uint8_t pad_20[0x24 - 0x20];
-  gaddr model;         /* 0x24: from the shared data's table (by g_ribbon_kind) */
+  union {
+    NjSprite sprite;     /* 0x00: b07 */
+    struct {
+      uint8_t pad_00[0x14];
+      uint32_t word14;     /* 0x14: 0 (sprite.ang) */
+      uint32_t shared_word; /* 0x18 (sprite.tlist) */
+      gaddr data;          /* 0x1C: RIBBON_SET_DATA (sprite.tanim) */
+    };
+  };
+  gaddr object;        /* 0x20: b07: the model tree of the motion-model particles (kinds 8 and 10) */
+  gaddr model;         /* 0x24: from the shared data's table (by g_ribbon_kind); b07: an NJS_MOTION (nb_frames) */
   gaddr texture;       /* 0x28 */
   int32_t count;       /* 0x2C: g_ribbon_count */
   uint8_t pad_30[0x34 - 0x30];
-  gaddr arrays[RIBBON_SET_ARRAYS]; /* 0x34: a word per ribbon each (the third, 0x3C, cleared) */
+  union {
+    gaddr arrays[RIBBON_SET_ARRAYS]; /* 0x34: a word per ribbon each (the third, 0x3C, cleared) */
+    struct {             /* b07: what the update and the draw do with them */
+      gaddr kinds;       /* 0x34: int32: 8, 10 = a motion model; 0, 3, 4, 5 = a sprite of that texture entry */
+      gaddr counters;    /* 0x38: int32: frames to wait in state 1 */
+      gaddr states;      /* 0x3C: int32 */
+      gaddr alphas;      /* 0x40: f32 (the draw computes it) */
+      gaddr sizes;       /* 0x44: f32: counted up to g_ribbon_size_limit */
+      gaddr scales;      /* 0x48: f32 */
+      gaddr frames;      /* 0x4C: f32: the motion's frame */
+      gaddr angles;      /* 0x50: f32: the model's turn (Ninja angle units) */
+    };
+  };
   gaddr bodies;        /* 0x54: a Body per ribbon */
 } RibbonSet;
 HW_OFFSET(RibbonSet, word14, 0x14);
+HW_OFFSET(RibbonSet, object, 0x20);
 HW_OFFSET(RibbonSet, model, 0x24);
 HW_OFFSET(RibbonSet, count, 0x2C);
 HW_OFFSET(RibbonSet, arrays, 0x34);
+HW_OFFSET(RibbonSet, angles, 0x50);
 HW_OFFSET(RibbonSet, bodies, 0x54);
 HW_SIZE(RibbonSet, 0x58);
 
-/* set A (constructor func_8C039CF2): `count` at 0x20, arrays from 0x30 */
+/* set A (constructor func_8C039CF2): `count` at 0x20, arrays from 0x30. b07: puffs that rise from an origin
+ * (positions are origin + offset; drawn while above the course's floor) */
 typedef struct EffectSetA {
-  uint8_t pad_00[0x30];
-  gaddr arrays[8];     /* 0x30 */
+  NjSprite sprite;     /* 0x00: b07: scale 0.05 (g_set_a_scale), tanim 0x8C096CD0 */
+  int32_t count;       /* 0x20: b07 */
+  uint32_t word24;     /* 0x24: b07: 0 */
+  int32_t cell;        /* 0x28: b07: the course cell whose floor height hides the puffs */
+  f32 heading;         /* 0x2C: b07: the drift's direction (Ninja angle units) */
+  union {
+    gaddr arrays[8];   /* 0x30 */
+    struct {           /* b07 */
+      gaddr counters;  /* 0x30: int32 */
+      gaddr states;    /* 0x34: int32 */
+      gaddr types;     /* 0x38: int32: the sprite's texture entry (1: rises faster) */
+      gaddr origins;   /* 0x3C: Vec3 */
+      gaddr offsets;   /* 0x40: Vec3 */
+      gaddr scales;    /* 0x44: f32 (0.05 at construction) */
+      gaddr sizes;     /* 0x48: f32: counted up to g_set_a_size_limit */
+      gaddr alphas;    /* 0x4C: f32 */
+    };
+  };
 } EffectSetA;
+HW_OFFSET(EffectSetA, count, 0x20);
+HW_OFFSET(EffectSetA, heading, 0x2C);
 HW_OFFSET(EffectSetA, arrays, 0x30);
+HW_OFFSET(EffectSetA, alphas, 0x4C);
 HW_SIZE(EffectSetA, 0x50);
 
 /* set B (constructor func_8C03AF80) */
 typedef struct EffectSetB {
-  uint8_t pad_00[0x14];
-  uint32_t word14;     /* 0x14: 0 */
-  uint32_t shared_word; /* 0x18 */
-  gaddr data;          /* 0x1C: RIBBON_SET_DATA */
-  uint8_t pad_20[0x2C - 0x20];
+  union {
+    NjSprite sprite;     /* 0x00: b07 */
+    struct {
+      uint8_t pad_00[0x14];
+      uint32_t word14;     /* 0x14: 0 (sprite.ang) */
+      uint32_t shared_word; /* 0x18 */
+      gaddr data;          /* 0x1C: RIBBON_SET_DATA */
+    };
+  };
+  gaddr object;        /* 0x20: b07: as RibbonSet's (kinds 12-15) */
+  gaddr motion;        /* 0x24: b07: NJS_MOTION */
+  gaddr texture;       /* 0x28: b07 */
   int32_t count;       /* 0x2C */
   uint32_t word30;     /* 0x30: 1 */
-  gaddr arrays[7];     /* 0x34: a word per particle each (the second, 0x38, cleared) */
+  union {
+    gaddr arrays[7];   /* 0x34: a word per particle each (the second, 0x38, cleared) */
+    struct {           /* b07 */
+      gaddr counters;  /* 0x34: int32 */
+      gaddr states;    /* 0x38: int32 */
+      gaddr kinds;     /* 0x3C: int32: 0-7 a sprite, 8-11 a flat sprite turned by sprite.ang, 12-15 a motion model */
+      gaddr scales;    /* 0x40: f32 */
+      gaddr alphas;    /* 0x44: f32 */
+      gaddr sizes;     /* 0x48: f32 */
+      gaddr frames;    /* 0x4C: f32 */
+    };
+  };
   gaddr bodies;        /* 0x50: a Body per particle */
 } EffectSetB;
 HW_OFFSET(EffectSetB, word14, 0x14);
+HW_OFFSET(EffectSetB, object, 0x20);
 HW_OFFSET(EffectSetB, count, 0x2C);
 HW_OFFSET(EffectSetB, arrays, 0x34);
+HW_OFFSET(EffectSetB, frames, 0x4C);
 HW_OFFSET(EffectSetB, bodies, 0x50);
 HW_SIZE(EffectSetB, 0x54);
 
 /* set C (constructor func_8C03BE38; g_object_set_c_count particles) */
 typedef struct EffectSetC {
-  uint8_t pad_00[0x28];
+  NjSprite sprite;     /* 0x00: b07: scale 0.15625, a random angle, tanim 0x8C096CF8 */
+  uint8_t pad_20[0x28 - 0x20];
   gaddr counters;      /* 0x28: int32 per particle */
   gaddr states;        /* 0x2C: int32 per particle: 1 = waiting, 2 = growing, 3 = ending, 0 = off */
-  gaddr array30;       /* 0x30 */
-  gaddr array34;       /* 0x34 */
+  gaddr array30;       /* 0x30: b07: f32 scale (0.078125 at construction) */
+  gaddr array34;       /* 0x34: b07: f32 alpha */
   gaddr values;        /* 0x38: f32 per particle */
-  gaddr array3c;       /* 0x3C */
+  gaddr array3c;       /* 0x3C: b07: f32 (0 at construction) */
   gaddr bodies;        /* 0x40: a Body per particle */
 } EffectSetC;
 HW_OFFSET(EffectSetC, counters, 0x28);
@@ -122,5 +191,46 @@ static inline RacerEffects *racer_effects_at(gaddr a) { return (RacerEffects *)h
 
 /* game/model.c */
 void racer_effects_reset_ribbon(gaddr fx, f32 drop, gaddr m);
+void ribbon_push(gaddr ribbon, gaddr frame); /* func_8C038FFE (S14 b05 declares it) */
+
+/* game/racer_body.c (S14 b05): the racer's frame handed to each effect */
+void racer_effects_push_ribbon(gaddr fx, gaddr frame);
+void racer_effects_push_ribbons(gaddr fx, gaddr frame);
+void racer_effects_push_set_b(gaddr fx, gaddr frame);
+void racer_effects_push_set_c(gaddr fx, gaddr frame);
+
+/* game/model.c (b07 declares them for their callers) */
+gaddr ribbon_record_clear(gaddr rec);
+void shared_data_load(void);
+void model_draw(gaddr obj);
+gaddr ribbon_set_construct(gaddr set);
+void ribbon_set_free(gaddr set);
+gaddr effect_set_b_construct(gaddr set, int32_t count);
+/* game/stage.c (b07 declares them for their callers) */
+void effect_set_a_free(gaddr set);
+void effect_set_b_free(gaddr set);
+void effect_set_c_free(gaddr set);
+void effect_set_c_update(gaddr set);
+
+/* b07, game/effects.c */
+void effect_material_set(f32 r, f32 g, f32 b, f32 a);
+gaddr racer_effects_init(gaddr fx, gaddr racer);
+gaddr racer_effects_construct(gaddr fx, gaddr racer);
+void racer_effects_free(gaddr fx);
+gaddr racer_effects_delete(gaddr fx, int32_t free_memory);
+void racer_effects_update(gaddr fx);
+void racer_effects_draw(gaddr fx);
+gaddr ribbon_construct(gaddr ribbon);
+void ribbon_free(gaddr ribbon);
+void ribbon_set_update(gaddr set);
+void ribbon_set_draw(gaddr set);
+gaddr effect_set_a_construct(gaddr set, int32_t count);
+void effect_set_a_update(gaddr set);
+void effect_set_a_draw(gaddr set);
+void effect_set_b_update(gaddr set);
+void effect_set_b_draw(gaddr set);
+gaddr effect_set_c_construct(gaddr set);
+void effect_set_c_draw(gaddr set);
+void effect_set_c_emit(gaddr set, gaddr frame);
 
 #endif

@@ -217,6 +217,10 @@ static void interp_call(SH4 *c, uint32_t a) {
       }
       if (c->last == SH4_BR_NONE) continue;
       if (c->last == SH4_BR_RET && c->pc == ret && c->r[15] >= sp) return;
+      /* S14: a function Ghidra cut short is translated up to the cut and the interpreter runs the rest from there,
+       * entered with the PR of the last call (not its caller's): when the original's caller is hand-written, the
+       * function's final rts goes to hw_call's return marker (hw.c HW_RETURN): that is the return too */
+      if (c->last == SH4_BR_RET && c->pc == 0x8C000F08u) return;
       t = RT_NORM(c->pc);
       if (!((hle_known(t) || rt_lookup(t)) && t != rt_force_interp)) continue;
     }

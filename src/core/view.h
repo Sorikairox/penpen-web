@@ -29,7 +29,10 @@ HW_SIZE(NjScreen, 0x14);
 
 typedef struct View {
   int32_t layout;               /* 0x000: index into the layout table (screen rectangle, ...) */
-  uint8_t clip[0x20];           /* 0x004: the njClip2D rectangle */
+  uint8_t clip[0x10];           /* 0x004: the njClip2D rectangle */
+  f32 origin_x, origin_y;       /* 0x014: the view's top-left corner on the screen (its 2D sprites and digits are
+                                   placed from it) */
+  uint8_t unknown1c[0x24 - 0x1C]; /* 0x01C */
   uint8_t camera[0x40];         /* 0x024: the Ninja camera (NJS_CAMERA) */
   struct {
     Vec3 position, direction;
@@ -48,6 +51,7 @@ typedef struct View {
   Vec3 vec150[3];               /* 0x150: three members with empty constructors */
   uint8_t unknown174[0x18C - 0x174];
 } View;
+HW_OFFSET(View, origin_x, 0x14);
 HW_OFFSET(View, camera, 0x24);
 HW_OFFSET(View, camera_copy, 0x64);
 HW_OFFSET(View, screen, 0x9C);

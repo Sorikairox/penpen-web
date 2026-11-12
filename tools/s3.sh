@@ -14,7 +14,7 @@
 #                               (RANGES=all: on the SDK code too; MUTS="2 7": a subset)
 #   tools/s3.sh mutate [args]   S12 (first pipeline, retired): rebuild per mutant (tools/mut_worker.py)
 #   tools/s3.sh mull [args]     S12: mutation testing with Mull (tools/mull_run.py in the penpen-mull:1 image)
-#   tools/s3.sh native [args]   build + run the boot natively (disc read from penpen-disc)
+#   tools/s3.sh native [args]   build + run the boot natively (disc read from penpen-disc); NOBUILD=1: run only
 #   tools/s3.sh wasm [args]     build the boot as wasm32 + run it in node (disc read by the node host)
 # Every container that sees disc-derived data runs with --network none --read-only --cap-drop ALL; the
 # disc, 1ST_READ.BIN, the generated C, objects, wasm and logs stay in the volumes penpen-disc, penpen-work
@@ -98,8 +98,12 @@ case "${1:-}" in
     box -v penpen-disc:/disc:ro -v penpen-build:/build:ro -e CF="$CF" -v "${MUTSRC:-$REPO/src}":/mutsrc:ro -e SRC=/mutsrc \
       ${MULL_IMAGE:-penpen-mull:1} python3 -I /src/tools/mull_run.py /src/tools/routes.tsv "$@" 2>&1 | filt ;;
   native)
+    # S14: NOBUILD=1 runs the build that is there (several runs in parallel after one build: tools/s11.sh test)
     shift
-    box -v penpen-disc:/disc:ro -v penpen-build:/build $IMG sh -c "{ sh /src/port/runtime/build.sh native /build/$G /build/native$SFX '$CF' $J || { echo 'build FAILED (compiler messages are not shown: they may quote generated code)'; exit 1; }; } && /build/native$SFX/penpen --disc /disc $(qargs "$@")" 2>&1 | filt ;;
+    BUILD="sh /src/port/runtime/build.sh native /build/$G /build/native$SFX '$CF' $J"
+    BMODE=rw
+    [ -z "${NOBUILD:-}" ] || { BUILD=true; BMODE=ro; }
+    box -v penpen-disc:/disc:ro -v penpen-build:/build:$BMODE $IMG sh -c "{ $BUILD || { echo 'build FAILED (compiler messages are not shown: they may quote generated code)'; exit 1; }; } && /build/native$SFX/penpen --disc /disc $(qargs "$@")" 2>&1 | filt ;;
   wasm)
     shift
     box -v penpen-disc:/disc:ro -v penpen-build:/build $IMG sh -c "{ sh /src/port/runtime/build.sh wasm /build/$G /build/wasm$SFX '$CF' $J || { echo 'build FAILED (compiler messages are not shown: they may quote generated code)'; exit 1; }; } && /emsdk/node/22.16.0_64bit/bin/node /src/port/runtime/node/run.mjs /build/wasm$SFX/penpen.wasm /disc $(qargs "$@")" 2>&1 | filt ;;

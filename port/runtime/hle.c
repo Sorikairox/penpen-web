@@ -418,12 +418,12 @@ int hle_set_watch(const char *s) {
 }
 /* S14: --poke ADDR=VALUE@FRAME[,...]: a test input that writes a guest word at the end of frame FRAME (after its
  * frame line): progress a route cannot play through (the save record's unlock flags) is set the way a loaded save
- * would set it; pure and hand runs get the same writes */
-static struct { uint32_t frame, addr, value; } poke[16];
+ * would set it; pure and hand runs get the same writes; at most 64 */
+static struct { uint32_t frame, addr, value; } poke[64];
 static int npoke;
 int hle_set_poke(const char *s) {
   npoke = 0;
-  while (*s && npoke < 16) {
+  while (*s && npoke < 64) {
     char *e;
     poke[npoke].addr = (uint32_t)strtoul(s, &e, 16);
     if (*e != '=') return -1;

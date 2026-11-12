@@ -106,7 +106,7 @@ HW_EXPORT(8c0165e2, RET(view_current_index()))
 
 /* was func_8C04241E: fog on for view i (the counterpart of view_fog_off) */
 void view_fog_on(int32_t index) { g_views[index].fog = 1; }
-HW_EXPORT(8c04241e, view_fog_on((int32_t)ARG0))
+/* not exported (S14 difftest: untested: since the menu code that called it is hand-written, it is entered only from C, and no passing sample of its callers covered it): HW_EXPORT(8c04241e, view_fog_on((int32_t)ARG0)) */
 
 /* was func_8C01E282 (and its copy func_8C0228D0): the current view's light colour = (r, g, b), the view pointer read
  * again for each component as the original does */

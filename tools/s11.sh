@@ -5,7 +5,7 @@
 #                                 (/build/genhand, recomp.py --hand)
 #   tools/s11.sh native [args]    build + run the hand build natively (args as tools/s3.sh native)
 #   tools/s11.sh wasm [args]      the same as wasm32 in node
-#   tools/s11.sh test [B[:S]]     the in-run differential test of every hand-written function (difftest.c) over every
+#   tools/s11.sh test [B[:S]]     (S14: one build, then PAR=2 routes at a time) the in-run differential test of every hand-written function (difftest.c) over every
 #                                 route of tools/routes.tsv (S12; S11: the boot and the S4 route); B samples per
 #                                 function, one sample per S frames after the first calls; a merged verdict per
 #                                 function over all routes (tools/hwtest_merge.py)
@@ -41,9 +41,19 @@ case "${1:-}" in
     k=$1; shift
     GEN=genhand "$REPO/tools/s3.sh" $k "$@" ;;
   test)
+    # S14: one build, then the routes PAR at a time (default 2: two containers)
     b=${2:-160}
+    GEN=genhand "$REPO/tools/s3.sh" native --frames 1 > "$LOGS/test_build.log" 2>&1 || true
+    grep -q 'build FAILED' "$LOGS/test_build.log" && { echo "test: build FAILED"; exit 1; }
+    i=0
+    for r in $(routes | cut -f1); do
+      routes | awk -F'\t' -v r="$r" '$1 == r' | { IFS='	' read -r r f p x
+        NOBUILD=1 GEN=genhand "$REPO/tools/s3.sh" native --frames "$f" $(padarg "$p") $(extra "$x") --verbose 0 --frame-log 0 --hwtest "$b" > "$LOGS/test_$r.log" 2>&1 || true; } &
+      i=$((i + 1))
+      [ $((i % ${PAR:-2})) -ne 0 ] || wait
+    done
+    wait
     routes | while IFS='	' read -r r f p x; do
-      GEN=genhand "$REPO/tools/s3.sh" native --frames "$f" $(padarg "$p") $(extra "$x") --verbose 0 --frame-log 0 --hwtest "$b" > "$LOGS/test_$r.log" 2>&1 || true
       echo "== $r"
       grep -E '^hw (FAIL|sandbox)' "$LOGS/test_$r.log" | head -20 || true
       grep -E '^hw test hand-written' "$LOGS/test_$r.log" || echo "no summary (see $LOGS/test_$r.log)"

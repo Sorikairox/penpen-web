@@ -271,3 +271,5 @@ cxx_init_const:src/game/title.c:108:16:108:17	equivalent	title_init: skipping an
 cxx_lt_to_le:src/game/title.c:108:21:108:22	equivalent	title_init: a fourth quat_identity writes (0, 0, 0, 1) over goal and goal_angle[0] (0x1AC-0x1BB), which the same function sets to zero later, before anything reads them
 cxx_replace_scalar_call_nz:src/game/title.c:110:3:110:34	equivalent	title_init: method_self is Vec3's empty constructor (returns its argument); its result is not used
 cxx_replace_scalar_call_zr:src/game/title.c:107:3:107:33	equivalent	title_init: the mover's first body_init is overwritten by body_reset and the damping fill later in the same function, before anything reads it
+cxx_assign_const:src/core/task.c:134:27:134:28	equivalent	S14: the root tree's updates_per_frame is written by game_frame (main.c) every frame before tasktree_update reads it; the 1 stored at attach time is never read
+cxx_add_to_sub:src/game/vmu.c:57:29:57:30	unreachable	S14: drive is always 0 (the routes have one VMU, A1), so + and - of drive * size agree; a second card (drive 1+) would reach it

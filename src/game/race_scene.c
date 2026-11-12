@@ -76,9 +76,9 @@ void race_ending_draw_a(gaddr scene) {
   if (s->state != RACE_STATE_ENDING) return;
   if (s->substate == 1) {
     int32_t view = view_current_index();
-    ending_draw_banner(view != s->player_view[s->focus]);
+    ending_draw_banner(view != s->player_view[s->focus[0]]);
   } else if (s->substate == 3) {
-    if (view_current_index() == s->player_view[s->focus]) ending_draw_result(s->result);
+    if (view_current_index() == s->player_view[s->focus[0]]) ending_draw_result(s->result);
   }
 }
 HW_EXPORT(8c02daf0, race_ending_draw_a(ARG0))
@@ -89,14 +89,14 @@ void race_ending_draw_b(gaddr scene) {
   RaceScene *s = race_scene_at(scene);
   if (s->state != RACE_STATE_ENDING) return;
   if (s->substate == 1) {
-    if (view_current_index() == s->player_view[s->focus]) {
+    if (view_current_index() == s->player_view[s->focus[0]]) {
       ending_draw_item(0);
       return;
     }
     int32_t player = s->view_player[view_current_index()];
     if (player >= 0) ending_draw_item(s->player_item[player]);
   } else if (s->substate == 3) {
-    if (view_current_index() == s->player_view[s->focus]) ending_draw_result2(s->result);
+    if (view_current_index() == s->player_view[s->focus[0]]) ending_draw_result2(s->result);
   }
 }
 HW_EXPORT(8c02dc26, race_ending_draw_b(ARG0))
@@ -272,7 +272,7 @@ void race_music_update(gaddr scene) {
   if (r->mode == 0 || r->mode == 5)
     player = s->players[0];
   else
-    player = s->players[s->focus];
+    player = s->players[s->focus[0]];
   int32_t cell = racer_at(player)->contacts.cell;
   int32_t attribute = CELL_KIND(((const uint16_t *)hw_ptr(course_at(s->course)->cell_attrs))[cell]);
   if (attribute == 6) return;

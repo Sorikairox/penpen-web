@@ -217,13 +217,14 @@ void racer_set_variant(gaddr racer, int32_t n) {
 }
 HW_EXPORT(8c03735c, racer_set_variant(ARG0, (int32_t)ARG1))
 
-/* func_8C037586: the racer's destructor body (a jump to func_8C0309A4) */
-static void racer_destroy_body(gaddr racer) { CALL1(0x8C037586u, racer); }
+/* was func_8C037586 (and its copy func_8C03783C): a jump to the racer's destructor body (racer_body_destroy, was
+ * func_8C0309A4, game/racer_body.c) */
+HW_EXPORT(8c037586, racer_body_destroy(ARG0))
 
 /* was func_8C03758C: the racer's deleting destructor (its vtable's first entry): the body, then the memory when
  * asked */
 gaddr racer_delete(gaddr racer, int32_t free_memory) {
-  racer_destroy_body(racer);
+  racer_body_destroy(racer);
   if (free_memory) syFree(racer);
   return racer;
 }
