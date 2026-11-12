@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Pen Pen S14: the functions left to hand-write, in batches for delegated writers (DECOMP.md 13.5, 15).
 
-  batches.py REPO OUTDIR [KB]
+  batches.py REPO OUTDIR [KB]      (COVER_EXTRA="f1 f2": more coverage, fncover's "rt cover" lines)
 
 "Left" = game functions (port/symbols/functions.tsv) that some route runs (docs/progress/fn_coverage.tsv) and that
 src/ does not export yet (commented-out exports count as left). Each gets a level: 0 when every direct callee
@@ -17,7 +17,7 @@ import os, re, sys
 def split_dump(path):
     d, cur = {}, None
     for line in open(path, errors='replace'):
-        m = re.match(r'  == (?:FUN_)?(8c[0-9a-f]{6})(?: in FUN_8c[0-9a-f]{6})? @', line)
+        m = re.match(r'  == \S+(?: in \S+)? @ (8c[0-9a-f]{6})', line)
         if m:
             cur = m.group(1)
             d[cur] = []
@@ -42,6 +42,8 @@ def main():
             if x.endswith('.c'):
                 done |= set(re.findall(r'^HW_EXPORT[A-Z_]*\((8c[0-9a-f]{6}),', open(os.path.join(d, x)).read(), re.M))
     cov = {l.split('\t')[0] for l in open(os.path.join(repo, 'docs/progress/fn_coverage.tsv')) if not l.startswith('#')}
+    for extra in os.environ.get('COVER_EXTRA', '').split():  # S14: "rt cover ADDR ..." lines of candidate routes
+        cov |= {l.split()[2] for l in open(extra) if l.startswith('rt cover 8')}
     left = {a: n for a, n in fn.items() if a in cov and a not in done}
     calls = {}
     for l in open(os.path.join(repo, 'port_work/s13/calls.txt')):

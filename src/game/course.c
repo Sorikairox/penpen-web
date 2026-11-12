@@ -9,6 +9,7 @@
 #include "../core/view.h"
 #include "course.h"
 #include "racer.h"
+#include "race_scene.h"
 
 /* func_8C062754 (SHC runtime): destroy `n` objects of `size` bytes at `p` with the destructor `dtor` */
 static void array_destroy(int32_t n, uint32_t size, gaddr p, gaddr dtor) { CALL4(0x8C062754u, n, size, p, dtor); }
@@ -210,3 +211,16 @@ gaddr course_env_construct(gaddr env) {
   return env;
 }
 HW_EXPORT(8c042668, RET(course_env_construct(ARG0)))
+
+/* was func_8C030A66 (and 5 identical copies): bit `bit` of the current view's bit set of the scene's course */
+int32_t race_scene_view_bit(gaddr scene, int32_t bit) {
+  return course_row_bit(race_scene_at(scene)->course, g_cur_view_index, bit);
+}
+HW_EXPORT(8c030a66, RET(race_scene_view_bit(ARG0, (int32_t)ARG1)))
+
+/* was func_8C029218 (and its copy func_8C03C65A): the scene's course value at the course's start segment */
+f32 race_scene_start_value(gaddr scene) {
+  gaddr course = race_scene_at(scene)->course;
+  return course_value(course, course_at(course)->start_segment);
+}
+HW_EXPORT(8c029218, RETF(race_scene_start_value(ARG0)))

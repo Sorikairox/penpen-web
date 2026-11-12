@@ -82,4 +82,9 @@ void view_apply_fog(void);
 gaddr view_screen(void);
 int32_t view_current_index(void);
 
+/* S14 */
+void view_fog_on(int32_t index);
+void view_current_set_light_color(f32 r, f32 g, f32 b);
+void view_current_set_light_dir(f32 x, f32 y, f32 z);
+
 #endif

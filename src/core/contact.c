@@ -115,3 +115,22 @@ void contact_respond(gaddr self, int32_t i, gaddr body) {
   hw_stack_free(sizeof(RespondScratch));
 }
 HW_EXPORT(8c014e88, contact_respond(ARG0, (int32_t)ARG1, ARG2))
+
+/* ---- objects that keep their Contacts after two words ----
+ * 63 classes (the scenery objects' colliders and the effects' holders) keep two words, then their Contacts: their
+ * destructor bodies are the same two functions, copied into every unit (port/symbols/copies.tsv) */
+typedef struct ContactsHolder {
+  uint32_t head[2];   /* 0x00 */
+  Contacts contacts;  /* 0x08 */
+} ContactsHolder;
+HW_OFFSET(ContactsHolder, contacts, 0x08);
+
+/* was func_8C01661E (and 62 identical copies): the destructor body: the Contacts freed */
+void contacts_holder_destroy(gaddr obj) { contacts_free(member_addr(obj, ContactsHolder, contacts)); }
+HW_EXPORT(8c01661e, contacts_holder_destroy(ARG0))
+/* was func_8C016628 (and 62 identical copies): the same, returning the object */
+gaddr contacts_holder_destroy_self(gaddr obj) {
+  contacts_free(member_addr(obj, ContactsHolder, contacts));
+  return obj;
+}
+HW_EXPORT(8c016628, RET(contacts_holder_destroy_self(ARG0)))

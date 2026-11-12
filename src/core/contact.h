@@ -34,4 +34,10 @@ HW_SIZE(Contacts, 0x54);
 
 static inline Contacts *contacts_at(gaddr a) { return (Contacts *)hw_ptr(a); }
 
+/* core/contact.c */
+void contacts_free(gaddr self);
+
+void contacts_holder_destroy(gaddr obj);
+gaddr contacts_holder_destroy_self(gaddr obj);
+
 #endif

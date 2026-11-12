@@ -118,4 +118,9 @@ HW_OFFSET(EffectSetC, counters, 0x28);
 HW_OFFSET(EffectSetC, bodies, 0x40);
 HW_SIZE(EffectSetC, 0x44);
 
+static inline RacerEffects *racer_effects_at(gaddr a) { return (RacerEffects *)hw_ptr(a); }
+
+/* game/model.c */
+void racer_effects_reset_ribbon(gaddr fx, f32 drop, gaddr m);
+
 #endif

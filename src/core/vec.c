@@ -19,7 +19,8 @@ gaddr vec3_set(f32 x, f32 y, f32 z, gaddr v) {
 }
 HW_EXPORT(8c01657a, RET(vec3_set(FARG0, FARG1, FARG2, ARG0)))
 HW_EXPORT(8c012198, vec3_set(FARG0, FARG1, FARG2, ARG0))
-HW_EXPORT(8c01af44, vec3_set(FARG0, FARG1, FARG2, ARG0)) /* was func_8C01AF44 */
+/* was func_8C01AF44 */
+HW_EXPORT(8c01af44, vec3_set(FARG0, FARG1, FARG2, ARG0))
 /* was func_8C01E19A and func_8C01E1B6: an object's Vec3 at 0x0C / at 0x24 = (x, y, z) (a Body's velocity and
  * damping) */
 HW_EXPORT(8c01e19a, vec3_set(FARG0, FARG1, FARG2, member_addr(ARG0, Body, velocity)))

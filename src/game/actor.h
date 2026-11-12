@@ -289,4 +289,9 @@ typedef struct MemberArray {
 HW_OFFSET(MemberArray, array, 0x04);
 HW_OFFSET(MemberArray, rotation, 0x14);
 
+/* game/actor.c */
+void actor_a_destroy(gaddr obj);
+void actor_b_destroy(gaddr obj);
+gaddr actor_base_construct(gaddr actor);
+
 #endif

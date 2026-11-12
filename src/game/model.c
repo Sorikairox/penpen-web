@@ -244,3 +244,16 @@ gaddr effect_set_b_construct(gaddr set, int32_t count) {
   return set;
 }
 HW_EXPORT(8c03af80, RET(effect_set_b_construct(ARG0, (int32_t)ARG1)))
+
+/* was func_8C01D1A6 (and 3 identical copies): the deleting destructor of a class that is a MotionPlayer: its model
+ * file freed, then the object when asked */
+gaddr motion_player_delete(gaddr player, int32_t free_memory) {
+  motion_player_free(player);
+  if (free_memory) syFree(player);
+  return player;
+}
+HW_EXPORT(8c01d1a6, RET(motion_player_delete(ARG0, (int32_t)ARG1)))
+
+/* was func_8C01E308 (and its copy func_8C030B02): reset a RacerEffects' ribbon (ribbon_reset) */
+void racer_effects_reset_ribbon(gaddr fx, f32 drop, gaddr m) { ribbon_reset(racer_effects_at(fx)->ribbon, drop, m); }
+HW_EXPORT(8c01e308, racer_effects_reset_ribbon(ARG0, FARG0, ARG1))

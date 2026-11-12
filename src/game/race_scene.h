@@ -17,8 +17,9 @@
  * which game; the mode argument of Game mode 7), the course and its variant. */
 typedef struct RaceSetup {
   Task task;          /* 0x00 */
-  uint32_t word24;    /* 0x24: 7 */
-  uint32_t word28;    /* 0x28: 1 in mode 5 */
+  int32_t state;      /* 0x24: what it shows now (7 at construction: nothing) */
+  int32_t requested;  /* 0x28: what it is asked to show (race_setup_update): 0 the SetupMenu, 1 the RaceScene (from
+                       * the start in mode 5, the demo), 2 a third scene, 3-6 leave the mode */
   int32_t mode;       /* 0x2C */
   int32_t course;     /* 0x30 */
   int32_t variant;    /* 0x34 */
@@ -116,5 +117,9 @@ static inline RaceSetup *race_setup_at(gaddr a) { return (RaceSetup *)hw_ptr(a);
 
 /* game/camera.c */
 int32_t race_scene_view_cell(gaddr scene, int32_t view);
+
+/* game/race_scene.c, game/stage.c */
+gaddr race_setup_get(void);
+int32_t race_scene_slot_insert(gaddr scene, gaddr contacts, int32_t slot);
 
 #endif

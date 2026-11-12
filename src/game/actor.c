@@ -94,20 +94,37 @@ static gaddr delete_after(gaddr obj, int32_t free_memory) {
   return obj;
 }
 
-/* func_8C04503C / func_8C047978: destructor bodies (still translated) */
-static void destroy_body_8c04503c(gaddr obj) { CALL1(0x8C04503Cu, obj); }
-static void destroy_body_8c047978(gaddr obj) { CALL1(0x8C047978u, obj); }
+/* two actor classes whose Contacts sit at 0x74 and 0x58 (their types are not mapped yet) */
+typedef struct ActorContacts74 {
+  Actor actor;            /* 0x00 */
+  uint8_t pad_28[0x74 - 0x28];
+  Contacts contacts;      /* 0x74 */
+} ActorContacts74;
+HW_OFFSET(ActorContacts74, contacts, 0x74);
+typedef struct ActorContacts58 {
+  Actor actor;            /* 0x00 */
+  uint8_t pad_28[0x58 - 0x28];
+  Contacts contacts;      /* 0x58 */
+} ActorContacts58;
+HW_OFFSET(ActorContacts58, contacts, 0x58);
+
+/* was func_8C04503C (and its copy func_8C048C74): the destructor body: the Contacts freed */
+void actor_a_destroy(gaddr obj) { contacts_free(member_addr(obj, ActorContacts74, contacts)); }
+HW_EXPORT(8c04503c, actor_a_destroy(ARG0))
+/* was func_8C047978 (and its copy func_8C053050) */
+void actor_b_destroy(gaddr obj) { contacts_free(member_addr(obj, ActorContacts58, contacts)); }
+HW_EXPORT(8c047978, actor_b_destroy(ARG0))
 
 /* was func_8C045050 */
 gaddr actor_a_delete(gaddr obj, int32_t free_memory) {
-  destroy_body_8c04503c(obj);
+  actor_a_destroy(obj);
   return delete_after(obj, free_memory);
 }
 HW_EXPORT(8c045050, RET(actor_a_delete(ARG0, (int32_t)ARG1)))
 
 /* was func_8C04798C */
 gaddr actor_b_delete(gaddr obj, int32_t free_memory) {
-  destroy_body_8c047978(obj);
+  actor_b_destroy(obj);
   return delete_after(obj, free_memory);
 }
 HW_EXPORT(8c04798c, RET(actor_b_delete(ARG0, (int32_t)ARG1)))
@@ -402,7 +419,6 @@ HW_EXPORT(8c047f38, effect_defaults(ARG0))
 /* nj_ModelL3 (Ninja, S2 name): draw a chunk model (another light mode than nj_ModelL1) */
 static inline void nj_ModelL3(gaddr model) { CALL1(0x8C0D1996u, model); }
 /* func_8C046B84: whether something of this size is on the panel's view (still translated) */
-static int32_t panel_sees(gaddr panel, uint32_t what) { return (int32_t)CALL2(0x8C046B84u, panel, what); }
 
 
 /* was func_8C0473C2: draw the 15 pieces that are not gone (state < 2) and that the race scene sees: placed and
@@ -414,7 +430,7 @@ void pieces_draw(gaddr obj) {
     Piece *p = (Piece *)hw_ptr(rec);
     if (p->state >= 2) continue;
     uint32_t what = p->size;
-    if (!panel_sees(panel_get(), what)) continue;
+    if (!race_scene_view_bit(panel_get(), (int32_t)what)) continue;
     matrix_push();
     matrix_translate_v(method_self(rec));
     matrix_rotate_x(p->angle.x);
@@ -430,7 +446,7 @@ void pieces_draw(gaddr obj) {
     matrix_pop();
   }
 }
-/* not exported (S13 difftest: differs from the original, to redo): HW_EXPORT(8c0473c2, pieces_draw(ARG0)) */
+HW_EXPORT(8c0473c2, pieces_draw(ARG0))
 
 /* was func_8C0485D0: draw a three-part object: part 0 (model_a of the actor's list) at its place turned by its
  * angle, and again turned half a turn and moved 7 along x; parts 1 and 2 (model_b) at theirs */
@@ -557,3 +573,10 @@ void chain_init(gaddr chain, gaddr placement) {
   }
 }
 HW_EXPORT(8c0479ec, chain_init(ARG0, ARG1))
+
+/* was func_8C0466DE (and 7 identical copies): an actor class's base construction (the Actor's); returns the actor */
+gaddr actor_base_construct(gaddr actor) {
+  actor_construct(actor);
+  return actor;
+}
+HW_EXPORT(8c0466de, RET(actor_base_construct(ARG0)))

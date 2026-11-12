@@ -70,6 +70,10 @@ HW_EXPORT(8c04235c, view_set_light_color(FARG0, FARG1, FARG2, (int32_t)ARG0))
 /* copies of 8c01b10c */
 HW_EXPORT(8c022856, view_set_light_dir(FARG0, FARG1, FARG2, (int32_t)ARG0))
 HW_EXPORT(8c042374, view_set_light_dir(FARG0, FARG1, FARG2, (int32_t)ARG0))
+/* copies of 8c01e282 */
+HW_EXPORT(8c0228d0, view_current_set_light_color(FARG0, FARG1, FARG2))
+/* copies of 8c01e298 */
+HW_EXPORT(8c0228e6, view_current_set_light_dir(FARG0, FARG1, FARG2))
 /* copies of 8c01f5b0 */
 HW_EXPORT(8c042430, view_fog_off((int32_t)ARG0))
 /* copies of 8c028e90 */

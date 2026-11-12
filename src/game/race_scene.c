@@ -13,8 +13,10 @@
 #include "../core/inline.h"
 #include "../core/view.h"
 #include "race_scene.h"
+#include "game.h"
 #include "racer.h"
 #include "course.h"
+#include "../core/task.h"
 
 /* the music cues of every course: [course][kind 0..2][variant 0..4][cue 0..7] */
 typedef struct MusicCue {
@@ -289,3 +291,81 @@ void race_music_update(gaddr scene) {
   s->music_cue += 1;
 }
 HW_EXPORT(8c02f2c4, race_music_update(ARG0))
+
+/* was func_8C02F734 (and 13 identical copies): the RaceSetup being played */
+gaddr race_setup_get(void) { return g_race_setup; }
+HW_EXPORT(8c02f734, RET(race_setup_get()))
+
+/* ---- scene constructors ----
+ * Each stores its class's vtable in the Task, then runs the class's construction (still translated: it loads files
+ * and can end frames, so these are resumable), and returns the scene. */
+static gaddr scene_construct(uint32_t self, gaddr scene, uint32_t arg, gaddr vtable, gaddr init, int nargs) {
+  HW_RESUMABLE(self, scene, arg, vtable, init, nargs);
+  HW_RESUME_AT(0);
+  task_at(scene)->vtable = vtable;
+  HW_YIELDING_RET(0, hw_call(init, nargs, scene, arg, 0, 0), 0);
+  return scene;
+}
+/* was func_8C01A3EE: mode 0's scene (the logos): vtable 0x8C23D93C, construction func_8C01A386 */
+HW_EXPORT_RESUMABLE(8c01a3ee, RET(scene_construct(0x8C01A3EEu, ARG0, 0, 0x8C23D93Cu, 0x8C01A386u, 1)))
+/* was func_8C01DDE2: mode 3's scene: vtable 0x8C23D99C, construction func_8C01DD7A */
+HW_EXPORT_RESUMABLE(8c01dde2, RET(scene_construct(0x8C01DDE2u, ARG0, 0, 0x8C23D99Cu, 0x8C01DD7Au, 1)))
+/* was func_8C01A8DE: mode 7's RaceSetup (argument: the game's mode): vtable 0x8C23D954, construction func_8C01A6B6 */
+HW_EXPORT_RESUMABLE(8c01a8de, RET(scene_construct(0x8C01A8DEu, ARG0, ARG1, 0x8C23D954u, 0x8C01A6B6u, 2)))
+/* was func_8C0232C6: the SetupMenu (0x424 bytes; argument: the RaceSetup): vtable 0x8C23DA5C, construction
+ * func_8C022D80 */
+HW_EXPORT_RESUMABLE(8c0232c6, RET(scene_construct(0x8C0232C6u, ARG0, ARG1, 0x8C23DA5Cu, 0x8C022D80u, 2)))
+/* was func_8C0297AC: the RaceScene (0xD2C bytes; argument: the RaceSetup): vtable 0x8C23DA74, construction
+ * func_8C0293F0 */
+HW_EXPORT_RESUMABLE(8c0297ac, RET(scene_construct(0x8C0297ACu, ARG0, ARG1, 0x8C23DA74u, 0x8C0293F0u, 2)))
+
+/* ---- the RaceSetup's update: switching what it shows ---- */
+
+/* func_8C01AA58: before the race scene (still translated) */
+static void race_setup_before_race(gaddr setup) { CALL1(0x8C01AA58u, setup); }
+
+enum { SETUP_MENU_SIZE = 0x424, RACE_SCENE_SIZE = 0xD2C, COURSE_MAP_SIZE = 0x10C };
+
+/* was func_8C01A950: when another state is asked for (RaceSetup.requested), the current scene is destroyed and the
+ * new one built under the set-up: 0 the SetupMenu, 1 the RaceScene (after func_8C01AA58), 2 a third scene
+ * (func_8C02FC12: vtable 0x8C23DA8C, construction func_8C02F850; no route asks for it);
+ * 3 to 6 leave mode 7 for Game mode 4 (GOOD NIGHT), 9, 1 or 2. The constructors load files and end frames
+ * (resumable) */
+void race_setup_update(gaddr setup) {
+  gaddr block = 0, scene = 0;
+  HW_RESUMABLE(0x8C01A950u, setup, block, scene);
+  HW_RESUME_AT(0, 1, 2, 3);
+  RaceSetup *s = race_setup_at(setup);
+  Game *owner = game_at(s->task.owner);
+  if (s->state == s->requested) return;
+  if (s->task.child != 0) {
+    task_destroy_tree(task_at(s->task.child));
+    s->task.child = 0;
+  }
+  s->state = s->requested;
+  switch (s->requested) {
+  case 0:
+    block = syMalloc(SETUP_MENU_SIZE);
+    if (block == 0) { scene = 0; break; }
+    HW_YIELDING(0, scene = scene_construct(0x8C0232C6u, block, setup, 0x8C23DA5Cu, 0x8C022D80u, 2));
+    break;
+  case 1:
+    HW_YIELDING(1, race_setup_before_race(setup));
+    block = syMalloc(RACE_SCENE_SIZE);
+    if (block == 0) { scene = 0; break; }
+    HW_YIELDING(2, scene = scene_construct(0x8C0297ACu, block, setup, 0x8C23DA74u, 0x8C0293F0u, 2));
+    break;
+  case 2:
+    block = syMalloc(COURSE_MAP_SIZE);
+    if (block == 0) { scene = 0; break; }
+    HW_YIELDING(3, scene = CALL2(0x8C02FC12u, block, setup));
+    break;
+  case 3: owner->next_mode = MODE_4; owner->mode_arg = 0; return;
+  case 4: owner->next_mode = MODE_9; owner->mode_arg = 0; return;
+  case 5: owner->next_mode = MODE_1; owner->mode_arg = 0; return;
+  case 6: owner->next_mode = MODE_TITLE; owner->mode_arg = 0; return;
+  default: return;
+  }
+  task_add_children(task_at(setup), task_at(scene));
+}
+HW_EXPORT_RESUMABLE(8c01a950, race_setup_update(ARG0))

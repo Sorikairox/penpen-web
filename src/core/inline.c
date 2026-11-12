@@ -162,3 +162,9 @@ HW_EXPORT(8c029202, RET(race_scene_cell_point(ARG0, (int32_t)ARG1)))
 /* was func_8C03DACC: the attribute word of cell i, sign-extended */
 int32_t course_cell_attr(gaddr course, int32_t i) { return field_table16_get(course, offsetof(Course, cell_attrs), i); }
 HW_EXPORT(8c03dacc, RET(course_cell_attr(ARG0, (int32_t)ARG1)))
+
+/* S14: more class-neutral copies: was func_8C038900 (and 4 copies): the float at 0x10 = x; func_8C046A50 (and a
+ * copy): the float at 0x0C; func_8C046A5C (and a copy): the float at 0x14 */
+HW_EXPORT(8c038900, field_set_f32(ARG0, 0x10, FARG0))
+HW_EXPORT(8c046a50, RETF(field_get_f32(ARG0, 0x0C)))
+HW_EXPORT(8c046a5c, RETF(field_get_f32(ARG0, 0x14)))

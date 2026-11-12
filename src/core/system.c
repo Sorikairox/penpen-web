@@ -78,4 +78,5 @@ int32_t system_language(void) {
   default: return 0;
   }
 }
-/* not exported (S13 difftest: its HLE calls differ from the original's (game_init samples ran too long)): HW_EXPORT(8c0623b4, RET(system_language())) */
+/* not exported (S13, S14: untestable: its only caller is game_init, whose difftest samples run past the step
+ * budget; it is called from hand-written C, so it is never sampled itself): HW_EXPORT(8c0623b4, RET(system_language())) */

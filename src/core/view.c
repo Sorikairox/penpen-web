@@ -103,3 +103,24 @@ HW_EXPORT(8c028e90, RET(view_screen()))
 /* was func_8C0165E2 */
 int32_t view_current_index(void) { return g_cur_view_index; }
 HW_EXPORT(8c0165e2, RET(view_current_index()))
+
+/* was func_8C04241E: fog on for view i (the counterpart of view_fog_off) */
+void view_fog_on(int32_t index) { g_views[index].fog = 1; }
+HW_EXPORT(8c04241e, view_fog_on((int32_t)ARG0))
+
+/* was func_8C01E282 (and its copy func_8C0228D0): the current view's light colour = (r, g, b), the view pointer read
+ * again for each component as the original does */
+void view_current_set_light_color(f32 r, f32 g, f32 b) {
+  ((View *)hw_ptr(g_cur_view))->light_color.x = r;
+  ((View *)hw_ptr(g_cur_view))->light_color.y = g;
+  ((View *)hw_ptr(g_cur_view))->light_color.z = b;
+}
+HW_EXPORT(8c01e282, view_current_set_light_color(FARG0, FARG1, FARG2))
+/* was func_8C01E298 (and its copy func_8C0228E6): the current view's light direction = (x, y, z), stored z first */
+void view_current_set_light_dir(f32 x, f32 y, f32 z) {
+  View *v = (View *)hw_ptr(g_cur_view);
+  v->light_dir.z = z;
+  v->light_dir.y = y;
+  v->light_dir.x = x;
+}
+HW_EXPORT(8c01e298, view_current_set_light_dir(FARG0, FARG1, FARG2))

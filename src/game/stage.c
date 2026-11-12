@@ -182,3 +182,9 @@ void effect_set_c_update(gaddr set) {
   }
 }
 HW_EXPORT(8c03bfe4, effect_set_c_update(ARG0))
+
+/* was func_8C030ABC (and 22 identical copies): chain a Contacts into the race scene's slot list */
+int32_t race_scene_slot_insert(gaddr scene, gaddr contacts, int32_t slot) {
+  return slot_list_insert(member_addr(scene, RaceScene, slots), contacts, slot);
+}
+HW_EXPORT(8c030abc, RET(race_scene_slot_insert(ARG0, ARG1, (int32_t)ARG2)))

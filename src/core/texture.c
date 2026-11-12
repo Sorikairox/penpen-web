@@ -21,15 +21,17 @@ void texture_load(gaddr name, gaddr texlist, gaddr dir_name) {
   do
     handle = gdFsOpen(name, 0);
   while (handle == 0);
-  gaddr sectors = hw_stack_alloc(4);
+  /* the original's frame, 0x20 bytes deep (the sector count at 0, the arguments, four saved registers): the same
+   * depth keeps the SDK's writes that the difftest replays relative to r15 on the same words */
+  gaddr sectors = hw_stack_alloc(0x20);
   gdFsGetFileSctSize(handle, sectors);
   while (gdFsRead(handle, (int32_t)U32_AT(sectors), FILE_FIXED_AREA) != 0) {
   }
   gdFsClose(handle);
   njLoadTexturePvmMemory(FILE_FIXED_AREA, texlist);
-  hw_stack_free(4);
+  hw_stack_free(0x20);
 }
-/* not exported (S13 difftest: differs from the original, to redo): HW_EXPORT(8c0120ca, texture_load(ARG0, ARG1, ARG2)) */
+HW_EXPORT(8c0120ca, texture_load(ARG0, ARG1, ARG2))
 
 /* Game mode 0's scene (0x38 bytes, constructor func_8C01A3EE -> func_8C01A386, vtable 0x8C23D93C, a Task): only its
  * texture list is declared */

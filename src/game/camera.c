@@ -87,8 +87,6 @@ HW_EXPORT(8c042400, view_light_dir_set(ARG0))
 /* ---- a view's fog and lights over the course ---- */
 
 
-/* func_8C04241E: fog on for view i (the counterpart of view_fog_off; still translated) */
-static void view_fog_on(int32_t index) { CALL1(0x8C04241Eu, index); }
 
 /* was func_8C042E28: follow the course's fog track: the first fog key past the camera's cell gives the mode; in
  * modes 0 and 1 the fog is on where the ground's attribute has bit 6 or 7, in modes 2 and 3 while the key's height
@@ -128,11 +126,6 @@ void course_env_update_fog(gaddr env) {
 }
 HW_EXPORT(8c042e28, course_env_update_fog(ARG0))
 
-/* func_8C0424C2: v = (x, y, z) (still translated) */
-static void vec3_put(gaddr v, f32 x, f32 y, f32 z) {
-  FARGS3(x, y, z);
-  CALL1(0x8C0424C2u, v);
-}
 
 /* was func_8C042EF2: set the player's View's lights, then the light rig's three Bodies at the three points of the
  * light track's first key, with damping 0.5 */
@@ -145,7 +138,7 @@ void course_env_init_lights(gaddr env, gaddr track) {
   e->light_track = track;
   for (uint32_t k = 0; k < 3; k++) {
     const Vec3 *p = &((const LightKey *)hw_ptr(e->light_track))->points[k];
-    vec3_put(member_addr(env, CourseEnv, lights[k]), p->x, p->y, p->z);
+    vec3_set(p->x, p->y, p->z, member_addr(env, CourseEnv, lights[k])); /* func_8C0424C2: a copy of vec3_set */
   }
   vec3_fill(member_addr(env, CourseEnv, lights[0].damping), F32(0.5f));
   vec3_fill(member_addr(env, CourseEnv, lights[1].damping), F32(0.5f));

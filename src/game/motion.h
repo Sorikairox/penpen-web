@@ -58,4 +58,10 @@ HW_OFFSET(MotionPlayer, texlist, 0x4C);
 
 static inline MotionPlayer *motion_player_at(gaddr a) { return (MotionPlayer *)hw_ptr(a); }
 
+/* game/racer.c */
+void motion_player_free(gaddr player);
+
+/* game/model.c */
+gaddr motion_player_delete(gaddr player, int32_t free_memory);
+
 #endif

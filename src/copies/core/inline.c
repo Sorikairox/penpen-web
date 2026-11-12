@@ -681,6 +681,11 @@ HW_EXPORT(8c060184, field_reset_2c(ARG0))
 HW_EXPORT(8c03dada, racer_set_action(ARG0, ARG1))
 /* copies of 8c030a40 */
 HW_EXPORT(8c03daea, RET(racer_matrix_axis_z(ARG0)))
+/* copies of 8c038900 */
+HW_EXPORT(8c045748, field_set_f32(ARG0, 0x10, FARG0))
+HW_EXPORT(8c046ab0, field_set_f32(ARG0, 0x10, FARG0))
+HW_EXPORT(8c04d746, field_set_f32(ARG0, 0x10, FARG0))
+HW_EXPORT(8c0600da, field_set_f32(ARG0, 0x10, FARG0))
 /* copies of 8c03dacc */
 HW_EXPORT(8c040922, RET(course_cell_attr(ARG0, (int32_t)ARG1)))
 /* copies of 8c03db00 */
@@ -700,3 +705,7 @@ HW_EXPORT(8c05af78, field_set_f32(ARG0, 0, F32(0.0f)))
 HW_EXPORT(8c05be5c, field_set_f32(ARG0, 0, F32(0.0f)))
 HW_EXPORT(8c05c53c, field_set_f32(ARG0, 0, F32(0.0f)))
 HW_EXPORT(8c061788, field_set_f32(ARG0, 0, F32(0.0f)))
+/* copies of 8c046a50 */
+HW_EXPORT(8c050292, RETF(field_get_f32(ARG0, 0x0C)))
+/* copies of 8c046a5c */
+HW_EXPORT(8c050298, RETF(field_get_f32(ARG0, 0x14)))

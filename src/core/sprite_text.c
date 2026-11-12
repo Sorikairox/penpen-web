@@ -7,16 +7,8 @@
  * helper called with 10 (the value's last digit, by the look of it: the helper is called as guest code). */
 #include "hw.h"
 #include "sdk.h"
+#include "../core/ninja.h"
 
-typedef struct NjSprite {
-  f32 x, y, z;     /* 0x00 */
-  f32 sx, sy;      /* 0x0C */
-  int32_t ang;     /* 0x14 */
-  gaddr tlist;     /* 0x18: NJS_TEXLIST */
-  gaddr tanim;     /* 0x1C: NJS_TEXANIM cells */
-} NjSprite;
-HW_OFFSET(NjSprite, tlist, 0x18);
-HW_SIZE(NjSprite, 0x20);
 
 #define SPRITE_SMALL      0x8C1B3AE8u
 #define SPRITE_BIG        0x8C1B3B08u
@@ -67,9 +59,9 @@ static void sprite_init(gaddr sprite, gaddr tanim) {
   s->ang = 0;
   s->sx = F32(1.0f);
   s->sy = F32(1.0f);
-  s->x = F32(0.0f);
-  s->y = F32(0.0f);
-  s->z = F32(0.0f);
+  s->p.x = F32(0.0f);
+  s->p.y = F32(0.0f);
+  s->p.z = F32(0.0f);
 }
 
 /* was func_8C015224: both sprites at the origin with the current texture list, then the default style */
@@ -96,8 +88,8 @@ void text_draw_digit(int32_t x, int32_t y, int32_t value, uint32_t attr) {
   text_blend();
   int32_t digit = digit_of(value);
   NjSprite *s = sprite_at(SPRITE_SMALL);
-  s->x = f32_from_int(x);
-  s->y = f32_from_int(y);
+  s->p.x = f32_from_int(x);
+  s->p.y = f32_from_int(y);
   njDrawSprite2D(SPRITE_SMALL, digit + DIGIT_CELL_SMALL, TEXT_PRIORITY, attr);
 }
 HW_EXPORT(8c015756, text_draw_digit((int32_t)ARG0, (int32_t)ARG1, (int32_t)ARG2, ARG3))
@@ -111,16 +103,16 @@ void text_draw_digit_sized(int32_t x, int32_t y, int32_t value, int32_t size, ui
   if (size > 32) {
     NjSprite *s = sprite_at(SPRITE_BIG);
     f32 scale = fdiv(fsize, F32(64.0f));
-    s->x = fx;
-    s->y = fy;
+    s->p.x = fx;
+    s->p.y = fy;
     s->sx = scale;
     s->sy = scale;
     njDrawSprite2D(SPRITE_BIG, digit, TEXT_PRIORITY, attr);
   } else {
     NjSprite *s = sprite_at(SPRITE_SMALL);
     f32 scale = fdiv(fsize, F32(32.0f));
-    s->x = fx;
-    s->y = fy;
+    s->p.x = fx;
+    s->p.y = fy;
     s->sx = scale;
     s->sy = scale;
     njDrawSprite2D(SPRITE_SMALL, digit + DIGIT_CELL_SMALL, TEXT_PRIORITY, attr);
@@ -131,8 +123,8 @@ HW_EXPORT(8c015826, text_draw_digit_sized((int32_t)ARG0, (int32_t)ARG1, (int32_t
 /* was func_8C0292DA: cell n of a sprite at (x, y), scale s (both axes) */
 static void sprite_draw_cell(gaddr sprite, int32_t n, uint32_t attr, f32 x, f32 y, f32 scale) {
   NjSprite *s = sprite_at(sprite);
-  s->x = x;
-  s->y = y;
+  s->p.x = x;
+  s->p.y = y;
   s->sx = scale;
   s->sy = scale;
   njDrawSprite2D(sprite, n, TEXT_PRIORITY, attr);

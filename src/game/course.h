@@ -198,4 +198,11 @@ static inline CourseEnv *course_env_at(gaddr a) { return (CourseEnv *)hw_ptr(a);
 /* the ground kind of a cell attribute word */
 #define CELL_KIND(attr) ((attr) & 0xF)
 
+/* game/course.c */
+int32_t course_row_bit(gaddr course, int32_t row, int32_t bit);
+int32_t race_scene_view_bit(gaddr scene, int32_t bit);
+f32 course_value(gaddr course, int32_t i);
+
+f32 race_scene_start_value(gaddr scene);
+
 #endif
