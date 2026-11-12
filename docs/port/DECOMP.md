@@ -8,15 +8,15 @@ only, PLAN 9), with types, structs, loops and comments.
 
 ## 1. Status
 
-| | S11 | S12 | S13 |
-|---|---|---|---|
-| Game functions replaced (`docs/progress/decomp_functions.tsv`) | 47 (section 9) | 70 (+23) (section 11) | 2 468 (+2 398: ~2 000 identical copies, section 13) |
-| Region | the game's core: main loop, start-up, callbacks, drive watch, task tree, Game modes, pads, views; the sound front end | + the GD-ROM file loader, the data-container fix-ups (Ninja models, motions, texture lists), CDDA pause and play, the title scene's constructor and destructor | + float helpers; the vector / Body / Ninja / accessor inline methods, the title scene, 231 delegated leaves (engine, save, VMU, race scene, racers, course, camera, actors) |
-| Routes (`tools/routes.tsv`) | boot 8 000, route 6 000 | + explore 7 000, vs2 4 000, vs4 4 000, demo 3 400, reset 3 600 (section 5.1), inputs 1 000 (section 10) | the same 8 |
-| Differential test (`tools/s11.sh test`) | every export but main passes, 0 fail | 8 routes, 5 792 samples: **69 of 70 pass, 0 FAIL** (main: never returns, whole-run comparison only) | 8 routes: 0 FAIL; every export passes or is a copy of a passing one |
-| Whole-run comparison (`tools/s11.sh compare`) | route + boot: every frame line identical, native and wasm | all 8 routes: every frame line identical (RAM digest every frame), native and wasm; native = wasm | all 8 routes identical, native and wasm; native = wasm |
-| Mutation score (section 10) | 63.6 % (upper bound: see section 10) | Mull: **90.4 %** (776 mutants: 672 killed, 33 equivalent, 71 unreached, 0 survived; reach score 100 %) | fpu.h 118/118; lead code 355 mutants: 90.9 % (reach 100 %); delegated code not yet |
-| Functions / bytes | 47 of 4 010 (1.17 %), 4 728 of 301 130 bytes (1.57 %) | **70 of 4 010 (1.75 %), 7 474 of 301 130 bytes (2.48 %)** | **2 468 of 4 010 (61.55 %), 57 508 of 301 130 bytes (19.10 %)** |
+| | S11 | S12 | S13 | S14 |
+|---|---|---|---|---|
+| Game functions replaced (`docs/progress/decomp_functions.tsv`) | 47 (section 9) | 70 (+23) (section 11) | 2 468 (+2 398: ~2 000 identical copies, section 13) | 2 938 (+470: copy-group leaders and their copies, scene constructors, the RaceSetup update, the loading screen, 7 delegated batches; section 15) |
+| Region | the game's core: main loop, start-up, callbacks, drive watch, task tree, Game modes, pads, views; the sound front end | + the GD-ROM file loader, the data-container fix-ups (Ninja models, motions, texture lists), CDDA pause and play, the title scene's constructor and destructor | + float helpers; the vector / Body / Ninja / accessor inline methods, the title scene, 231 delegated leaves (engine, save, VMU, race scene, racers, course, camera, actors) | + typed classes for S13's code (407 raw offsets -> 47); the race scene's HUD / pause / results, the racer's body, controls and effects, the motion player, the computer racer, the course construction, PenPen House / GOOD NIGHT / menus, the other cups' scenery actors |
+| Routes (`tools/routes.tsv`) | boot 8 000, route 6 000 | + explore 7 000, vs2 4 000, vs4 4 000, demo 3 400, reset 3 600 (section 5.1), inputs 1 000 (section 10) | the same 8 | + cup2, cup3, cup4 (unlock flags poked: the other cups), goodnight (mode 4): 12 routes |
+| Differential test (`tools/s11.sh test`) | every export but main passes, 0 fail | 8 routes, 5 792 samples: **69 of 70 pass, 0 FAIL** (main: never returns, whole-run comparison only) | 8 routes: 0 FAIL; every export passes or is a copy of a passing one | 12 routes, 135 382 samples: **0 FAIL**; every export passes or is a copy of a passing one, but main, cd_play (inside, S12) and task_destroy_tree (inside, a targeted run: 15.5) |
+| Whole-run comparison (`tools/s11.sh compare`) | route + boot: every frame line identical, native and wasm | all 8 routes: every frame line identical (RAM digest every frame), native and wasm; native = wasm | all 8 routes identical, native and wasm; native = wasm | all 12 routes identical (the interpreter-call count left out), native and wasm; native = wasm |
+| Mutation score (section 10) | 63.6 % (upper bound: see section 10) | Mull: **90.4 %** (776 mutants: 672 killed, 33 equivalent, 71 unreached, 0 survived; reach score 100 %) | fpu.h 118/118; lead code 355 mutants: 90.9 % (reach 100 %); delegated code not yet | S13 files the refactor left unchanged: 583 mutants, **91.6 %** (reach 100 %, 0 survived); refactored / new files: partial or not yet (15.3) |
+| Functions / bytes | 47 of 4 010 (1.17 %), 4 728 of 301 130 bytes (1.57 %) | **70 of 4 010 (1.75 %), 7 474 of 301 130 bytes (2.48 %)** | **2 468 of 4 010 (61.55 %), 57 508 of 301 130 bytes (19.10 %)** | **2 938 of 4 010 (73.27 %), 104 420 of 301 130 bytes (34.68 %)** |
 
 ## 2. How a hand-written function replaces the translated one (link-time selection)
 
@@ -490,3 +490,162 @@ runs it, from `docs/progress/fn_coverage.tsv`; "left, unreached" = no route runs
 4. **Mutation** on every batch (`tools/s11.sh mutate --only`), the report classified, then the final gates.
 5. The translated SDK and HLE stay as they are (PLAN 7.2); the end state is a build where every game function in
    `functions.tsv` (and the vtable-only ones like the title's draw at 0x8C01BB0C) is hand-written.
+
+## 15. S14: typed classes, Mull in two passes, unlock routes, more functions
+
+### 15.1 Tools (S14)
+
+- **Mull gate, two passes** (`tools/mull_gate.py`, `tools/mull_run.py`, `port/runtime/difftest.c`): with ~2 500
+  exports the full difftest makes every route ~5x slower (the control: 209 s against 42 s in S12). A mutant now runs
+  first with the difftest sampling only the exports of its own file and of that file's copies in `src/copies/`
+  (`--hwtest B:50:A1,A2,...`: the difftest's single-function filter became a list); a mutant that survives this pass
+  runs the full gate (every export sampled), so a survivor's verdict is the full gate's and a kill in the first pass is
+  a real kill (gate names `difftest-file` / `frame-file`). Killed mutants: mean 4 s. `mull_run.py` also snapshots
+  `tools/routes.tsv` (the gate read it live: an edit during a run would have broken every later mutant).
+- **One score from several runs** (`tools/mull_combine.py OUT RUN...`): Mull runs one or two files at a time; the
+  combiner keeps each file's last run, and `tools/mutate.py report-mull` reads the combined file.
+- **Readability debt** (`tools/rawoff.py [SRC] [-v]`): counts raw-offset accesses (`U32_AT(x + 0x..)`, `ARGn + 0x..`,
+  `field_*(.., 0x..)`).
+- **`--poke ADDR=VALUE@FRAME,...`** (runtime test input, native and the node host): writes a guest word at the end of
+  frame FRAME, after its frame line. Routes use it for progress no route can play through: the save record's unlock
+  flags (0x8C1B7E54-0x8C1B7E63 = all ones, written at frame 1100 in PenPen House, after the house has loaded the
+  record) open the other three cups and the VS entries of the course map. Pure and hand runs get the same writes.
+
+### 15.2 Typed structs for the S13 code (readability debt)
+
+S13's delegated batches reached fields by raw offsets (`U32_AT(obj + 0x38)`, `field_get_f32(ARG0, 0x74)`): 407 such
+accesses (`tools/rawoff.py`). S14 declared the classes behind them, with the guest layout checked by `HW_OFFSET` /
+`HW_SIZE`, from the constructors, allocation sizes, vtables and what the still-translated code (the race update, the
+camera, the course) does with each field (one delegated writer on a copy of `src/`, merged by the lead):
+
+- `game/racer.h`: **Racer** (0x5A8, constructor func_8C03755C, vtable 0x8C23DACC): character and motion player at
+  0x24, the Contacts at 0x1B8, the moving frame (**FrameBody**) at 0x2B8, heading Body1 at 0x32C, the character's
+  **CharacterParams** (0x434-byte records) at 0x43C, the follow camera from 0x498 (springs, the eye Body at 0x4EC).
+- `game/race_scene.h`: **RaceScene** (constructor func_8C0293F0; the "panel" of game.h) with its **RaceSetup** (mode
+  7's scene, 0xA8), course at 0x38, actors at 0x48, players at 0x4C, views and the watched player; **SlotList**.
+- `game/course.h`: **Course** (0x5790, constructor func_8C041114, vtable 0x8C23DB5C): cell attributes, segments,
+  actor placements, tracks, four **CourseEnv** (0x1BC: fog track, light rig, weather particles per view) at 0x4EE4,
+  the per-view bit sets at 0x55D4; record types (CourseSegment, FogKey, LightKey, CellKey).
+- `game/actor.h`: the **Actor** base (0x28, vtable at 0x24), **ActorGroup** (0x554: the course's placements built by
+  the factory func_8C043D4C, 0x34 types), and the actor classes whose methods are written (ActorPair, Strip, Pieces,
+  Chain, Effect, ...).
+- `game/motion.h` (**MotionPlayer**), `game/effects.h` (the racer's ribbons and effect sets), `game/menu.h`
+  (**SetupMenu**, the menu model drawer), `core/contact.h` (**Contacts**), View fields 0x64-0x15C in `core/view.h`,
+  **NjSprite** in `core/ninja.h`. `member_addr(a, Type, member)` (core/vec.h) is a member's guest address with the
+  original's arithmetic.
+
+Accessor copies (`core/inline.c`) whose whole copy group is used on one class say that class's field
+(`racer_heading`, `race_scene_cell_point`, ...); groups used on several classes stay class-neutral, which is what the
+44 raw offsets left are (the generic helpers' bodies and multi-class copies). Every changed file was compared before
+the gates at the object-code level (the old and new C compiled with a flat `hw_ptr`: the same loads, stores and calls
+in every function; differences only in register allocation and addressing form), then the difftest and the
+whole-run comparison. Reading the code with its types found two S13 bugs: func_8C044EEA added to `0xAC` instead of
+`Course.envs` (0x4EE4) and func_8C0417D2 read `0x1BC` instead of `Course.view_bits` (0x55D4): both took the wrong
+half of a literal-pool word that holds two 16-bit constants. The first passed S13's difftest (the routes push by
+zero vectors, so the wrong place was left unchanged); the second was S13's "to redo" failure. Both fixed.
+
+### 15.4 Routes (S14)
+
+What decides which code runs is mostly data: the course's actor placements pick among the actor factory's 0x34
+classes (func_8C043D4C), so the other cups' courses reach code no route ran. They are locked on a new save; the save
+record's unlock flags (game/save.c: `flags` and `course_flags`, 0x8C1B7E54-0x8C1B7E63) set by `--poke` in PenPen
+House (frame 1100: the house has loaded the record at ~700, which overwrote an earlier poke) open them, and RIGHT on
+the cup select (~1640, before the A at 1700) picks one. Measured with `fncover` on candidate routes
+(`tools/routes_try.tsv`, local) before adding them to `tools/routes.tsv` (cup2 also pokes the three score tables
+and the per-character bytes to small distinct values: S13's save code had only seen zero scores):
+
+| route | what | new game functions (beyond the 8 routes) |
+|---|---|---|
+| cup2 / cup3 / cup4 | the 2nd / 3rd / 4th cup's first course, raced from ~1830 | 153 / 142 / 111 (383 together, 22.6 KB) |
+| goodnight | PenPen House's GOOD NIGHT: Game mode 4 (never visited before), back to the title | 29 (2.9 KB) |
+| middle, long | Sweets' other two courses | 2 (same actors as Easy) |
+| vssame, vshana | the unlocked VS entries of the course map | 2 |
+| vs3 | VS with three controllers | 0 |
+
+Mode transitions found reading the menus' code: the title's choices 0 / 1 / 10-12 start mode 7 with argument 0 /
+4 / 1-3 (TRICELON, TIME TRIAL, VS 2-4 Pen); the RaceSetup's update (func_8C01A950) builds the SetupMenu (state 0,
+0x424 bytes) or the RaceScene (1, 0xD2C bytes) and leaves for mode 4 (state 3: GOOD NIGHT), 9 (state 4), 1 (5) or 2
+(6); mode 3's scene (func_8C01DE32) plays a Sofdec movie and leaves for mode 1 or 2 when it ends. Mode 12 needs the title's choice 3, which the title's menu never sets.
+
+**Frame depth (a difftest rule found in S14).** The difftest replays what an HLE call wrote into the live stack as
+offsets from r15 at the call (section 5). That covers out-parameters in the function's own frame, but also writes
+into a *caller's* stack data (a matrix the caller keeps on its stack, which njRotate rewrites): those land on the
+same words only when the hand-written function's r15 at the call is as deep as the original's. A function that
+calls the SDK with pointers into stack data therefore allocates the original's whole frame (its locals and its saved
+registers: `hw_stack_alloc(depth)` with a struct that names the slots), not just its out-parameters
+(func_8C0120CA, S13's "to redo": 0x20 bytes; it passes with them). `tools/framecheck.py` lists every hand-written
+function's allocation next to the original's frame depth (from the dumps) for review; a smaller allocation is only
+a problem when the SDK writes stack data outside it.
+
+### 15.3 Mull on S13's code
+
+Mull ran per file group (`tools/s11.sh mutate --budget 60 --only ...`, the two-pass gate of 15.1):
+
+- **m1** (13 S13 files, the 8 routes of the time, 6 796 s): 856 mutants, 770 killed, 1 equivalent, 64 unreached,
+  21 survived. 18 of the survivors were in game/save.c, where every route had zero scores (sums, bests, the
+  course-flag index all read zeros): cup2 now pokes small distinct scores; one in core/task.c is equivalent (the root
+  tree's updates_per_frame is rewritten by game_frame before it is read) and one in game/vmu.c unreached (a second
+  memory card), both noted by id in `mutation_notes.tsv`. contact.c, sprite_text.c, task.c, save.c and vmu.c changed
+  after m1 (the refactor), so their m1 results do not count.
+- **Recorded score (S14 row of `mutation_sessions.tsv`)**: the files whose m0 / m1 results still match the source:
+  core/{random,pad_analog,gfx_init,motion,model_build,pad,file}.c, game/{main,sound}.c: **583 mutants, 533 killed,
+  1 equivalent, 49 unreached, 0 survived: 91.6 %, reach score 100 %**.
+- **m2** (12 refactored files: game/{stage,menu_sprites,save,vmu}.c, core/{accessors,view_setup,system,texture,
+  sprite_text,contact,transform,task}.c, 12 routes): stopped part way to free the machine for the end-of-session gates: 55 mutants run (accessors, contact, sprite_text, system, transform): 51 killed, 4 on lines no route runs, 0 survived; not a score (`port_work/s14/mull/m2_partial_gate.log`)
+- Not mutation-tested yet: the refactored game files actor.c, camera.c, course.c, racer.c, model.c, race_scene.c,
+  title.c, core/{vec,inline,view}.c, and everything written in S14 (lead and batches).
+
+Two things the first m2 attempts found: the frame lines differed only in the interpreter-call count where hand-written
+C replaces a cut-short function's interpreted tail (vs2, vs4, cup4), so the gate stopped at its control; the count is
+now left out (15.1). And Mull's coverage step now survives a route that writes no profile.
+
+### 15.5 New functions
+
+- **Lead-written** (S14): the leaders of copy groups that no export covered yet (found by listing the groups with a
+  reached member and no export: the destructor bodies of the 63 classes that keep Contacts after two words, twice;
+  the race scene's slot list, 23 copies; the RaceSetup getter, 14; the current view's light colour and direction,
+  the motion player's deleting destructor, the ribbon reset, the actor base construction, the scene's view bit and
+  start value, float accessors), the scene constructors of modes 0, 3 and 7, of the SetupMenu and the RaceScene, the
+  RaceSetup's update (it switches between the menu and the race and leaves mode 7) and the loading screen
+  (func_8C01630E with the tail Ghidra split off at a literal pool): resumable, written by the lead (13.5's rule).
+  `tools/copies.py` had never seen an export with a trailing comment: vec3_set's group of 11 got its copies.
+  The RaceSetup's update now builds the menu and the race scene from C, so the constructors and the destructor of
+  the scene it replaces (task_destroy_tree) are entered only from C: a targeted run (`--hwtest 3000:1:8c01a950` on
+  the route's first 2 000 frames, every call sampled) covers the state changes: 1 295 samples pass, with
+  task_destroy_tree, the SetupMenu's and the RaceScene's constructors passing inside them.
+- **Delegated** (13.5's workflow, `tools/batches.py` batches of ~12 KB in `port_work/s14/b2/`, brief
+  `port_work/s14/WRITER_BRIEF.md`: typed classes required, `rawoff.py` must report 0): batch b05 (the race scene's
+  panel, pause screen, results and ending sprites, item digits, sound-by-mode helpers: `game/race_hud.c`; the
+  racer's collider, reset, state, destructor body and effect thunks: `game/racer_body.c`): 30 of 39; batch b02 (the
+  menus' penguins, GOOD NIGHT = mode 4's scene, the movie scene's set-up, the SetupMenu = PenPen House and the
+  selection screens: `game/menu_penguin.c`, `game/good_night.c`, `game/house.c`): 29 of 38; batch b10 (the other cups' scenery actors: the
+  factory's types 7, 8, 0x19, 0x1E, 0x23, 0x24, 0x2B, 0x2E, 0x33 declared as classes in `game/actor.h`, pieces, chains,
+  bubbles, motes, springs, posts, balls, wobblers, effects, bursts: `game/actor_*.c`, `game/burst.c`): 66 of 70;
+  batch b08 (the computer racer
+  LaneRacer, the Course's construction, three of the racer's camera modes, the race scene's contact pass:
+  `game/lane_racer.c`, `game/course_build.c`, `game/racer_camera.c`, `game/slot_collide.c`): 17 of 20; batch b07 (the
+  racer's effects task and its ribbon and particle sets, the motion player's build / play / advance, the racer's
+  construction and controls: `game/effects.c`, `game/motion_player.c`, `game/racer_control.c`): 26 of 37;
+  batch b11 (more of the cups' scenery: bumpers,
+  flaps, flocks, turning gates, geysers, swimmers, signs, buoys, flyers, fences, wave fields, ornaments, swingers,
+  sparkles, rings: `game/actor_*.c`): 65 of 69. The difftest caught one more literal-pool half (func_8C05045A read RaceScene.view_cell instead of the
+  per-view `focus` array at 0xDC: fixed, `focus` became an array). The cup4 route stopped in the hand build where
+  Ghidra had cut func_8C059CAC short: the recompiler translated its first part and let the interpreter run the rest,
+  entered with the return address of the last call; with a hand-written caller that address was hw_call's marker.
+  The function is now written whole (and the interpreter treats a return to the marker as a return). Skipped
+  with reasons: fragments Ghidra split off a function that the writer wrote whole, functions that end frames
+  (the Sofdec loop, constructions that show the loading screen: lead work), a dump that loses sync.
+
+### 15.6 Next
+
+1. Finish the Mull runs this session started or left (`tools/s11.sh mutate --budget 60 --only ...`, one or two
+   files per run; `tools/mull_combine.py` then `tools/s11.sh report`): m2's 12 files again (it was stopped part way), then game/{actor,camera,course,racer,model,race_scene,title}.c, core/{vec,inline,view}.c and every file written in S14 (`src/game/{race_hud,racer_body,house,good_night,menu_penguin,loading,lane_racer,course_build,racer_camera,slot_collide,effects,motion_player,racer_control,burst,actor_*}.c`); classify every survivor.
+2. Merge and gate the staged batches left (`port_work/s14/stage/<batch>/`, read their reports' header notes), then
+   write the remaining batches of `port_work/s14/b2/` (re-cut with `tools/batches.py` after `tools/s11.sh cover`:
+   the cup routes reach ~380 more functions) with the brief `port_work/s14/WRITER_BRIEF.md`.
+3. Lead work (resumable / yield chain): the SetupMenu's construction func_8C022D80, the RaceScene's func_8C0293F0,
+   GOOD NIGHT's func_8C01D2C4 / func_8C01D4CA, the movie scene func_8C01DE32 / func_8C01DEF8 (Sofdec loop),
+   func_8C0100A0 / func_8C010000 (start-up); func_8C0623B4 (needs a way to test inside game_init).
+4. More routes: the cups' other courses, the ending (Game mode 9: RaceSetup state 4, after winning a cup), the VMU
+   menus (no VMU, a full one), the house's DRESS UP / RESULTS with unlocked flags.
+

@@ -2,6 +2,75 @@
 
 Newest session first. Read `docs/port/PLAN.md` (disc facts, survey, approach, phases, rules) before working.
 
+## S14 — 2026-11-12: typed classes for the S13 code, Mull on S13's code with a two-pass gate, unlock routes, more functions
+
+The user's goal: "Don't stop until all the code is ported" (sessions back to back). All guest code ran in
+`--network none --read-only --cap-drop ALL --security-opt no-new-privileges --tmpfs /tmp` containers; `git log
+--all -- port/gen` stays empty; Ghidra output and disassembly stayed in the gitignored `port_work/`. Design and
+numbers: `docs/port/DECOMP.md` 15.
+
+1. **Tools** (15.1): the Mull gate in two passes (the difftest samples only the mutated file's exports first; the
+   full gate only for survivors: a kill costs ~4 s instead of minutes), `mull_combine.py` (one score from per-file
+   runs), `rawoff.py` (the raw-offset count), `batches.py` (functions left, by call level, cut into batches with
+   their dumps), the runtime's `--poke ADDR=VALUE@FRAME` (test input). Found: `tools/copies.py` never saw an export
+   with a trailing comment (vec3_set's group of 11 had no copies).
+2. **Readability** (15.2): the S13 code's classes declared with checked layouts (Racer, RaceScene / RaceSetup,
+   Course / CourseEnv, Actor / ActorGroup and the actor classes, MotionPlayer, RacerEffects, SetupMenu, Contacts,
+   View fields, NjSprite: `game/{racer,race_scene,course,actor,motion,effects,menu,scenery}.h`, `core/contact.h`):
+   **raw-offset accesses 407 -> 47** (`tools/rawoff.py`; the 47 are the class-neutral copy accessors of
+   `core/inline.c` / `core/vec.c`), every changed file compared at the object-code level first, then the gates.
+   Everything written this session is typed (the writers' brief requires `rawoff.py` = 0).
+3. **Fixes**: three S13 functions had read the wrong half of a literal-pool word holding two 16-bit constants
+   (func_8C044EEA: it passed S13's difftest because the routes push by zero vectors; func_8C0417D2 and
+   func_8C044F1E: S13's "to redo" failures). The other "to redo" ones: func_8C010610 turns from the model's z axis
+   (S13 reused the y-axis helper of func_8C010594) and keeps its translation in its frame; func_8C0120CA's frame now
+   has the original's depth (a difftest rule: DECOMP.md 15.1); func_8C0473C2 calls the course's view bit set, which
+   S13 had read from the wrong table: all three exported again. func_8C0623B4 stays out (untestable: its caller's
+   samples run past the step budget). Later: func_8C05045A (b10 read the other half again: the per-view `focus` array, caught by the
+   difftest on cup2); func_8C059CAC written whole (Ghidra cut it short; the interpreter ran its tail with hw_call's
+   return marker as the return address: cup4 stopped; the interpreter now treats that marker as a return).
+4. **Mull on S13's code** (15.3): m1 on 13 S13 files (856 mutants: 770 killed, 21 survived: 18 in save.c, where
+   every route had zero scores: cup2 now pokes scores; task.c / vmu.c survivors classified by id). Recorded for the
+   files whose results still match their source (9 files): **583 mutants, 533 killed, 1 equivalent, 49 unreached, 0
+   survived: 91.6 %, reach score 100 %**. m2 (12 refactored files): stopped part way to free the machine for the end-of-session gates: 55 mutants run (accessors, contact, sprite_text, system, transform): 51 killed, 4 on lines no route runs, 0 survived; not a score (`port_work/s14/mull/m2_partial_gate.log`)
+5. **Routes** (15.4): **cup2, cup3, cup4** (the save record's unlock flags poked in PenPen House, `--poke`: the
+   other three cups' first courses; cup2 also pokes the score tables) and **goodnight** (Game mode 4, never
+   visited before): 12 routes; game functions run **1 228 -> 1 640** (unreached 2 782 -> 2 370). Found reading the
+   menus: the title's choices and the RaceSetup's states (which modes lead where; mode 12 is never chosen).
+6. **New functions** (15.5): by the lead: the leaders of 13 copy groups no export covered (~220 functions with
+   their copies), the scene constructors of modes 0, 3, 7, the SetupMenu and the RaceScene, the RaceSetup's update
+   and the loading screen (resumable), func_8C059CAC; delegated (7 batches of ~12 KB, `tools/batches.py`, brief
+   `port_work/s14/WRITER_BRIEF.md`, merged and gated by the lead): b05 30, b02 29, b10 66, b08 17, b07 26, b11 65.
+7. **Gate fixes**: the frame-line comparisons (compare, Mull, mut_worker) leave out the interpreter-call count
+   (the pure translation interprets the tail of a function Ghidra cut short, which hand-written C replaces: only
+   that count differed); Mull's coverage step survives a route without a profile.
+
+**Progress: 2 938 of 4 010 game functions (73.27 %), 104 420 of 301 130 bytes (34.68 %)** (S13: 2 468 / 57 508, 19.10 %).
+
+Tests (end of S14): difftest over **12 routes, 135 382 samples: 0 FAIL** (every export passes or is a copy of a
+passing one, but main, cd_play and task_destroy_tree: inside only, the last checked by a targeted run); pure vs hand
+**identical frame lines on all 12 routes, native** (the interpreter-call count left out), **wasm identical on all 12 routes too; native = wasm**; sh4 **257 / 0**;
+mixer **26 / 0**; harness **5 736 / 0 / 207**; `GEN=genhand tools/rtw.sh build` + `check` **OK**; screenshots from
+the hand build (title f500, PenPen House f900, race f3000 of the route) look right.
+
+Not verified: Mull on the refactored game files (actor, camera, course, racer, model, race_scene, title, vec,
+inline, view) and on everything written in S14 (the gate is open; next step 1); m2 partial; the browser e2e; the
+writers' notes to check (`port_work/s14/stage/*`: the reports' "unsure" lists are summarised in DECOMP.md 15.5 only
+in part: e.g. the accessors.c names for the SetupMenu setters that write the RaceSetup, b11's flyer_pose host stack
+of 64).
+
+Next (DECOMP.md 15.6):
+1. Finish the Mull runs this session started or left (`tools/s11.sh mutate --budget 60 --only ...`, one or two
+   files per run; `tools/mull_combine.py` then `tools/s11.sh report`): m2's 12 files again (stopped part way), then game/{actor,camera,course,racer,model,race_scene,title}.c, core/{vec,inline,view}.c and every file written in S14; classify every survivor.
+2. Merge and gate the staged batches left (`port_work/s14/stage/<batch>/`, read their reports' header notes), then
+   write the remaining batches of `port_work/s14/b2/` (re-cut with `tools/batches.py` after `tools/s11.sh cover`:
+   the cup routes reach ~380 more functions) with the brief `port_work/s14/WRITER_BRIEF.md`.
+3. Lead work (resumable / yield chain): the SetupMenu's construction func_8C022D80, the RaceScene's func_8C0293F0,
+   GOOD NIGHT's func_8C01D2C4 / func_8C01D4CA, the movie scene func_8C01DE32 / func_8C01DEF8 (Sofdec loop),
+   func_8C0100A0 / func_8C010000 (start-up); func_8C0623B4 (needs a way to test inside game_init).
+4. More routes: the cups' other courses, the ending (Game mode 9: RaceSetup state 4, after winning a cup), the VMU
+   menus (no VMU, a full one), the house's DRESS UP / RESULTS with unlocked flags.
+
 ## S13 — 2026-11-12: float helpers, identical copies, function coverage, the title scene, two delegated batches
 
 The user's goal: "Don't stop until all the code is ported". All guest code ran in `--network none --read-only
