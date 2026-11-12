@@ -3,6 +3,9 @@
  * copy runs the same C as the copy it repeats (named in the comment above its lines). */
 #include "../../core/inline.h"
 #include "sdk.h"
+#include "../../game/racer.h"
+#include "../../game/race_scene.h"
+#include "../../game/course.h"
 
 /* copies of 8c010a4e */
 HW_EXPORT(8c01f6a4, field_set(ARG0, 0, ARG1))
@@ -564,22 +567,22 @@ HW_EXPORT(8c05ed68, RET(field_get(ARG0, 0x64)))
 /* copies of 8c02905c */
 HW_EXPORT(8c0408c2, field_set(ARG0, 0x38, ARG1))
 /* copies of 8c029118 */
-HW_EXPORT(8c030a30, RET(field_addr(ARG0, 0x2B8)))
+HW_EXPORT(8c030a30, RET(racer_body(ARG0)))
 /* copies of 8c029134 */
-HW_EXPORT(8c030a38, RETF(field_get_f32(ARG0, 0x32C)))
+HW_EXPORT(8c030a38, RETF(racer_heading(ARG0)))
 /* copies of 8c02914a */
-HW_EXPORT(8c02e8dc, RET(field_get(ARG0, 0x1C4)))
-HW_EXPORT(8c030a46, RET(field_get(ARG0, 0x1C4)))
-HW_EXPORT(8c03daf0, RET(field_get(ARG0, 0x1C4)))
+HW_EXPORT(8c02e8dc, RET(racer_cell(ARG0)))
+HW_EXPORT(8c030a46, RET(racer_cell(ARG0)))
+HW_EXPORT(8c03daf0, RET(racer_cell(ARG0)))
 /* copies of 8c0291ea */
 HW_EXPORT(8c030a50, RET(field_array_get(ARG0, 0xFC, (int32_t)ARG1, 4)))
 HW_EXPORT(8c048bd8, RET(field_array_get(ARG0, 0xFC, (int32_t)ARG1, 4)))
 /* copies of 8c029202 */
-HW_EXPORT(8c030a7c, RET(member_array_element(ARG0, (int32_t)ARG1)))
-HW_EXPORT(8c03db40, RET(member_array_element(ARG0, (int32_t)ARG1)))
+HW_EXPORT(8c030a7c, RET(race_scene_cell_point(ARG0, (int32_t)ARG1)))
+HW_EXPORT(8c03db40, RET(race_scene_cell_point(ARG0, (int32_t)ARG1)))
 /* copies of 8c02e8e2 */
-HW_EXPORT(8c030a92, RET(field_table16_get(U32_AT(ARG0 + 0x38), 0xB4, (int32_t)ARG1)))
-HW_EXPORT(8c04263a, RET(field_table16_get(U32_AT(ARG0 + 0x38), 0xB4, (int32_t)ARG1)))
+HW_EXPORT(8c030a92, RET(race_scene_cell_attr(ARG0, (int32_t)ARG1)))
+HW_EXPORT(8c04263a, RET(race_scene_cell_attr(ARG0, (int32_t)ARG1)))
 /* copies of 8c030590 */
 HW_EXPORT(8c0305e4, field_set(ARG0, 0x04, 0))
 HW_EXPORT(8c044dd8, field_set(ARG0, 0x04, 0))
@@ -675,11 +678,11 @@ HW_EXPORT(8c059b02, field_reset_2c(ARG0))
 HW_EXPORT(8c05cf90, field_reset_2c(ARG0))
 HW_EXPORT(8c060184, field_reset_2c(ARG0))
 /* copies of 8c030a20 */
-HW_EXPORT(8c03dada, field_set_and_clear2(ARG0, ARG1))
+HW_EXPORT(8c03dada, racer_set_action(ARG0, ARG1))
 /* copies of 8c030a40 */
-HW_EXPORT(8c03daea, RET(field_addr(ARG0, 0x3C8)))
+HW_EXPORT(8c03daea, RET(racer_matrix_axis_z(ARG0)))
 /* copies of 8c03dacc */
-HW_EXPORT(8c040922, RET(field_table16_get(ARG0, 0xB4, (int32_t)ARG1)))
+HW_EXPORT(8c040922, RET(course_cell_attr(ARG0, (int32_t)ARG1)))
 /* copies of 8c03db00 */
 HW_EXPORT(8c05ed74, RET(field_array_get(ARG0, 0x11C, (int32_t)ARG1, 8)))
 /* copies of 8c044dd2 */

@@ -31,6 +31,16 @@ void texture_load(gaddr name, gaddr texlist, gaddr dir_name) {
 }
 /* not exported (S13 difftest: differs from the original, to redo): HW_EXPORT(8c0120ca, texture_load(ARG0, ARG1, ARG2)) */
 
-/* was func_8C01A404: releases the texture list an object holds at 0x30 */
-void texture_release_member(gaddr obj) { njReleaseTexture(U32_AT(obj + 0x30)); }
+/* Game mode 0's scene (0x38 bytes, constructor func_8C01A3EE -> func_8C01A386, vtable 0x8C23D93C, a Task): only its
+ * texture list is declared */
+typedef struct Mode0Scene {
+  uint8_t pad_00[0x30];
+  gaddr texlist;          /* 0x30 */
+  uint8_t pad_34[0x38 - 0x34];
+} Mode0Scene;
+HW_OFFSET(Mode0Scene, texlist, 0x30);
+HW_SIZE(Mode0Scene, 0x38);
+
+/* was func_8C01A404: mode 0's scene's destructor body: release its texture list */
+void texture_release_member(gaddr scene) { njReleaseTexture(((const Mode0Scene *)hw_ptr(scene))->texlist); }
 HW_EXPORT(8c01a404, texture_release_member(ARG0))

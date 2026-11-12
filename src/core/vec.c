@@ -1,7 +1,9 @@
 /* Pen Pen port, S13: the vector, transform and scalar helpers (core/vec.h). Each exported function is the first of
  * a group of identical copies; tools/copies.py exports the others (src/copies/core/vec.c). The addresses named in
  * the "was" comments are the copies written here; where two groups of copies do the same thing with different code
- * (one returns the object, one does not; different registers), both are exported from the same C function. */
+ * (one returns the object, one does not; different registers), both are exported from the same C function. S14:
+ * the copies that work on a member of a Body (velocity 0x0C, force 0x18, damping 0x24: Body's inline methods, applied
+ * to the Bodies of many classes) name it; the others stay class-neutral offsets. */
 #include "vec.h"
 #include "sdk.h"
 
@@ -20,8 +22,8 @@ HW_EXPORT(8c012198, vec3_set(FARG0, FARG1, FARG2, ARG0))
 HW_EXPORT(8c01af44, vec3_set(FARG0, FARG1, FARG2, ARG0)) /* was func_8C01AF44 */
 /* was func_8C01E19A and func_8C01E1B6: an object's Vec3 at 0x0C / at 0x24 = (x, y, z) (a Body's velocity and
  * damping) */
-HW_EXPORT(8c01e19a, vec3_set(FARG0, FARG1, FARG2, ARG0 + 0x0C))
-HW_EXPORT(8c01e1b6, vec3_set(FARG0, FARG1, FARG2, ARG0 + 0x24))
+HW_EXPORT(8c01e19a, vec3_set(FARG0, FARG1, FARG2, member_addr(ARG0, Body, velocity)))
+HW_EXPORT(8c01e1b6, vec3_set(FARG0, FARG1, FARG2, member_addr(ARG0, Body, damping)))
 
 /* was func_8C012278: dst = src (the three loads first: dst may be src) */
 gaddr vec3_copy(gaddr dst, gaddr src) {
@@ -37,8 +39,8 @@ HW_EXPORT(8c03c480, vec3_copy(ARG1, ARG0 + 0x30))
  * into the object's Vec3 at 0x0C / 0x24 */
 void vec3_copy_bytes(gaddr dst, gaddr src) { memmove(hw_ptr(dst), hw_ptr(src), sizeof(Vec3)); }
 HW_EXPORT(8c0306ce, vec3_copy_bytes(ARG0, ARG1))
-HW_EXPORT(8c0306e0, vec3_copy_bytes(ARG0 + 0x0C, ARG1))
-HW_EXPORT(8c0306f4, vec3_copy_bytes(ARG0 + 0x24, ARG1))
+HW_EXPORT(8c0306e0, vec3_copy_bytes(member_addr(ARG0, Body, velocity), ARG1))
+HW_EXPORT(8c0306f4, vec3_copy_bytes(member_addr(ARG0, Body, damping), ARG1))
 
 /* was func_8C0121A2: v = (0, 0, 0); func_8C01D058 / func_8C01D064: the object's Vec3 at 0x0C / 0x18 */
 void vec3_zero(gaddr v) {
@@ -46,8 +48,8 @@ void vec3_zero(gaddr v) {
   p->z = p->y = p->x = F32(0.0f);
 }
 HW_EXPORT(8c0121a2, vec3_zero(ARG0))
-HW_EXPORT(8c01d058, vec3_zero(ARG0 + 0x0C))
-HW_EXPORT(8c01d064, vec3_zero(ARG0 + 0x18))
+HW_EXPORT(8c01d058, vec3_zero(member_addr(ARG0, Body, velocity)))
+HW_EXPORT(8c01d064, vec3_zero(member_addr(ARG0, Body, force)))
 
 /* was func_8C01AF50: v = (s, s, s) for the object's Vec3 at 0x24 (a Body's damping); func_8C01D070: (1, 1, 1)
  * there */
@@ -55,8 +57,8 @@ void vec3_fill(gaddr v, f32 s) {
   Vec3 *p = vec3_at(v);
   p->z = p->y = p->x = s;
 }
-HW_EXPORT(8c01af50, vec3_fill(ARG0 + 0x24, FARG0))
-HW_EXPORT(8c01d070, vec3_fill(ARG0 + 0x24, F32(1.0f)))
+HW_EXPORT(8c01af50, vec3_fill(member_addr(ARG0, Body, damping), FARG0))
+HW_EXPORT(8c01d070, vec3_fill(member_addr(ARG0, Body, damping), F32(1.0f)))
 
 /* was func_8C019D44 (returns q) and func_8C01AEAC / func_8C022D56 (void): q = (0, 0, 0, 1) */
 gaddr quat_identity(gaddr q) {
@@ -134,8 +136,8 @@ void vec3_add(gaddr v, gaddr w) {
 }
 HW_EXPORT(8c016594, vec3_add(ARG0, ARG1))
 HW_EXPORT(8c013b24, vec3_add(ARG0, ARG1))
-HW_EXPORT(8c013b44, vec3_add(ARG0 + 0x0C, ARG1))
-HW_EXPORT(8c04250c, vec3_add(ARG0 + 0x18, ARG1))
+HW_EXPORT(8c013b44, vec3_add(member_addr(ARG0, Body, velocity), ARG1))
+HW_EXPORT(8c04250c, vec3_add(member_addr(ARG0, Body, force), ARG1))
 HW_EXPORT(8c0165fc, vec3_add(ARG0 + 0x140, ARG1))
 
 /* was func_8C030798: v += (x, y, z) */

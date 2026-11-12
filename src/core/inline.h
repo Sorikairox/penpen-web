@@ -10,13 +10,20 @@ void field_set_f32(gaddr obj, uint32_t offset, f32 value);
 gaddr field_addr(gaddr obj, uint32_t offset);
 uint32_t field_array_get(gaddr obj, uint32_t offset, int32_t index, uint32_t stride);
 int32_t field_table16_get(gaddr obj, uint32_t offset, int32_t index);
-gaddr member_array_element(gaddr obj, int32_t index);
 void field_set_and_clear(gaddr obj, uint32_t value);
 void field_reset_2c(gaddr obj);
-void field_set_and_clear2(gaddr obj, uint32_t value);
 void method_empty(void);
 gaddr method_self(gaddr obj);
 gaddr word_construct(gaddr obj, uint32_t value);
 void global_color_set(f32 r, f32 g, f32 b, f32 a);
+/* S14: groups that serve one class */
+void racer_set_action(gaddr racer, uint32_t action);
+uint32_t racer_cell(gaddr racer);
+f32 racer_heading(gaddr racer);
+gaddr racer_body(gaddr racer);
+gaddr racer_matrix_axis_z(gaddr racer);
+int32_t race_scene_cell_attr(gaddr scene, int32_t i);
+gaddr race_scene_cell_point(gaddr scene, int32_t i);
+int32_t course_cell_attr(gaddr course, int32_t i);
 
 #endif

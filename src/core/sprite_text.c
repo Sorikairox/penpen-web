@@ -34,13 +34,9 @@ static inline NjSprite *sprite_at(gaddr a) { return (NjSprite *)hw_ptr(a); }
 
 /* blending for the digits (SDK) */
 static void njColorBlendingMode(int32_t target, int32_t mode) { CALL2(0x8C0A23A8u, target, mode); }
-/* func_8C062518: an SHC runtime helper taking its operands in r1 and r0 (result in r0) */
-static int32_t shc_rt_8C062518(int32_t r1, int32_t r0) {
-  hw_cpu->r[1] = (uint32_t)r1;
-  hw_cpu->r[0] = (uint32_t)r0;
-  return (int32_t)CALL0(0x8C062518u);
-}
-static int32_t digit_of(int32_t value) { return shc_rt_8C062518(value, 10); }
+/* the last decimal digit, with the dividend's sign: the original calls the SHC runtime's signed remainder
+ * (func_8C062518: r1 % r0, truncating; a zero divisor sets errno and gives 0, never with 10) */
+static int32_t digit_of(int32_t value) { return value % 10; }
 
 static void text_blend(void) {
   njColorBlendingMode(0, 8);

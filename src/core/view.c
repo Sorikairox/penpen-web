@@ -97,8 +97,8 @@ void view_apply_fog(void) {
     njFogEnable();
 }
 HW_EXPORT(8c042452, view_apply_fog())
-/* was func_8C028E90: the current view's Ninja screen */
-gaddr view_screen(void) { return hw_addr(((View *)hw_ptr(g_cur_view))->screen); }
+/* was func_8C028E90: the address of the current view's 0x64 (S14: the copy of its camera request, see View) */
+gaddr view_screen(void) { return hw_addr(&((View *)hw_ptr(g_cur_view))->camera_copy); }
 HW_EXPORT(8c028e90, RET(view_screen()))
 /* was func_8C0165E2 */
 int32_t view_current_index(void) { return g_cur_view_index; }

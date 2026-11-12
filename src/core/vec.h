@@ -43,6 +43,12 @@ typedef struct Matrix {
 HW_SIZE(Matrix, 64);
 
 static inline Vec3 *vec3_at(gaddr a) { return (Vec3 *)hw_ptr(a); }
+static inline Body *body_at(gaddr a) { return (Body *)hw_ptr(a); }
+static inline Body1 *body1_at(gaddr a) { return (Body1 *)hw_ptr(a); }
+
+/* S14: the guest address of a member of the object at guest address `a` (the original's `a + offset`, with the
+ * offset from the struct: member may be an array element, member_addr(a, Chain, links[k])) */
+#define member_addr(a, type, member) ((gaddr)((a) + (gaddr)__builtin_offsetof(type, member)))
 
 /* construction and copies */
 gaddr vec3_set(f32 x, f32 y, f32 z, gaddr v);

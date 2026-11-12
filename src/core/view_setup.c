@@ -3,25 +3,11 @@
  *
  * Inside a View (0x18C bytes) the camera code keeps, besides the NJS_CAMERA that Ninja reads (at 0x24) and the
  * NJS_SCREEN (at 0x9C: distance, width, height, ...), the camera as it was asked for at 0xB0 (position, unit
- * direction, roll, field of view: Ninja angle units) and a copy of its first seven words at 0x64. */
+ * direction, roll, field of view: Ninja angle units) and a copy of its first seven words at 0x64 (View, core/view.h). */
 #include "hw.h"
 #include "sdk.h"
 #include "../core/view.h"
 #include "../core/inline.h"
-
-/* the camera request inside a View */
-typedef struct ViewCamera {
-  Vec3 position;  /* 0x00 */
-  Vec3 direction; /* 0x0C: toward the target, normalised by Ninja; (0, 0, -1) when the target is the position */
-  int32_t roll;   /* 0x18: Ninja angle units */
-  int32_t fov;    /* 0x1C */
-} ViewCamera;
-HW_SIZE(ViewCamera, 0x20);
-#define VIEW_CAMERA_COPY   0x64 /* the first seven words of the request, copied */
-#define VIEW_SCREEN        0x9C /* NJS_SCREEN: dist (0x9C), w (0xA0), h, cx, cy */
-#define VIEW_CAMERA        0xB0
-#define VIEW_NJ_CAMERA     0x24
-#define VIEW_ARRAY_150     0x150 /* three 12-byte members (empty constructors) */
 
 /* SDK (Ninja) and the C runtime's array constructor */
 static f32 njTan(int32_t angle) { CALL1(0x8C0C4C00u, angle); return hw_fret(); }
@@ -36,7 +22,7 @@ static uint32_t array_construct(int32_t n, uint32_t size, gaddr array, gaddr cto
 /* was func_8C010BF2: a View's constructor: its members' (empty) constructors */
 void view_construct(gaddr view) {
   method_self(view + (gaddr)__builtin_offsetof(View, light_dir));
-  array_construct(3, 12, view + VIEW_ARRAY_150, EMPTY_CTOR);
+  array_construct(3, 12, member_addr(view, View, vec150), EMPTY_CTOR);
 }
 HW_EXPORT(8c010bf2, view_construct(ARG0))
 
@@ -50,7 +36,8 @@ HW_EXPORT(8c01212a, views_construct())
 /* was func_8C011F50: a view's camera from a position, a target, a roll and a field of view; with `apply`, the
  * screen distance for the field of view (width / (2 tan(fov / 2))) and the camera go to Ninja */
 void view_set_camera(gaddr view, gaddr position, gaddr target, f32 roll, f32 fov, int32_t apply) {
-  ViewCamera *c = (ViewCamera *)hw_ptr(view + VIEW_CAMERA);
+  View *v = view_at(view);
+  ViewCamera *c = &v->request;
   const Vec3 *p = vec3_at(position), *t = vec3_at(target);
   c->position.x = p->x;
   c->position.y = p->y;
@@ -68,7 +55,7 @@ void view_set_camera(gaddr view, gaddr position, gaddr target, f32 roll, f32 fov
     c->direction.z = F32(-1.0f);
   }
   /* the copy: position, direction, roll */
-  uint32_t *copy = (uint32_t *)hw_ptr(view + VIEW_CAMERA_COPY);
+  uint32_t *copy = (uint32_t *)&v->camera_copy;
   const uint32_t *words = (const uint32_t *)c;
   for (int i = 0; i < 7; i++)
     copy[i] = words[i];
@@ -76,9 +63,9 @@ void view_set_camera(gaddr view, gaddr position, gaddr target, f32 roll, f32 fov
     return;
   f32 two = F32(2.0f);
   f32 tangent = fmul(njTan(f32_to_int(fdiv(fov, two))), two);
-  F32_AT(view + VIEW_SCREEN) = fdiv(F32_AT(view + VIEW_SCREEN + 4), tangent);
-  njSetScreen(view + VIEW_SCREEN);
-  nj_SetCamera(view + VIEW_NJ_CAMERA);
+  v->screen.dist = fdiv(v->screen.w, tangent);
+  njSetScreen(member_addr(view, View, screen));
+  nj_SetCamera(member_addr(view, View, camera));
 }
 HW_EXPORT(8c011f50, view_set_camera(ARG0, ARG1, ARG2, FARG0, FARG1, (int32_t)ARG3))
 

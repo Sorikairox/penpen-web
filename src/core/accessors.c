@@ -1,47 +1,62 @@
 /* Pen Pen port, S13: more trivial inline methods (core/accessors.c): field getters and setters, operator new, a
- * destructor, thunks. Class-neutral like core/inline.c (their class is not declared yet); the merge may move them
- * there. */
+ * destructor, thunks. S14: the ones that are not copies (port/symbols/copies.tsv) and serve one class name its field
+ * (the menu of func_8C0233EA, RaceScene, Racer); the rest stay class-neutral like core/inline.c. */
 #include "hw.h"
 #include "sdk.h"
 #include "../core/inline.h"
 #include "../core/vec.h"
 #include "../game/game.h"
 #include "../game/sound.h"
+#include "../game/race_scene.h"
+#include "../game/racer.h"
+#include "../game/menu.h"
 
-/* the word at 0x0C of the object an object's first word points to */
-void field_set_indirect_0c(gaddr obj, uint32_t value) { U32_AT(U32_AT(obj) + 0x0C) = value; }
-/* was func_8C010508 */
-HW_EXPORT(8c010508, field_set_indirect_0c(ARG0, ARG1))
+/* was func_8C010508: pause a task tree (its root task's pause state; the callers pass a task's owner): another copy
+ * of tasktree_set_pause (core/task.c) */
+HW_EXPORT(8c010508, tasktree_set_pause(tasktree_at(ARG0), (int32_t)ARG1))
 
-/* setters of a word: was func_8C0229E6 (0x34), func_8C0229EA (0x30) */
-HW_EXPORT(8c0229e6, field_set(ARG0, 0x34, ARG1))
-HW_EXPORT(8c0229ea, field_set(ARG0, 0x30, ARG1))
+/* ---- the set-up menu (SetupMenu, game/menu.h) ---- */
 
-/* element i of a word array member = value: was func_8C0229EE (0x68), func_8C0229FA (0x88) (inline.c has the
- * getters) */
-void field_array_set(gaddr obj, uint32_t offset, int32_t index, uint32_t value) {
-  U32_AT(obj + offset + 4u * (uint32_t)index) = value;
-}
-HW_EXPORT(8c0229ee, field_array_set(ARG0, 0x68, (int32_t)ARG1, ARG2))
-HW_EXPORT(8c0229fa, field_array_set(ARG0, 0x88, (int32_t)ARG1, ARG2))
-/* getter: was func_8C0292AA (0x9C) */
-HW_EXPORT(8c0292aa, RET(field_array_get(ARG0, 0x9C, (int32_t)ARG1, 4)))
+/* was func_8C0229E6 / func_8C0229EA: its words at 0x34 / 0x30 */
+void setup_menu_set_word34(gaddr menu, uint32_t value) { setup_menu_at(menu)->word34 = value; }
+void setup_menu_set_word30(gaddr menu, uint32_t value) { setup_menu_at(menu)->word30 = value; }
+HW_EXPORT(8c0229e6, setup_menu_set_word34(ARG0, ARG1))
+HW_EXPORT(8c0229ea, setup_menu_set_word30(ARG0, ARG1))
 
-/* getters of a word: was func_8C02915C (0x19C), func_8C029162 (0x27C), func_8C029192 (0x55C) */
-HW_EXPORT(8c02915c, RET(field_get(ARG0, 0x19C)))
-HW_EXPORT(8c029162, RET(field_get(ARG0, 0x27C)))
-HW_EXPORT(8c029192, RET(field_get(ARG0, 0x55C)))
-/* the address of a member: was func_8C029120 (0x2C4: 0x0C into the member at 0x2B8), func_8C029198 (0x4EC),
- * func_8C0291A0 (0x4E0), func_8C0291A6 (0x51C) */
-HW_EXPORT(8c029120, RET(field_addr(ARG0, 0x2C4)))
-HW_EXPORT(8c029198, RET(field_addr(ARG0, 0x4EC)))
-HW_EXPORT(8c0291a0, RET(field_addr(ARG0, 0x4E0)))
-HW_EXPORT(8c0291a6, RET(field_addr(ARG0, 0x51C)))
+/* was func_8C0229EE / func_8C0229FA: its word i of the arrays at 0x68 / 0x88 = value (inline.c has the getters) */
+void setup_menu_set_word68(gaddr menu, int32_t i, uint32_t value) { setup_menu_at(menu)->words68[i] = value; }
+void setup_menu_set_word88(gaddr menu, int32_t i, uint32_t value) { setup_menu_at(menu)->words88[i] = value; }
+HW_EXPORT(8c0229ee, setup_menu_set_word68(ARG0, (int32_t)ARG1, ARG2))
+HW_EXPORT(8c0229fa, setup_menu_set_word88(ARG0, (int32_t)ARG1, ARG2))
 
-/* constant stores to globals: was func_8C01A8F4 (0x8C08C794 = 0), func_8C029026 (g_soft_reset = 0) */
-#define g_word_8c08c794 GUEST_VAR(int32_t, 0x8C08C794u)
-void global_8c08c794_clear(void) { g_word_8c08c794 = 0; }
-HW_EXPORT(8c01a8f4, global_8c08c794_clear())
+/* was func_8C0292AA: the player view i shows (RaceScene) */
+int32_t race_scene_view_player(gaddr scene, int32_t view) { return race_scene_at(scene)->view_player[view]; }
+HW_EXPORT(8c0292aa, RET(race_scene_view_player(ARG0, (int32_t)ARG1)))
+
+/* ---- the racer's (game/racer.h) ---- */
+
+/* was func_8C02915C, func_8C029162, func_8C029192: its state, its action, its word at 0x55C */
+int32_t racer_state(gaddr racer) { return racer_at(racer)->state; }
+int32_t racer_action(gaddr racer) { return racer_at(racer)->action; }
+uint32_t racer_word55c(gaddr racer) { return racer_at(racer)->word55c; }
+HW_EXPORT(8c02915c, RET(racer_state(ARG0)))
+HW_EXPORT(8c029162, RET(racer_action(ARG0)))
+HW_EXPORT(8c029192, RET(racer_word55c(ARG0)))
+/* was func_8C029120 (its body's velocity), func_8C029198 (its camera's eye), func_8C0291A0, func_8C0291A6 (the
+ * camera's Vec3s at 0x4E0, 0x51C): the address of a member */
+gaddr racer_velocity(gaddr racer) { return member_addr(racer, Racer, body.body.velocity); }
+gaddr racer_camera_eye(gaddr racer) { return member_addr(racer, Racer, camera_eye); }
+gaddr racer_camera_vec4e0(gaddr racer) { return member_addr(racer, Racer, camera_vec4e0); }
+gaddr racer_camera_vec51c(gaddr racer) { return member_addr(racer, Racer, camera_vec51c); }
+HW_EXPORT(8c029120, RET(racer_velocity(ARG0)))
+HW_EXPORT(8c029198, RET(racer_camera_eye(ARG0)))
+HW_EXPORT(8c0291a0, RET(racer_camera_vec4e0(ARG0)))
+HW_EXPORT(8c0291a6, RET(racer_camera_vec51c(ARG0)))
+
+/* constant stores to globals: was func_8C01A8F4 (g_race_setup = 0: the set-up's destructor body), func_8C029026
+ * (g_soft_reset = 0) */
+void race_setup_clear(void) { g_race_setup = 0; }
+HW_EXPORT(8c01a8f4, race_setup_clear())
 void soft_reset_clear(void) { g_soft_reset = 0; }
 HW_EXPORT(8c029026, soft_reset_clear())
 

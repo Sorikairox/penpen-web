@@ -3,6 +3,16 @@
 #define PENPEN_NINJA_H
 #include "vec.h"
 
+/* NJS_SPRITE (S14: moved here from game/camera.c for its users) */
+typedef struct NjSprite {
+  Vec3 p;        /* 0x00 */
+  f32 sx, sy;    /* 0x0C */
+  int32_t ang;   /* 0x14 */
+  gaddr tlist;   /* 0x18: NJS_TEXLIST */
+  gaddr tanim;   /* 0x1C: NJS_TEXANIM */
+} NjSprite;
+HW_SIZE(NjSprite, 0x20);
+
 void matrix_push(void);
 void matrix_pop(void);
 void matrix_reset(void);

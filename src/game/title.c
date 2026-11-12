@@ -126,12 +126,15 @@ gaddr title_init(gaddr scene, int32_t variant) {
     texture_load(title_textures[language], t->texlist, 0);
 
   /* the models: each file into the fixed area, then read into its own memory */
-  static const uint16_t slot[7] = {0x9C, 0xA8, 0xB4, 0xA0, 0xAC, 0xA4, 0xB0};
+  static const uint16_t slot[7] = {
+      offsetof(TitleScene, model[0]), offsetof(TitleScene, motion[0]), offsetof(TitleScene, logo_shape),
+      offsetof(TitleScene, model[1]), offsetof(TitleScene, motion[1]), offsetof(TitleScene, model[2]),
+      offsetof(TitleScene, motion[2])};
   gaddr out = hw_stack_alloc(8); /* nj_ReadChunkFile's two out-words (the first must be 0 on the way in) */
   for (int i = 0; i < 7; i++) {
     U32_AT(out) = 0;
     gaddr data = file_load_fixed(GUEST_VAR(gaddr, TITLE_FILES + 4u * (uint32_t)i), 0);
-    U32_AT(scene + slot[i]) = nj_ReadChunkFile(data, out, out + 4);
+    *(gaddr *)hw_ptr(scene + slot[i]) = nj_ReadChunkFile(data, out, out + sizeof(uint32_t));
   }
   hw_stack_free(8);
 

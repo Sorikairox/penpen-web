@@ -3,40 +3,12 @@
  * An object that collides keeps one of these: room for `capacity` contacts, each with the other body's velocity,
  * mass and the contact's restitution, normal and depth, and a handler to call. The default response (contact_respond)
  * pushes the body out along the normal and bounces its velocity like a collision between two masses. Field names
- * are what the response does with them; the words at 0x00-0x20 other than mass are only initialised here. */
+ * are what the response does with them; the words at 0x00-0x20 other than mass are only initialised here. S14: the
+ * struct is in core/contact.h. */
 #include "hw.h"
 #include "sdk.h"
 #include "../core/vec.h"
-
-typedef struct Contacts {
-  int32_t unknown00;     /* 0x00: 0 */
-  gaddr owner;           /* 0x04 */
-  f32 radius;            /* 0x08 */
-  int32_t unknown0c;     /* 0x0C: -1 */
-  int32_t unknown10;     /* 0x10: 0 */
-  f32 mass;              /* 0x14: this body's mass (1) */
-  f32 unknown18;         /* 0x18: 1 */
-  int32_t unknown1c;     /* 0x1C */
-  int32_t unknown20;     /* 0x20 */
-  gaddr respond;         /* 0x24: the response, contact_respond (func_8C014E88) */
-  int32_t capacity;      /* 0x28 */
-  int32_t count;         /* 0x2C: contacts in use */
-  gaddr other;           /* 0x30: a word per contact */
-  gaddr velocity;        /* 0x34: Vec3 per contact: the other body's velocity */
-  gaddr other_mass;      /* 0x38: f32 per contact */
-  gaddr restitution;     /* 0x3C: f32 per contact */
-  gaddr normal;          /* 0x40: Vec3 per contact (unit) */
-  gaddr depth;           /* 0x44: f32 per contact: how far to push out */
-  gaddr unknown48;       /* 0x48: a word per contact */
-  gaddr unknown4c;       /* 0x4C: a word per contact */
-  gaddr handler;         /* 0x50: per contact, a function (self, index, a, b, c) or 0 */
-} Contacts;
-HW_OFFSET(Contacts, respond, 0x24);
-HW_OFFSET(Contacts, other, 0x30);
-HW_OFFSET(Contacts, handler, 0x50);
-HW_SIZE(Contacts, 0x54);
-
-static inline Contacts *contacts_at(gaddr a) { return (Contacts *)hw_ptr(a); }
+#include "contact.h"
 
 #define CONTACT_RESPOND 0x8C014E88u /* contact_respond */
 #define VEC3_CTOR       0x8C013B66u /* an empty constructor (method_empty) */
@@ -54,11 +26,11 @@ static gaddr vec3_array_new(int32_t capacity, int32_t n) {
  * element, except the handlers) */
 gaddr contacts_construct(gaddr self, gaddr owner, f32 radius, int32_t capacity) {
   Contacts *c = contacts_at(self);
-  c->unknown00 = 0;
+  c->next = 0;
   c->owner = owner;
   c->radius = radius;
-  c->unknown0c = -1;
-  c->unknown10 = 0;
+  c->cell = -1;
+  c->owner_velocity = 0;
   c->mass = F32(1.0f);
   c->unknown18 = F32(1.0f);
   c->unknown1c = 0;

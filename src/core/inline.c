@@ -4,9 +4,13 @@
  * the same offset compile to the same bytes: one copy here stands for all of them (port/symbols/copies.tsv; the
  * copies' exports are in src/copies/core/inline.c, which tools/copies.py takes from this file first). Since a copy may
  * belong to any class, the names say what the code does to the object, not which field it is: a class that is
- * declared later gets its own named accessor, and the copies stay class-neutral. */
+ * declared later gets its own named accessor, and the copies stay class-neutral. S14: the groups whose every copy is
+ * called on one class (by their callers in the call graph) say that class's field; they are at the end. */
 #include "inline.h"
 #include "sdk.h"
+#include "../game/racer.h"
+#include "../game/race_scene.h"
+#include "../game/course.h"
 
 /* an object's word / float / address at an offset */
 uint32_t field_get(gaddr obj, uint32_t offset) { return U32_AT(obj + offset); }
@@ -66,13 +70,6 @@ void field_reset_2c(gaddr obj) {
   U32_AT(obj + 0x54) = 4;
 }
 HW_EXPORT(8c030850, field_reset_2c(ARG0))
-/* was func_8C030A20: a value at 0x27C, the two words after it cleared */
-void field_set_and_clear2(gaddr obj, uint32_t value) {
-  U32_AT(obj + 0x27C) = value;
-  U32_AT(obj + 0x280) = 0;
-  U32_AT(obj + 0x284) = 0;
-}
-HW_EXPORT(8c030a20, field_set_and_clear2(ARG0, ARG1))
 
 /* setters of a float: was func_8C01E136 (0), func_8C01E13A (4), func_8C01E140 (8), func_8C01AEA6 (0x0C),
  * func_8C030744 (0x14), func_8C03074A (0x18) */
@@ -83,22 +80,17 @@ HW_EXPORT(8c01aea6, field_set_f32(ARG0, 0x0C, FARG0))
 HW_EXPORT(8c030744, field_set_f32(ARG0, 0x14, FARG0))
 HW_EXPORT(8c03074a, field_set_f32(ARG0, 0x18, FARG0))
 
-/* getters of a word: was func_8C0229CA (0x2C), func_8C02903A (0x30), func_8C029036 (0x34), func_8C02903E (0x64),
- * func_8C02914A (0x1C4) */
+/* getters of a word: was func_8C0229CA (0x2C), func_8C02903A (0x30), func_8C029036 (0x34), func_8C02903E (0x64) */
 HW_EXPORT(8c0229ca, RET(field_get(ARG0, 0x2C)))
 HW_EXPORT(8c02903a, RET(field_get(ARG0, 0x30)))
 HW_EXPORT(8c029036, RET(field_get(ARG0, 0x34)))
 HW_EXPORT(8c02903e, RET(field_get(ARG0, 0x64)))
-HW_EXPORT(8c02914a, RET(field_get(ARG0, 0x1C4)))
-/* getters of a float: was func_8C01AEA2 (0), func_8C01AF04 (4), func_8C0225D8 (8), func_8C029134 (0x32C) */
+/* getters of a float: was func_8C01AEA2 (0), func_8C01AF04 (4), func_8C0225D8 (8) */
 HW_EXPORT(8c01aea2, RETF(field_get_f32(ARG0, 0x00)))
 HW_EXPORT(8c01af04, RETF(field_get_f32(ARG0, 0x04)))
 HW_EXPORT(8c0225d8, RETF(field_get_f32(ARG0, 0x08)))
-HW_EXPORT(8c029134, RETF(field_get_f32(ARG0, 0x32C)))
-/* the address of a member: was func_8C013B1E (0x0C), func_8C029118 (0x2B8), func_8C030A40 (0x3C8) */
+/* the address of a member: was func_8C013B1E (0x0C) */
 HW_EXPORT(8c013b1e, RET(field_addr(ARG0, 0x0C)))
-HW_EXPORT(8c029118, RET(field_addr(ARG0, 0x2B8)))
-HW_EXPORT(8c030a40, RET(field_addr(ARG0, 0x3C8)))
 
 /* an element of an array member: was func_8C0229CE (words at 0x68), func_8C0229DA (0x88), func_8C0291EA (0xFC); func_8C03DB00 (the first word of 8-byte elements at 0x11C) */
 uint32_t field_array_get(gaddr obj, uint32_t offset, int32_t index, uint32_t stride) {
@@ -108,20 +100,11 @@ HW_EXPORT(8c0229ce, RET(field_array_get(ARG0, 0x68, (int32_t)ARG1, 4)))
 HW_EXPORT(8c0229da, RET(field_array_get(ARG0, 0x88, (int32_t)ARG1, 4)))
 HW_EXPORT(8c0291ea, RET(field_array_get(ARG0, 0xFC, (int32_t)ARG1, 4)))
 HW_EXPORT(8c03db00, RET(field_array_get(ARG0, 0x11C, (int32_t)ARG1, 8)))
-/* was func_8C03DACC: element i of the 16-bit table the member at 0xB4 points to, sign-extended */
+/* element i of the 16-bit table a member points to, sign-extended */
 int32_t field_table16_get(gaddr obj, uint32_t offset, int32_t index) {
   gaddr table = U32_AT(obj + offset);
   return *(int16_t *)hw_ptr(table + 2u * (uint32_t)index);
 }
-HW_EXPORT(8c03dacc, RET(field_table16_get(ARG0, 0xB4, (int32_t)ARG1)))
-/* was func_8C02E8E2: the same through the member object at 0x38 */
-HW_EXPORT(8c02e8e2, RET(field_table16_get(U32_AT(ARG0 + 0x38), 0xB4, (int32_t)ARG1)))
-/* was func_8C029202: the address of the 12-byte element i of the array the member object at 0x38 holds at 0x68 */
-gaddr member_array_element(gaddr obj, int32_t index) {
-  gaddr array = U32_AT(U32_AT(obj + 0x38) + 0x68);
-  return array + (uint32_t)index * 12;
-}
-HW_EXPORT(8c029202, RET(member_array_element(ARG0, (int32_t)ARG1)))
 
 /* a float ARGB colour {a, r, g, b} at 0x8C1B3B34 (its reader is still translated) */
 #define G_COLOR 0x8C1B3B34u
@@ -134,3 +117,48 @@ void global_color_set(f32 r, f32 g, f32 b, f32 a) {
   c[0] = a;
 }
 HW_EXPORT(8c018d9e, global_color_set(FARG0, FARG1, FARG2, FARG3))
+
+/* ---- groups that serve one class (S14: every copy's callers pass that class) ---- */
+
+/* the Racer's (game/racer.h; also called on the racer class of func_8C03E150 / func_8C03FC68, LaneRacer, which has
+ * the same fields there) */
+
+/* was func_8C030A20: start an action, its two arguments cleared */
+void racer_set_action(gaddr racer, uint32_t action) {
+  Racer *r = racer_at(racer);
+  r->action = (int32_t)action;
+  r->action_arg[0] = 0;
+  r->action_arg[1] = 0;
+}
+HW_EXPORT(8c030a20, racer_set_action(ARG0, ARG1))
+/* was func_8C02914A: its course cell (its contacts' cell) */
+uint32_t racer_cell(gaddr racer) { return field_get(racer, offsetof(Racer, contacts.cell)); }
+HW_EXPORT(8c02914a, RET(racer_cell(ARG0)))
+/* was func_8C029134: its heading */
+f32 racer_heading(gaddr racer) { return field_get_f32(racer, offsetof(Racer, heading.value)); }
+HW_EXPORT(8c029134, RETF(racer_heading(ARG0)))
+/* was func_8C029118 / func_8C030A40: the address of its moving body / of its matrix's z axis (the third row) */
+gaddr racer_body(gaddr racer) { return field_addr(racer, offsetof(Racer, body)); }
+gaddr racer_matrix_axis_z(gaddr racer) { return field_addr(racer, offsetof(Racer, matrix3a8.m[8])); }
+HW_EXPORT(8c029118, RET(racer_body(ARG0)))
+HW_EXPORT(8c030a40, RET(racer_matrix_axis_z(ARG0)))
+
+/* the RaceScene's (game/race_scene.h), through its course (game/course.h) */
+
+/* was func_8C02E8E2: the attribute word of the course's cell i, sign-extended */
+int32_t race_scene_cell_attr(gaddr scene, int32_t i) {
+  return field_table16_get(race_scene_at(scene)->course, offsetof(Course, cell_attrs), i);
+}
+HW_EXPORT(8c02e8e2, RET(race_scene_cell_attr(ARG0, (int32_t)ARG1)))
+/* was func_8C029202: the address of the course's 12-byte record of cell i */
+gaddr race_scene_cell_point(gaddr scene, int32_t i) {
+  gaddr array = course_at(race_scene_at(scene)->course)->cell_points;
+  return array + (uint32_t)i * 12;
+}
+HW_EXPORT(8c029202, RET(race_scene_cell_point(ARG0, (int32_t)ARG1)))
+
+/* the Course's */
+
+/* was func_8C03DACC: the attribute word of cell i, sign-extended */
+int32_t course_cell_attr(gaddr course, int32_t i) { return field_table16_get(course, offsetof(Course, cell_attrs), i); }
+HW_EXPORT(8c03dacc, RET(course_cell_attr(ARG0, (int32_t)ARG1)))

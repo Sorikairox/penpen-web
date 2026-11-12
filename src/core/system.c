@@ -60,11 +60,18 @@ static inline void syBtCfg_ReadFlash(uint32_t a) { CALL1(0x8C0E2BCCu, a); }
 /* func_8C063150 (a BIOS stub): the system configuration block read from the flash */
 static gaddr bios_config_block(void) { return CALL0(0x8C063150u); }
 
+/* the part of the configuration block read here */
+typedef struct SysConfigBlock {
+  uint8_t pad_00[0x0C];
+  int8_t language;        /* 0x0C: an ASCII digit */
+} SysConfigBlock;
+HW_OFFSET(SysConfigBlock, language, 0x0C);
+
 /* was func_8C0623B4: the language digit of the flash's configuration ('1' to '3' give 1 to 3, else 0) */
 int32_t system_language(void) {
   syBtCfg_ReadFlash(0);
   gaddr block = bios_config_block();
-  switch (*(int8_t *)hw_ptr(block + 0xC)) {
+  switch (((const SysConfigBlock *)hw_ptr(block))->language) {
   case '1': return 1;
   case '2': return 2;
   case '3': return 3;
