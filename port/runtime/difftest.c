@@ -41,7 +41,15 @@ int hwt_set(const char *opt) { (void)opt; return -1; }
 int hwt_enabled, hwt_recording;
 static int hwt_budget = 160;   /* samples per function */
 static int hwt_spread = 50;    /* after the first calls: at most one sample per function every this many frames */
-static uint32_t hwt_only;      /* test only this function */
+/* S14: test only these functions (--hwtest B:S:A1,A2,...; the Mull gate's first pass samples only the exports of the
+   mutated file) */
+#define ONLY_MAX 4096
+static uint32_t hwt_only[ONLY_MAX];
+static int hwt_only_n;
+static int only_has(uint32_t a) {
+  for (int i = 0; i < hwt_only_n; i++) if (hwt_only[i] == a) return 1;
+  return 0;
+}
 extern int hw_last_ret_set, hw_call_arity, hw_call_fargs;
 extern SH4 *hw_cpu;
 extern uint8_t *sh4_ram;
@@ -258,7 +266,7 @@ int hwt_begin(SH4 *c, uint32_t addr) {
   s->calls++;
   uint32_t fr = hle_frame();
   if (hwt_recording && fr - cur_frame > PENDING_FRAMES_MAX) { cur->abandoned++; hwt_recording = 0; cur_sample = 0; }
-  if (hwt_recording || (hwt_only && addr != hwt_only) || (int)s->samples >= hwt_budget) return 0;
+  if (hwt_recording || (hwt_only_n && !only_has(addr)) || (int)s->samples >= hwt_budget) return 0;
   uint32_t n = s->calls;
   int want = n <= 8 || (n & (n - 1)) == 0 || fr >= s->next_frame;
   if (!want) return 0;
@@ -428,7 +436,9 @@ int hwt_set(const char *opt) {
   char *e;
   hwt_budget = (int)strtol(opt, &e, 10);
   if (*e == ':') hwt_spread = (int)strtol(e + 1, &e, 10);
-  if (*e == ':') hwt_only = (uint32_t)strtoul(e + 1, &e, 16);
+  if (*e == ':')
+    do hwt_only[hwt_only_n < ONLY_MAX ? hwt_only_n++ : ONLY_MAX - 1] = (uint32_t)strtoul(e + 1, &e, 16);
+    while (*e == ',');
   if (hwt_budget <= 0) return 0;
   buf_s = malloc(16u << 20); buf_a = malloc(16u << 20); buf_b = malloc(16u << 20);
   rec = malloc(sizeof *rec * REC_MAX);

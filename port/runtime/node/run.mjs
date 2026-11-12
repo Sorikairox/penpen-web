@@ -1,7 +1,7 @@
 // Pen Pen port, S3: a minimal stand-in for the retrowser host in node (inside the sandbox only): it
 // gives the wasm module env.rtw_disc_toc / rtw_disc_read over a Redump .cue + .bin set (same LBA model
 // as port/runtime/disc_native.c and retrowser spec 4.10) and env.rtw_log, then calls rtw_start.
-// Usage: node run.mjs penpen.wasm DISC_DIR [--frames N] [--verbose N] [--pad SCRIPT] [--digest N] [--frame-log 0|1]
+// Usage: node run.mjs penpen.wasm DISC_DIR [--frames N] [--verbose N] [--pad SCRIPT] [--poke A=V@F,...] [--digest N] [--frame-log 0|1]
 //          [--audio 0|1] [--wav FILE]
 //          [--shots F1,F2,... --shot-dir DIR]
 // S5: env.penpen_gl_frame(ptr, len) receives each frame's draw list (port/render/rd.c). This host has no GL: it
@@ -159,6 +159,14 @@ if (strOpt('--rtc')) inst.exports.penpen_set_rtc?.(opt('--rtc', 0)); // S8: else
     const b = Buffer.from(rest[i + 1] + '\0', 'latin1');
     new Uint8Array(mem.buffer, inst.exports.rt_arg_buf(), b.length).set(b);
     if (inst.exports.rt_set_pad() < 0) { console.log('boot bad pad script'); process.exit(2); }
+  }
+}
+{ // S14: --poke ADDR=VALUE@FRAME,... (test input, hle.c)
+  const i = rest.indexOf('--poke');
+  if (i >= 0) {
+    const b = Buffer.from(rest[i + 1] + '\0', 'latin1');
+    new Uint8Array(mem.buffer, inst.exports.rt_arg_buf(), b.length).set(b);
+    if (inst.exports.rt_set_poke() < 0) { console.log('boot bad poke list'); process.exit(2); }
   }
 }
 const ex = inst.exports;

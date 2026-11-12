@@ -61,13 +61,23 @@ def main():
             return 0
         key, runs = 'control', order
     took = {}
-    for r in runs:
-        ref = open(M + '/ref/' + r['name']).read().split('\n')[:-1]
-        v, g, d, dt = mw.gate_run(binary, r, ref, digest, budget, 3 * times[r['name']] + 30)
-        took[r['name']] = round(dt, 2)
-        if v == 'killed':
-            log(key, 'killed', g, d, r['name'], '%ds' % (time.time() - t0))
-            return 1
+    # S14: a mutant first runs with the difftest sampling only the exports of its own file (and their copies): with
+    # ~2 500 exports the full difftest makes every route ~5x slower; a mutant that survives this pass runs the full
+    # gate (every export sampled), so the verdict is the full gate's
+    passes = [budget]
+    if key != 'control':
+        ex = info.get('exports', {}).get(rel)
+        if ex is not None:
+            passes = ['%s:50:%s' % (budget.split(':')[0], ','.join(ex) or '0')] + passes
+    for i, hw in enumerate(passes):
+        for r in runs:
+            ref = open(M + '/ref/' + r['name']).read().split('\n')[:-1]
+            v, g, d, dt = mw.gate_run(binary, r, ref, digest, hw, 3 * times[r['name']] + 30)
+            if i == len(passes) - 1:
+                took[r['name']] = round(dt, 2)
+            if v == 'killed':
+                log(key, 'killed', g + ('' if i == len(passes) - 1 else '-file'), d, r['name'], '%ds' % (time.time() - t0))
+                return 1
     if key == 'control':
         json.dump(took, open(ctl, 'w'))
         log(key, 'times', ' '.join('%s=%.1fs' % kv for kv in sorted(took.items())), '-', '-', '-')

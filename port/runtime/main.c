@@ -3,7 +3,8 @@
  * and call the entry point; the recompiled code then runs until the frame limit, a stop or a fault.
  * Options (native argv / wasm exports): --frames N, --verbose N (first HLE calls logged), --pad SCRIPT
  * (hle.c: "F[+N]:BTN|BTN,..." on port A), --digest N (RAM digest every N frames, 0 = off),
- * --frame-log 0|1 (the per-frame line), --watch A,B,... (guest words shown on the frame line); S7: --audio 0|1 (the
+ * --frame-log 0|1 (the per-frame line), --watch A,B,... (guest words shown on the frame line); S14: --poke
+ * ADDR=VALUE@FRAME,... (test input: a guest word written at the end of that frame, hle.c); S7: --audio 0|1 (the
  * sd HLE + CDDA + mixer, default on), --audio-solo cdda|sfx (hear one source), --wav FILE (native: every drained sample into a 44.1 kHz stereo WAV).
  * S11: --hwtest BUDGET[:SPREAD[:ADDR]] (native: the in-run differential test of the hand-written functions, difftest.c),
  * --digest-nostack 0|1 (the RAM digest leaves out the stack area 0x8C00C000-0x8C00F3FF: hand-written functions keep
@@ -154,6 +155,7 @@ int main(int argc, char **argv) {
     else if (!strcmp(argv[i], "--verbose")) hle_verbose = atoi(argv[++i]);
     else if (!strcmp(argv[i], "--pad")) { if (hle_set_pad_script(argv[++i]) < 0) return 2; }
     else if (!strcmp(argv[i], "--watch")) { if (hle_set_watch(argv[++i]) < 0) return 2; }
+    else if (!strcmp(argv[i], "--poke")) { if (hle_set_poke(argv[++i]) < 0) return 2; }
     else if (!strcmp(argv[i], "--digest")) hle_digest_every = atoi(argv[++i]);
     else if (!strcmp(argv[i], "--frame-log")) hle_frame_log = atoi(argv[++i]);
     else if (!strcmp(argv[i], "--vmu")) vmu_path = argv[++i];
@@ -188,4 +190,6 @@ __attribute__((export_name("rt_set_audio"))) void rt_set_audio(int n) { audio_en
 static char arg_buf[4096];
 __attribute__((export_name("rt_arg_buf"))) char *rt_arg_buf(void) { return arg_buf; }
 __attribute__((export_name("rt_set_pad"))) int rt_set_pad(void) { arg_buf[sizeof arg_buf - 1] = 0; return hle_set_pad_script(arg_buf); }
+/* S14: the same for --poke */
+__attribute__((export_name("rt_set_poke"))) int rt_set_poke(void) { arg_buf[sizeof arg_buf - 1] = 0; return hle_set_poke(arg_buf); }
 #endif

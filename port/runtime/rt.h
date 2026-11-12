@@ -35,6 +35,7 @@ uint32_t hle_rtc(void);       /* S8: the RTC, seconds since 1950-01-01 local: th
 extern uint32_t hle_rtc_base;
 int hle_set_pad_script(const char *s);
 int hle_set_watch(const char *s);
+int hle_set_poke(const char *s); /* S14: --poke ADDR=VALUE@FRAME,... (hle.c) */
 extern int hle_digest_every, hle_frame_log;
 uint32_t rt_interp_calls(void);
 void hle_init(SH4 *c);

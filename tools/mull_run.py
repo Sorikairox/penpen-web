@@ -69,6 +69,10 @@ def main():
     os.makedirs(M + '/tools', exist_ok=True)
     for t in ('mull_gate.py', 'mut_worker.py'):
         shutil.copy(os.path.join(os.path.dirname(os.path.abspath(__file__)), t), M + '/tools/' + t)
+    # S14: the routes too (the gate reads them for every mutant: an edit of tools/routes.tsv during a run must not
+    # reach it)
+    shutil.copy(routep, M + '/tools/routes.tsv')
+    routep = M + '/tools/routes.tsv'
     open(M + '/mull.yml', 'w').write(MULL_YML % only)
     rels = mw.src_files(M + '/src')
     flags = mw.CF + mw.INC + ['-I' + M + '/src/include'] + mw.HWFLAGS + ['-g', '-grecord-command-line',
@@ -133,7 +137,18 @@ def main():
         res = dict(zip([r['name'] for r in routes], ex.map(cov_route, routes)))
     cov = {r['name']: res[r['name']][0] for r in routes}
     times = {r['name']: res[r['name']][1] for r in routes}
-    json.dump({'cov': cov, 'times': times, 'digest': digest, 'budget': budget, 'sample': sample},
+    # S14: the exports of each file (and of its copies in src/copies/): the gate's first pass samples only these
+    import re
+    exports = {}
+    for rel in rels:
+        if rel.startswith('copies/'):
+            continue
+        addrs = []
+        for p in (os.path.join(M, 'src', rel), os.path.join(M, 'src', 'copies', rel)):
+            if os.path.exists(p):
+                addrs += re.findall(r'^HW_EXPORT[A-Z_]*\((8c[0-9a-f]{6}),', open(p).read(), re.M)
+        exports[rel] = addrs
+    json.dump({'cov': cov, 'times': times, 'digest': digest, 'budget': budget, 'sample': sample, 'exports': exports},
               open(M + '/cov.json', 'w'))
     for k in sorted({k for c in cov.values() for k in c}):
         say('cov', 'src/' + k, ' '.join('%s=%d' % (r['name'], cov[r['name']].get(k, 0)) for r in routes))

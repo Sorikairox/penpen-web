@@ -8,6 +8,7 @@
  * Every call is counted (per run and per frame). The frame loop of the console (end of render, V-blank,
  * timer, pads, drive) is driven from njWaitVSync: one V-blank per call, no wall time anywhere, so a run is
  * a deterministic function of the disc and the pad script. Semantics: docs/port/SDK.md 2, RECOMP.md 7. */
+#include <stdlib.h>
 #include "rt.h"
 #include "../render/nj.h"
 #include "hle_io.h"
@@ -415,6 +416,31 @@ int hle_set_watch(const char *s) {
   }
   return nwatch;
 }
+/* S14: --poke ADDR=VALUE@FRAME[,...]: a test input that writes a guest word at the end of frame FRAME (after its
+ * frame line): progress a route cannot play through (the save record's unlock flags) is set the way a loaded save
+ * would set it; pure and hand runs get the same writes */
+static struct { uint32_t frame, addr, value; } poke[16];
+static int npoke;
+int hle_set_poke(const char *s) {
+  npoke = 0;
+  while (*s && npoke < 16) {
+    char *e;
+    poke[npoke].addr = (uint32_t)strtoul(s, &e, 16);
+    if (*e != '=') return -1;
+    poke[npoke].value = (uint32_t)strtoul(e + 1, &e, 16);
+    if (*e != '@') return -1;
+    poke[npoke].frame = (uint32_t)strtoul(e + 1, &e, 10);
+    npoke++;
+    if (*e == ',') e++;
+    else if (*e) return -1;
+    s = e;
+  }
+  return npoke;
+}
+static void poke_apply(uint32_t fr) {
+  for (int i = 0; i < npoke; i++)
+    if (poke[i].frame == fr) wr32(poke[i].addr, poke[i].value);
+}
 /* S11 (DECOMP.md 6): the guest stack's layout is not program state. Hand-written functions keep no frames on the
  * guest stack, so with --digest-nostack the digest leaves the stack area out and counts every word that points into
  * it (a stack address some code stored in a global) as the same token. */
@@ -471,7 +497,12 @@ static void screen_track(void) {
   *o = 0;
   rt_log("hle screen %u from frame %u: %d functions/frame, files %d: %s", scr_n, frame - 7, nf, gd_files_loaded, buf);
 }
+static void frame_log_line(void);
 static void frame_log(void) {
+  frame_log_line();
+  poke_apply(frame);
+}
+static void frame_log_line(void) {
   screen_track();
   if (!hle_frame_log) return;
   uint32_t blocks, fr = heap_free(&blocks);
