@@ -23,7 +23,7 @@ HW_SIZE(MotionRequest, 0x18); /* b07: a motion set is an array of them (flags 0 
 /* an entry of a motion table: the NJS_MOTION and a word */
 typedef struct MotionEntry {
   gaddr motion;        /* 0x00: NJS_MOTION (core/file.h: NjMotion) */
-  uint32_t word4;      /* 0x04 */
+  uint32_t word4;      /* 0x04: S15 b06: the shape motion drawn with it (motion_player_draw) */
 } MotionEntry;
 HW_SIZE(MotionEntry, 8);
 
@@ -32,7 +32,7 @@ typedef struct MotionPlayer {
   gaddr next;          /* 0x04: the request's follower */
   f32 blend;           /* 0x08: 0 = the previous motion, 1 = this one */
   f32 blend_speed;     /* 0x0C */
-  uint8_t unknown10[0x14 - 0x10];
+  int32_t loop;        /* 0x10: S15 b06: the loop flag the draw passes to the motion drawers (core/motion.c) */
   int32_t word14;      /* 0x14: b07: 1 at construction */
   gaddr motion_table;  /* 0x18: the motion descriptions (set at construction); b07: a MotionRequest set per entry */
   int32_t motion_count; /* 0x1C: b07: the set being played (motion_player_play) */
@@ -48,8 +48,10 @@ typedef struct MotionPlayer {
   gaddr file;          /* 0x40: the model file (container) it loaded, or 0; freed by func_8C037F44 */
   gaddr model;         /* 0x44: the file's first entry */
   gaddr motions;       /* 0x48: MotionEntry per motion (the file's second entry) */
-  gaddr texlist;       /* 0x4C: the file's third entry */
-  uint8_t unknown50[0x60 - 0x50];
+  gaddr texlist;       /* 0x4C: the file's third entry (S15 b06: the draw hands it to its node callback as four
+                        * node pointers, the nodes the parts are attached to) */
+  int32_t attached[4]; /* 0x50: S15 b06: the draw clears them, the draw's node callback sets one to 1 when it
+                        * passes the matching attach node (the parts are drawn at the matrices it saved) */
   int32_t looks[4];    /* 0x60: b02: four style numbers by the character (menu_penguin_set_looks: from the table at
                         * 0x8C085514 by the save's byte for it; 0, 0, 1, 1 for the other variant) */
   f32 timers[4];       /* 0x70: b07: count up by 1 every update (the parts' frames: motion_player_frame) */
@@ -73,6 +75,8 @@ HW_OFFSET(MotionPlayer, word14, 0x14);
 HW_OFFSET(MotionPlayer, ended, 0x28);
 HW_OFFSET(MotionPlayer, timers, 0x70);
 HW_OFFSET(MotionPlayer, draw_l2, 0xD4);
+HW_OFFSET(MotionPlayer, loop, 0x10);
+HW_OFFSET(MotionPlayer, attached, 0x50);
 
 static inline MotionPlayer *motion_player_at(gaddr a) { return (MotionPlayer *)hw_ptr(a); }
 
@@ -87,9 +91,11 @@ gaddr menu_penguin_construct(gaddr penguin, int32_t character, int32_t variant, 
 void menu_penguin_set_looks(gaddr penguin);
 void menu_penguin_reset(gaddr penguin, int32_t waving);
 
-/* game/menu_penguin.c: calls of the still-translated frame and drawing */
+/* game/menu_penguin.c: calls of the still-translated frame */
 void motion_player_update(gaddr player);
+/* S15 b06, game/motion_draw.c (motion_player_draw was menu_penguin.c's call of the translated draw) */
 void motion_player_draw(gaddr player);
+void motion_player_draw_extra(gaddr player);
 
 /* b07, game/motion_player.c */
 gaddr motion_player_build(gaddr player, int32_t character, int32_t variant, gaddr container, int32_t table);

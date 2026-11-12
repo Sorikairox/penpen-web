@@ -9,5 +9,7 @@ void text_draw_digit_sized(int32_t x, int32_t y, int32_t value, int32_t size, ui
 /* was func_8C0292DA / func_8C029306: cell n of the small / big sprite at (x, y), scale s */
 void sprite_small_draw(int32_t n, uint32_t attr, f32 x, f32 y, f32 scale);
 void sprite_big_draw(int32_t n, uint32_t attr, f32 x, f32 y, f32 scale);
+/* S15 b04: was func_8C022A78 (and its copy func_8C029332): the style back to its default (white, scale 1) */
+void text_style_reset(void);
 
 #endif

@@ -33,7 +33,6 @@ static void motion_player_start(gaddr player, int32_t set, f32 speed) {
 /* func_8C037F86: a MotionPlayer's frame; func_8C0381C4: its drawing (still translated; the thunks below export
  * them under these names) */
 void motion_player_update(gaddr player) { CALL1(0x8C037F86u, player); }
-void motion_player_draw(gaddr player) { CALL1(0x8C0381C4u, player); }
 static int32_t save_byte44(int32_t i) { return (int32_t)CALL1(0x8C0196C2u, i); } /* func_8C0196C2 (game/save.c) */
 
 /* was func_8C01D178 and func_8C02295E (identical copies): the constructor: the first word points at the part at

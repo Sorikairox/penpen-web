@@ -18,7 +18,6 @@
 static void motion_player_play(gaddr player, int32_t n, f32 speed) { FARGS1(speed); CALL2(0x8C0385ACu, player, n); }
 /* the effects' methods that take the racer's frame (still translated) */
 static void ribbon_set_push(gaddr set, gaddr frame) { CALL2(0x8C0397A8u, set, frame); }    /* func_8C0397A8 */
-static void effect_set_b_push(gaddr set, gaddr frame) { CALL2(0x8C03B6F2u, set, frame); }  /* func_8C03B6F2 */
 static void effect_set_c_push(gaddr set, gaddr frame) { CALL2(0x8C03C198u, set, frame); }  /* func_8C03C198 */
 
 /* ---- the current matrix ---- */

@@ -33,14 +33,17 @@ HW_SIZE(FrameBody, 0x44);
  * word points to its own storage at 0x6C; the Contacts' owner is the position it collides at. */
 typedef struct Collider {
   gaddr data;         /* 0x00: = &store */
-  int32_t word4;      /* 0x04: -1 */
-  Contacts contacts;  /* 0x08: capacity 8 */
-  uint8_t pad_5c[0x64 - 0x5C];
+  int32_t word4;      /* 0x04: -1 (S15 b07: the cell before the last update, func_8C041880) */
+  Contacts contacts;  /* 0x08: capacity 8 (S15 b07: contacts.cell is the course cell it is on) */
+  int32_t contacts_word; /* 0x5C: S15 b07: the word after the Contacts (4 after each update) */
+  int32_t segment_kind;  /* 0x60: S15 b07: the kind of the course segment its cell is in */
   gaddr position;     /* 0x64: the Vec3 it collides at (the Contacts' owner) */
   gaddr anchor;       /* 0x68: a Vec3 given at construction (the racer's vec2ac) */
   uint8_t store[0x24]; /* 0x6C: (the racer's: up to its 0x240) */
 } Collider;
 HW_OFFSET(Collider, contacts, 0x08);
+HW_OFFSET(Collider, contacts_word, 0x5C);
+HW_OFFSET(Collider, segment_kind, 0x60);
 HW_OFFSET(Collider, position, 0x64);
 HW_OFFSET(Collider, store, 0x6C);
 HW_SIZE(Collider, 0x90);
@@ -54,12 +57,45 @@ HW_SIZE(ButtonEdges, 8);
 
 /* the character parameters (0x434 bytes per character at 0x8C085648) */
 typedef struct CharacterParams {
-  uint8_t pad_00[8];
+  f32 radius;     /* 0x00: S15 b04: the racer's collider's radius (racer_base_init) */
+  f32 f04;        /* 0x04: S15 b05: copied into the frame for set C (RibbonFrame.high) */
   f32 mass;       /* 0x08: the racer's Contacts' mass */
-  uint8_t pad_0c[0x434 - 0x0C];
+  f32 dash_mass;  /* 0x0C: S15 b05: its mass while action 2 (the dash) starts */
+  f32 hit_mass;   /* 0x10: S15 b05: its mass while action 3 (hit) runs */
+  uint8_t pad_14[0x44 - 0x14];
+  f32 dash_push;  /* 0x44: S15 b05: added to the moving body's push (z) when the dash starts */
+  uint8_t pad_48[0x64 - 0x48];
+  f32 damping_y;  /* 0x64: S15 b05: the moving body's vertical damping in the dash and the hit */
+  f32 ground_damping[7]; /* 0x68: S15 b05: its horizontal damping while hit, by Racer.ground (0-4 seen) */
+  f32 dash_damping;      /* 0x84: S15 b05: its horizontal damping in the dash */
+  uint8_t pad_88[0x90 - 0x88];
+  int32_t dash_frames;    /* 0x90: S15 b05: the dash's first part */
+  int32_t dash_end_frames; /* 0x94: its second part */
+  int32_t hit_frames[3];  /* 0x98: S15 b05: action 3's length by hit_strength: [0] for 2, [1] for 1, [2] for 0 */
+  uint8_t pad_a4[0x1F8 - 0xA4];
+  f32 f1f8;       /* 0x1F8: S15 b05: state 4's action 4: push (z) while on the special ground */
+  f32 f1fc;       /* 0x1FC: its turn rate (times stick_y) */
+  f32 f200;       /* 0x200: its damping (all axes off the special ground; y on it) */
+  uint8_t pad_204[0x354 - 0x204];
+  f32 f354;       /* 0x354: its x damping on the special ground */
+  f32 f358;       /* 0x358: its z damping on the special ground */
+  uint8_t pad_35c[0x378 - 0x35C];
+  int32_t frames378; /* 0x378: its length (scaled by the item, func_8C03438C) */
+  uint8_t pad_37c[0x434 - 0x37C];
 } CharacterParams;
 HW_OFFSET(CharacterParams, mass, 0x08);
+HW_OFFSET(CharacterParams, hit_mass, 0x10);
+HW_OFFSET(CharacterParams, dash_push, 0x44);
+HW_OFFSET(CharacterParams, damping_y, 0x64);
+HW_OFFSET(CharacterParams, dash_damping, 0x84);
+HW_OFFSET(CharacterParams, dash_frames, 0x90);
+HW_OFFSET(CharacterParams, hit_frames, 0x98);
+HW_OFFSET(CharacterParams, f1f8, 0x1F8);
+HW_OFFSET(CharacterParams, f200, 0x200);
+HW_OFFSET(CharacterParams, f354, 0x354);
+HW_OFFSET(CharacterParams, frames378, 0x378);
 HW_SIZE(CharacterParams, 0x434);
+static inline CharacterParams *character_params_at(gaddr a) { return (CharacterParams *)hw_ptr(a); }
 
 typedef struct Racer {
   Task task;                 /* 0x000: vtable 0x8C23DACC */
@@ -68,10 +104,19 @@ typedef struct Racer {
   uint8_t pad_028[0x050 - 0x028];
   int32_t motion;            /* 0x050: the motion playing (character + 0x2C) */
   f32 motion_frame;          /* 0x054: its frame (character + 0x30) */
-  uint8_t pad_058[0x0A4 - 0x058];
+  uint8_t pad_058[0x084 - 0x058];
+  int32_t looks[4];          /* 0x084: S15 b04: the character's four looks (character + 0x60; racer_base_init: by
+                              * the table at 0x8C085514, or 0, 0, 1, 1 with a costume) */
+  uint8_t pad_094[0x0A4 - 0x094];
   int32_t character;         /* 0x0A4: which penguin (character + 0x80) */
   int32_t costume;           /* 0x0A8: (character + 0x84) */
-  uint8_t pad_0ac[0x0F0 - 0x0AC];
+  int32_t racer_contact_prev;  /* 0x0AC: S15 b05: racer_contact of the previous update */
+  int32_t object_contact_prev; /* 0x0B0: object_contact of the previous update */
+  int32_t racer_contact;     /* 0x0B4: S15 b05: the contact (index in contacts) with another racer, -1: none
+                              * (func_8C031D8C) */
+  int32_t object_contact;    /* 0x0B8: the contact with something else, -1: none */
+  Vec3 vec0bc;               /* 0x0BC: S15 b06: the squash axis that mark_d sets (racer_squash_update) */
+  uint8_t pad_0c8[0x0F0 - 0x0C8];
   f32 speed;                 /* 0x0F0 */
   uint8_t pad_0f4[0x100 - 0x0F4];
   /* S14 b08: the racer's controls (its pad, or the computer player's choices; func_8C030F00 clears them) */
@@ -83,11 +128,24 @@ typedef struct Racer {
   f32 stick_angle;           /* 0x11C: the stick's direction in Ninja angle units (kept while |stick| <= 0.1) */
   ButtonEdges edges[2];      /* 0x120: per button, pressed / released this update */
   int32_t button_lock[2];    /* 0x130: updates a button stays ignored after a release (15) */
-  uint8_t pad_138[0x148 - 0x138];
-  int32_t mark_a;            /* 0x148: achievement flags (racer_check_marks) */
-  int32_t mark_b;            /* 0x14C */
-  int32_t mark_c;            /* 0x150 */
-  uint8_t pad_154[0x184 - 0x154];
+  uint8_t pad_138[0x144 - 0x138];
+  int32_t word144;           /* 0x144: S15 b05: state 2 plays motion set 2 when set, 3 when 0 */
+  union {
+    struct {
+      int32_t mark_a;        /* 0x148: achievement flags (racer_check_marks) */
+      int32_t mark_b;        /* 0x14C */
+      int32_t mark_c;        /* 0x150 */
+      int32_t mark_d;        /* 0x154: S15 b06 */
+      int32_t mark_e;        /* 0x158: S15 b06 */
+    };
+    int32_t marks[5];        /* 0x148: S15 b06: cleared every update after being noted in marks_prev */
+  };
+  int32_t marks_prev[5];     /* 0x15C: S15 b06: marks[] of the previous update (racer_squash_update) */
+  uint8_t pad_170[0x174 - 0x170];
+  int32_t word174;           /* 0x174: S15 b05 (copied into the frame for set C) */
+  uint8_t pad_178[0x17C - 0x178];
+  int32_t word17c;           /* 0x17C: S15 b05 */
+  int32_t word180;           /* 0x180: S15 b05 */
   int32_t stick_damped;      /* 0x184: S14 b08: the update scales the stick down (x by 0.5, y by 0.75) */
   uint8_t pad_188[0x18C - 0x188];
   int32_t had_contacts;      /* 0x18C: racer_handle_contacts saw contacts this frame */
@@ -96,7 +154,9 @@ typedef struct Racer {
   uint8_t pad_198[0x19C - 0x198];
   int32_t state;             /* 0x19C */
   int32_t effects_shown;     /* 0x1A0: 0 = its effects are not drawn (racer_effects_draw) */
-  uint8_t pad_1a4[0x1AC - 0x1A4];
+  uint8_t pad_1a4[0x1A8 - 0x1A4];
+  int32_t word1a8;           /* 0x1A8: S15 b04: (func_8C029150; the time trial's timer shows times298[word1a8 - 3]
+                              * once the player is in state 2) */
   uint32_t word1ac;          /* 0x1AC */
   /* 0x1B0-0x23F: the collider (func_8C0308BC) */
   gaddr collider_data;       /* 0x1B0: = racer + 0x21C */
@@ -105,9 +165,14 @@ typedef struct Racer {
   uint8_t pad_20c[0x214 - 0x20C];
   uint32_t collider_a;       /* 0x214 */
   uint32_t collider_b;       /* 0x218 */
-  uint8_t pad_21c[0x240 - 0x21C];
-  Vec3 vec240;               /* 0x240 */
-  uint8_t pad_24c[0x258 - 0x24C];
+  uint8_t pad_21c[0x238 - 0x21C];
+  int32_t ground_prev;       /* 0x238: S15 b05: ground of the previous update */
+  int32_t ground;            /* 0x23C: S15 b05: the kind of special ground its contacts touch (func_8C03207C: 2,
+                              * 3, 4 by the contact's attribute; 0 = none) */
+  Vec3 vec240;               /* 0x240: (S15 b05: where the special ground was touched) */
+  int32_t ground_touch_prev; /* 0x24C: S15 b05: ground_touch of the previous update */
+  int32_t ground_touch;      /* 0x250: S15 b05: its contacts touch special ground this update */
+  uint8_t pad_254[0x258 - 0x254];
   int32_t mark_a_on;         /* 0x258: mark_a counts */
   int32_t mark_b_on;         /* 0x25C: mark_b counts */
   Vec3 vec260;               /* 0x260 */
@@ -116,17 +181,28 @@ typedef struct Racer {
   uint8_t pad_274[0x278 - 0x274];
   int32_t hit_strength;      /* 0x278: 1 or 2, for action 3 */
   int32_t action;            /* 0x27C: set with its two arguments cleared (racer_set_action) */
-  uint32_t action_arg[2];    /* 0x280 */
-  uint8_t pad_288[0x2AC - 0x288];
+  union {
+    uint32_t action_arg[2];  /* 0x280 */
+    struct {                 /* S15 b05: how the actions use them */
+      int32_t action_timer;  /* 0x280: frames left in the action's step (it ends when it goes below 0) */
+      int32_t action_step;   /* 0x284: the action's step (0: start it) */
+    };
+  };
+  int32_t word288;           /* 0x288: S15 b05: cleared when state 4 starts (func_8C033DC4) */
+  int32_t word28c;           /* 0x28C: the same */
+  int32_t word290;           /* 0x290: the same */
+  int32_t word294;           /* 0x294: the same */
+  f32 times298[5];           /* 0x298: S15 b04: times (func_8C029168 reads one; the timer shows it) */
   Vec3 vec2ac;               /* 0x2AC */
   FrameBody body;            /* 0x2B8 */
   Body body2fc;              /* 0x2FC */
   Body1 heading;             /* 0x32C: Ninja angle units */
   Body1 value33c;            /* 0x33C */
   Body1 value34c;            /* 0x34C */
-  Body1 value35c[3];         /* 0x35C: (Quat-constructed; reset to value 1, damping 1) */
+  Body1 value35c[3];         /* 0x35C: (Quat-constructed; reset to value 1, damping 1); S15 b06: the draw's scale
+                              * along vec39c (racer_draw), springs pulled back to 1 (racer_squash_update) */
   Body1 value38c;            /* 0x38C */
-  Vec3 vec39c;               /* 0x39C */
+  Vec3 vec39c;               /* 0x39C: S15 b06: the axis of the squash (value35c) */
   Matrix matrix3a8;          /* 0x3A8 */
   Matrix matrix3e8;          /* 0x3E8 */
   Vec3 vec428;               /* 0x428 */
@@ -168,7 +244,17 @@ typedef struct Racer {
   uint8_t second_base_at[0x5A8 - 0x58C]; /* 0x58C */
 } Racer;
 HW_OFFSET(Racer, motion, 0x050);
+HW_OFFSET(Racer, looks, 0x084);
 HW_OFFSET(Racer, character, 0x0A4);
+HW_OFFSET(Racer, racer_contact, 0x0B4);
+HW_OFFSET(Racer, object_contact, 0x0B8);
+HW_OFFSET(Racer, word174, 0x174);
+HW_OFFSET(Racer, vec0bc, 0x0BC);
+HW_OFFSET(Racer, mark_a, 0x148);
+HW_OFFSET(Racer, mark_c, 0x150);
+HW_OFFSET(Racer, mark_d, 0x154);
+HW_OFFSET(Racer, marks_prev, 0x15C);
+HW_OFFSET(Racer, word180, 0x180);
 HW_OFFSET(Racer, speed, 0x0F0);
 HW_OFFSET(Racer, button_prev, 0x100);
 HW_OFFSET(Racer, button, 0x108);
@@ -179,10 +265,13 @@ HW_OFFSET(Racer, button_lock, 0x130);
 HW_OFFSET(Racer, effects_shown, 0x1A0);
 HW_OFFSET(Racer, stick_damped, 0x184);
 HW_OFFSET(Racer, mark_a, 0x148);
+HW_OFFSET(Racer, word144, 0x144);
 HW_OFFSET(Racer, had_contacts, 0x18C);
 HW_OFFSET(Racer, scene, 0x194);
 HW_OFFSET(Racer, state, 0x19C);
+HW_OFFSET(Racer, word1a8, 0x1A8);
 HW_OFFSET(Racer, word1ac, 0x1AC);
+HW_OFFSET(Racer, times298, 0x298);
 HW_OFFSET(Racer, contacts, 0x1B8);
 HW_OFFSET(Racer, collider_a, 0x214);
 HW_OFFSET(Racer, vec240, 0x240);
@@ -190,6 +279,11 @@ HW_OFFSET(Racer, mark_a_on, 0x258);
 HW_OFFSET(Racer, mark_b_value, 0x26C);
 HW_OFFSET(Racer, hit_strength, 0x278);
 HW_OFFSET(Racer, action_arg, 0x280);
+HW_OFFSET(Racer, action_step, 0x284);
+HW_OFFSET(Racer, word288, 0x288);
+HW_OFFSET(Racer, word294, 0x294);
+HW_OFFSET(Racer, ground, 0x23C);
+HW_OFFSET(Racer, ground_touch, 0x250);
 HW_OFFSET(Racer, vec2ac, 0x2AC);
 HW_OFFSET(Racer, body, 0x2B8);
 HW_OFFSET(Racer, body2fc, 0x2FC);
@@ -223,6 +317,14 @@ HW_OFFSET(Racer, word588, 0x588);
 HW_OFFSET(Racer, second_base_at, 0x58C);
 HW_SIZE(Racer, 0x5A8);
 #define RACER_VTABLE 0x8C23DACCu
+
+/* S15 b04: the racer's virtual table (the Racer's and the LaneRacer's): the Task's methods, then the reset that
+ * puts it at a start position (position, a word (0 at the race's set-up), the heading in fr4) */
+typedef struct RacerVtbl {
+  TaskVtbl task;  /* 0x00 */
+  VMethod reset;  /* 0x18 */
+} RacerVtbl;
+HW_OFFSET(RacerVtbl, reset, 0x18);
 
 /* A racer class larger than Racer: the computer player (S14 b08: constructor func_8C03DB9A -> func_8C03DB60, vtable
  * 0x8C23DB34, destructor body func_8C03DBC4, deleting destructor func_8C03DBEA; reset func_8C03DC54, update
@@ -322,10 +424,40 @@ void lane_racer_update(gaddr self);
 int32_t lane_racer_find_quad(gaddr self, gaddr point, int32_t near);
 f32 racer_x_fraction(gaddr racer);
 
+/* game/racer.c (S15 b05 declares it) */
+void racer_set_variant(gaddr racer, int32_t n);
+/* game/racer_actions.c (S15 b05) */
+void racer_dash_start(gaddr racer);
+void racer_dash(gaddr racer);
+void racer_hit_start_medium(gaddr racer);
+void racer_hit_start_strong(gaddr racer);
+void racer_hit_contacts(gaddr racer);
+void racer_hit(gaddr racer);
+void racer_dash_check_hits(gaddr racer);
+void racer_update_state2(gaddr racer);
+void racer_update_state3(gaddr racer);
+void racer_state4_start(gaddr racer);
+void racer_state4_action4_start(gaddr racer);
+void racer_state4_action4(gaddr racer);
+void racer_update_state4(gaddr racer);
+
 /* game/racer_control.c */
 gaddr racer_init_base(gaddr racer, gaddr scene, uint32_t a, uint32_t b, uint32_t c, uint32_t d, uint32_t e, f32 f);
 gaddr racer_construct(gaddr racer, gaddr scene, uint32_t a, uint32_t b, uint32_t c, uint32_t d, uint32_t e, f32 f);
 void racer_read_controls(gaddr racer);
 void racer_draw_thunk(gaddr racer);
+
+/* S15 b04: game/racer.c */
+gaddr frame_body_init(gaddr obj);
+/* game/save.c: entry i of the save's byte table at 0x44 */
+int32_t save_byte44(int32_t i);
+/* S15 b06: game/motion_draw.c, game/racer_squash.c, game/racer_camera_update.c */
+void racer_draw(gaddr racer);
+void racer_squash_update(gaddr racer);
+void racer_camera_start(gaddr racer);
+void racer_camera_update(gaddr racer);
+/* S15 b04: game/racer_base.c (was func_8C030BF4) */
+#define CHARACTER_PARAMS 0x8C085648u /* CharacterParams[], by character */
+gaddr racer_base_init(gaddr racer, uint32_t index, gaddr unused_b, int32_t character, f32 unused_f, int32_t costume);
 
 #endif

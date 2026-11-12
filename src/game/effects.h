@@ -32,17 +32,35 @@ typedef struct Ribbon {
 HW_SIZE(Ribbon, 8);
 
 /* what ribbon_push is handed: a matrix and, after it, the two heights the edges are placed between (a local of the
- * racer's update, func_8C0351C8) */
+ * racer's update, func_8C0351C8). S15 b05: a snapshot of the racer (0x98 bytes; func_8C033A88 fills one for set C):
+ * its matrix at 0x3A8, its moving body's position and velocity, its vectors at 0x534 / 0x540, its contact radius,
+ * the character's word at +4, ... its index */
 typedef struct RibbonFrame {
   Matrix m;            /* 0x00 */
   Vec3 position;       /* 0x40: b07: where set C's particles start (effect_set_c_emit) */
-  uint8_t pad_4c[0x70 - 0x4C];
-  f32 low;             /* 0x70 */
-  f32 high;            /* 0x74 */
+  Vec3 velocity;       /* 0x4C: S15 b05 */
+  Vec3 vec58;          /* 0x58: S15 b05: Racer.vec534 */
+  Vec3 vec64;          /* 0x64: S15 b05: Racer.vec540 */
+  f32 low;             /* 0x70: (S15 b05: Racer.contacts.radius) */
+  f32 high;            /* 0x74: (S15 b05: CharacterParams.f04) */
+  f32 f78;             /* 0x78: S15 b05: Racer.f434 */
+  f32 heading;         /* 0x7C: S15 b05 */
+  int32_t word80;      /* 0x80: S15 b05: Racer.word144 */
+  int32_t word84;      /* 0x84: S15 b05: Racer.word174 */
+  int32_t word88;      /* 0x88: S15 b05: Racer.word17c */
+  int32_t word8c;      /* 0x8C: S15 b05: Racer.word180 */
+  int32_t index;       /* 0x90: S15 b05: Racer.index */
+  uint32_t word94;     /* 0x94 */
 } RibbonFrame;
 HW_OFFSET(RibbonFrame, position, 0x40);
+HW_OFFSET(RibbonFrame, velocity, 0x4C);
+HW_OFFSET(RibbonFrame, vec64, 0x64);
 HW_OFFSET(RibbonFrame, low, 0x70);
 HW_OFFSET(RibbonFrame, high, 0x74);
+HW_OFFSET(RibbonFrame, heading, 0x7C);
+HW_OFFSET(RibbonFrame, word8c, 0x8C);
+HW_OFFSET(RibbonFrame, index, 0x90);
+HW_SIZE(RibbonFrame, 0x98);
 
 /* a 0x18-byte record of the ribbon's (func_8C038788 clears one; b07: the first 0x18 bytes of the ribbon's NJS_MODEL) */
 typedef struct RibbonRecord {
@@ -148,7 +166,9 @@ typedef struct EffectSetB {
   gaddr motion;        /* 0x24: b07: NJS_MOTION */
   gaddr texture;       /* 0x28: b07 */
   int32_t count;       /* 0x2C */
-  uint32_t word30;     /* 0x30: 1 */
+  int32_t word30;      /* 0x30: 1 (S15 c05: a gate for the sprites effect_set_b_push starts: when it is positive,
+                        * it is counted down and the sprite starts; at 0 the particle stays off and it goes back
+                        * to 1, so they start every other time) */
   union {
     gaddr arrays[7];   /* 0x34: a word per particle each (the second, 0x38, cleared) */
     struct {           /* b07 */
@@ -166,6 +186,7 @@ typedef struct EffectSetB {
 HW_OFFSET(EffectSetB, word14, 0x14);
 HW_OFFSET(EffectSetB, object, 0x20);
 HW_OFFSET(EffectSetB, count, 0x2C);
+HW_OFFSET(EffectSetB, word30, 0x30);
 HW_OFFSET(EffectSetB, arrays, 0x34);
 HW_OFFSET(EffectSetB, frames, 0x4C);
 HW_OFFSET(EffectSetB, bodies, 0x50);
@@ -232,5 +253,8 @@ void effect_set_b_draw(gaddr set);
 gaddr effect_set_c_construct(gaddr set);
 void effect_set_c_draw(gaddr set);
 void effect_set_c_emit(gaddr set, gaddr frame);
+
+/* S15 c05, game/effects_push_b.c */
+void effect_set_b_push(gaddr set, gaddr frame);
 
 #endif

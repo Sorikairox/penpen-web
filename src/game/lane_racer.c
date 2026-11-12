@@ -277,9 +277,9 @@ void lane_racer_update(gaddr self) {
 }
 HW_EXPORT(8c03de18, lane_racer_update(ARG0))
 
-/* was func_8C03E14A: a jump to func_8C0373B8 with the same `this` (a method the LaneRacer shares with the Racer) */
-static uint32_t racer_method_8c0373b8(gaddr self) { return CALL1(0x8C0373B8u, self); }
-HW_EXPORT(8c03e14a, RET(racer_method_8c0373b8(ARG0)))
+/* was func_8C03E14A: a jump to func_8C0373B8 = racer_draw with the same `this` (a method the LaneRacer shares with
+ * the Racer; S15: racer_draw is hand-written and returns nothing its callers read) */
+HW_EXPORT(8c03e14a, racer_draw(ARG0))
 
 /* was func_8C040682: the fractional part of the racer's x position (x - its truncation toward zero) */
 f32 racer_x_fraction(gaddr racer) {

@@ -33,20 +33,25 @@ typedef struct ActorVtbl {
   VMethod destroy;  /* 0x00: (this, int free_memory) */
   VMethod init;     /* 0x08: (this, const ActorPlacement *) */
   VMethod draw;     /* 0x10: (this) */
+  VMethod draw_view; /* 0x18: (this) S15 b08: once per view, when the actor is visible in it (func_8C04489A) */
 } ActorVtbl;
 HW_OFFSET(ActorVtbl, draw, 0x10);
-HW_SIZE(ActorVtbl, 0x18);
+HW_OFFSET(ActorVtbl, draw_view, 0x18);
+HW_SIZE(ActorVtbl, 0x20);
 
 typedef struct Actor {
   int32_t index;    /* 0x00: its number in the group */
   int32_t cell;     /* 0x04: the course cell it stands on */
   uint32_t flags;   /* 0x08: 0 at construction (bit 1 set by the group's re-init) */
-  uint32_t word0c;  /* 0x0C: the group's word at 0x434 */
+  uint32_t word0c;  /* 0x0C: the group's word at 0x434 (S15 b08: the number of views) */
   gaddr scene;      /* 0x10: the RaceScene */
-  gaddr model_set;  /* 0x14 */
-  gaddr texlist;    /* 0x18 */
-  gaddr word1c;     /* 0x1C */
-  gaddr models;     /* 0x20: a list of models (NJS_CNK_OBJECT / NJS_OBJECT addresses) */
+  gaddr model_set;  /* 0x14: S15 b08: a placement with param bit 16: the group file's ContainerEntry 2k+1 (k: param
+                     * bits 12-15); else not set by the group */
+  gaddr texlist;    /* 0x18: the group's texture list; with param bit 16 the group's container file (its first
+                     * entry's offset is its texture list) */
+  gaddr word1c;     /* 0x1C: with param bit 16 the group file's ContainerEntry 2k+2 (a motion list); else not set by
+                     * the group */
+  gaddr models;     /* 0x20: a list of models (NJS_CNK_OBJECT / NJS_OBJECT addresses): the group's blocks (S15) */
   gaddr vtable;     /* 0x24: ActorVtbl */
 } Actor;
 HW_OFFSET(Actor, scene, 0x10);
@@ -60,14 +65,16 @@ typedef struct ActorGroup {
   Task task;                /* 0x000: vtable 0x8C23DB74; task.parent is the RaceScene */
   gaddr actors[ACTOR_MAX];  /* 0x024: Actor */
   int32_t count;            /* 0x424 */
-  uint8_t pad_428[0x430 - 0x428];
+  uint32_t word428;         /* 0x428: S15 b08: 0 at construction */
+  uint8_t pad_42c[0x430 - 0x42C];
   gaddr file;               /* 0x430: the group's data file (its texture list at +4) */
-  uint32_t word434;         /* 0x434 */
+  uint32_t word434;         /* 0x434: S15 b08: the number of views (1, 2 or 4 by g_split_mode) */
   gaddr texlist;            /* 0x438 */
   gaddr blocks[(0x554 - 0x43C) / 4]; /* 0x43C: model blocks, 0-terminated */
 } ActorGroup;
 HW_OFFSET(ActorGroup, actors, 0x024);
 HW_OFFSET(ActorGroup, count, 0x424);
+HW_OFFSET(ActorGroup, word428, 0x428);
 HW_OFFSET(ActorGroup, file, 0x430);
 HW_OFFSET(ActorGroup, texlist, 0x438);
 HW_OFFSET(ActorGroup, blocks, 0x43C);
@@ -1050,6 +1057,146 @@ HW_SIZE(Rings, 0x3F0);
 
 /* ---- end of S14 b11 ---- */
 
+/* ---- S15 b08: the factory's types 1, 2, 0x20 and 0x2D (game/actor_types.c) ---- */
+
+/* type 1 (constructor func_8C045020, 0x110 bytes; vtable 0x8C23DBCC, its second base's 0x8C23DBEC): a body with
+ * contacts (radius 10) whose response is the class's own (func_8C0455B0), a Body1 that turns (damping 0.9) and four
+ * direction vectors; while the camera's cell is 0x3A..0x3D it pushes the course's wind (func_8C045514) */
+typedef struct ActorType01 {
+  Actor base;               /* 0x000 */
+  Vec3 position;            /* 0x028: the contacts' owner */
+  f32 heading;              /* 0x034: the placement's angle about y */
+  f32 word38;               /* 0x038: 0 */
+  Body1 spin;               /* 0x03C: (0, 0, 0, 1) at construction */
+  f32 word4c;               /* 0x04C */
+  Vec3 push;                /* 0x050: the wind it adds (func_8C045514: 40 long) */
+  int32_t word5c;           /* 0x05C */
+  uint8_t pad_60[0x64 - 0x60];
+  int32_t word64;           /* 0x064: 0, or 3 when kind_b is not 0 */
+  int32_t kind_a;           /* 0x068: the placement's param bits 0-3 */
+  int32_t word6c;           /* 0x06C */
+  int32_t kind_b;           /* 0x070: param bits 4-7 */
+  Contacts contacts;        /* 0x074 */
+  int32_t contacts_word;    /* 0x0C8: 4 */
+  Vec3 dir[4];              /* 0x0CC: (0,0,0), (0,0,-1), (0,0,0), (0,0,-1) at construction */
+  Vec3 point;               /* 0x0FC */
+  f32 reach;                /* 0x108: 40 */
+  gaddr second_vtable;      /* 0x10C */
+} ActorType01;
+HW_OFFSET(ActorType01, position, 0x028);
+HW_OFFSET(ActorType01, spin, 0x03C);
+HW_OFFSET(ActorType01, push, 0x050);
+HW_OFFSET(ActorType01, word64, 0x064);
+HW_OFFSET(ActorType01, kind_b, 0x070);
+HW_OFFSET(ActorType01, contacts, 0x074);
+HW_OFFSET(ActorType01, contacts_word, 0x0C8);
+HW_OFFSET(ActorType01, dir, 0x0CC);
+HW_OFFSET(ActorType01, point, 0x0FC);
+HW_OFFSET(ActorType01, reach, 0x108);
+HW_OFFSET(ActorType01, second_vtable, 0x10C);
+HW_SIZE(ActorType01, 0x110);
+
+/* type 2 (constructor func_8C0458FC, 0xE0 bytes; vtable 0x8C23DC0C, second 0x8C23DC2C): a Body with contacts
+ * (radius 5, two slots), a target point picked by the placement's param (bits 0-5), a model (param bit 7: the list's
+ * first, else its second) and a Burst of 10 particles (func_8C0459BA sets it up) */
+typedef struct ActorType02 {
+  Actor base;               /* 0x00 */
+  int32_t state;            /* 0x28: 0 at set-up */
+  int32_t flag40;           /* 0x2C: param bit 6 */
+  Body body;                /* 0x30 */
+  Vec3 target;              /* 0x60: by param bits 0-5 (kinds 0-3; other kinds leave it) */
+  f32 angle_x;              /* 0x6C: the placement's angles */
+  f32 angle_y;              /* 0x70 */
+  Contacts contacts;        /* 0x74 */
+  int32_t contacts_word;    /* 0xC8: 4 */
+  gaddr model;              /* 0xCC */
+  int32_t delay;            /* 0xD0: param bits 8-15, times 5 */
+  int32_t wordd4;           /* 0xD4: 0 at set-up */
+  gaddr burst;              /* 0xD8: Burst (10 particles) or 0 */
+  gaddr second_vtable;      /* 0xDC */
+} ActorType02;
+HW_OFFSET(ActorType02, body, 0x30);
+HW_OFFSET(ActorType02, target, 0x60);
+HW_OFFSET(ActorType02, angle_y, 0x70);
+HW_OFFSET(ActorType02, contacts, 0x74);
+HW_OFFSET(ActorType02, contacts_word, 0xC8);
+HW_OFFSET(ActorType02, model, 0xCC);
+HW_OFFSET(ActorType02, wordd4, 0xD4);
+HW_OFFSET(ActorType02, burst, 0xD8);
+HW_OFFSET(ActorType02, second_vtable, 0xDC);
+HW_SIZE(ActorType02, 0xE0);
+
+/* type 0x2D (constructor func_8C05C6AA, 0xB8 bytes; vtable 0x8C23E77C, second 0x8C23E79C): something that turns
+ * about y by steps (a Body1, its speed +-341.33 by param bit 4), waits between them (param bits 0-3 times 144), with
+ * contacts (radius 20) whose response is the class's own (func_8C05CAA8); func_8C05C738 sets it up, func_8C05C81E
+ * steps it */
+typedef struct ActorType2D {
+  Actor base;               /* 0x00 */
+  Vec3 position;            /* 0x28: the contacts' owner */
+  f32 heading;              /* 0x34: the placement's angle about y */
+  int32_t state;            /* 0x38: 0, or 4 with param bit 5 */
+  int32_t reverse;          /* 0x3C: param bit 4 */
+  Body1 turn;               /* 0x40 */
+  f32 speed;                /* 0x50 */
+  f32 timer;                /* 0x54 */
+  f32 wait;                 /* 0x58 */
+  Contacts contacts;        /* 0x5C */
+  int32_t contacts_word;    /* 0xB0: 4 */
+  gaddr second_vtable;      /* 0xB4 */
+} ActorType2D;
+HW_OFFSET(ActorType2D, heading, 0x34);
+HW_OFFSET(ActorType2D, turn, 0x40);
+HW_OFFSET(ActorType2D, wait, 0x58);
+HW_OFFSET(ActorType2D, contacts, 0x5C);
+HW_OFFSET(ActorType2D, contacts_word, 0xB0);
+HW_OFFSET(ActorType2D, second_vtable, 0xB4);
+HW_SIZE(ActorType2D, 0xB8);
+
+/* type 0x20 (constructor func_8C061964, 0xE8 bytes; vtable 0x8C23E87C, second 0x8C23E89C): a Body that sways about
+ * its home by two random phases, two Body1s; kinds 0 and 1 (param bits 0-3) differ in their speeds
+ * (func_8C0619DC sets it up) */
+typedef struct ActorType20 {
+  Actor base;               /* 0x00 */
+  uint32_t tex_word;        /* 0x28: the second word of the actor's texlist field */
+  uint8_t pad_2c[0x30 - 0x2C];
+  int32_t frame;            /* 0x30: random 0..15 at set-up */
+  int32_t kind;             /* 0x34 */
+  uint8_t pad_38[0x40 - 0x38];
+  Vec3 home;                /* 0x40: S15 b09: the body's position, copied every update */
+  f32 word4c;               /* 0x4C: 0.625 */
+  f32 word50;               /* 0x50: 0.625 */
+  int32_t word54;           /* 0x54: 0 */
+  uint32_t word58;          /* 0x58: tex_word */
+  gaddr table;              /* 0x5C: static data at 0x8C09975C */
+  Body body;                /* 0x60 */
+  f32 pull;                 /* 0x90: 0.05 (S15 b09: the two Body1s' pull rate) */
+  f32 damping94;            /* 0x94: 0.8 (S15 b09: the two Body1s' damping, set every update) */
+  f32 radius;               /* 0x98: 20 (kind 0), 5 (kind 1) */
+  f32 phase_a;              /* 0x9C: random 0..65536; S15 b09: + rate_a every update */
+  f32 phase_b;              /* 0xA0: S15 b09: + rate_b every update */
+  f32 rate_a;               /* 0xA4: 36.4 + random 0..18.2 (kinds 0, 1) */
+  f32 rate_b;               /* 0xA8: +-546.13 (kind 0), +-273.07 (kind 1) */
+  Vec3 start;               /* 0xAC */
+  Vec3 target;              /* 0xB8: S15 b09: where the body is pulled: start + the turned offset (0, 0, radius) */
+  Body1 c4;                 /* 0xC4: S15 b09: the tilt (njRotateX), pulled toward phase_a */
+  Body1 d4;                 /* 0xD4: S15 b09: the turn (njRotateY), pulled toward phase_b */
+  gaddr second_vtable;      /* 0xE4 */
+} ActorType20;
+HW_OFFSET(ActorType20, frame, 0x30);
+HW_OFFSET(ActorType20, home, 0x40);
+HW_OFFSET(ActorType20, table, 0x5C);
+HW_OFFSET(ActorType20, body, 0x60);
+HW_OFFSET(ActorType20, pull, 0x90);
+HW_OFFSET(ActorType20, rate_b, 0xA8);
+HW_OFFSET(ActorType20, start, 0xAC);
+HW_OFFSET(ActorType20, target, 0xB8);
+HW_OFFSET(ActorType20, c4, 0xC4);
+HW_OFFSET(ActorType20, d4, 0xD4);
+HW_OFFSET(ActorType20, second_vtable, 0xE4);
+HW_SIZE(ActorType20, 0xE8);
+
+/* ---- end of S15 b08 ---- */
+
 /* game/actor.c */
 void actor_a_destroy(gaddr obj);
 void actor_b_destroy(gaddr obj);
@@ -1062,5 +1209,21 @@ gaddr member_array_init(gaddr obj, int32_t count);
 void member_array_free(gaddr obj);
 gaddr buffer_pair_init(gaddr obj, uint32_t size);
 void buffer_pair_free(gaddr obj);
+void actor_group_release(gaddr group);   /* S15 b08: exported there, declared here */
+void race_scene_env_push(gaddr scene, int32_t i, gaddr v); /* S15 b08 */
+void effect_defaults(gaddr fx);          /* S15 b08 */
+/* game/burst.c (S15 b08: exported there, declared here) */
+gaddr burst_construct(gaddr obj, uint32_t count);
+/* S15 b08: game/actor_group.c */
+void actor_set_cell(gaddr actor, gaddr pos, int32_t hint);
+int32_t actor_in_view(gaddr actor);
+gaddr actor_group_init(gaddr group);
+gaddr actor_group_construct(gaddr group);
+gaddr actor_group_delete(gaddr group, int32_t free_memory);
+void actor_group_populate(gaddr group);
+void actor_group_attach(gaddr group, gaddr actor, gaddr placement, int32_t index);
+void actor_group_draw_view(gaddr group);
+/* S15 b08: game/actor_types.c */
+void body_damping_none(gaddr body);
 
 #endif

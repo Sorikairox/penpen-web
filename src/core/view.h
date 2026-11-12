@@ -32,7 +32,7 @@ typedef struct View {
   uint8_t clip[0x10];           /* 0x004: the njClip2D rectangle */
   f32 origin_x, origin_y;       /* 0x014: the view's top-left corner on the screen (its 2D sprites and digits are
                                    placed from it) */
-  uint8_t unknown1c[0x24 - 0x1C]; /* 0x01C */
+  f32 extent[2];                /* 0x01C: S15 b01: the layout rectangle's other two values (copied with the origin) */
   uint8_t camera[0x40];         /* 0x024: the Ninja camera (NJS_CAMERA) */
   struct {
     Vec3 position, direction;
@@ -45,11 +45,17 @@ typedef struct View {
   int32_t fog;                  /* 0x0F0: fog on */
   Vec3 light_dir;               /* 0x0F4: the lights' direction (turned by the camera) */
   Vec3 light_intensity;         /* 0x100: (unused, diffuse, ambient): nj_Light*Intensity */
-  uint32_t unknown10c;          /* 0x10C */
+  f32 light_10c;                /* 0x10C: S15 b01: 1.0 when the layout is set */
   Vec3 light_color;             /* 0x110: nj_Light*Color */
-  uint8_t unknown11c[0x150 - 0x11C];
+  int32_t word11c;              /* 0x11C: S15 b01: 1 when the layout is set */
+  struct {
+    uint32_t word0;             /* not set by view_set_layout */
+    f32 rgb[3];                 /* 1.0 each when the layout is set */
+  } colors120[3];               /* 0x120 */
   Vec3 vec150[3];               /* 0x150: three members with empty constructors */
-  uint8_t unknown174[0x18C - 0x174];
+  struct {
+    f32 a, b;                   /* (1, 100) when the layout is set */
+  } ranges174[3];               /* 0x174 */
 } View;
 HW_OFFSET(View, origin_x, 0x14);
 HW_OFFSET(View, camera, 0x24);
@@ -59,6 +65,12 @@ HW_OFFSET(View, request, 0xB0);
 HW_OFFSET(View, fog, 0xF0);
 HW_OFFSET(View, light_color, 0x110);
 HW_OFFSET(View, vec150, 0x150);
+HW_OFFSET(View, extent, 0x1C);
+HW_OFFSET(View, light_intensity, 0x100);
+HW_OFFSET(View, light_10c, 0x10C);
+HW_OFFSET(View, word11c, 0x11C);
+HW_OFFSET(View, colors120, 0x120);
+HW_OFFSET(View, ranges174, 0x174);
 HW_SIZE(View, 0x18C);
 
 static inline View *view_at(gaddr a) { return (View *)hw_ptr(a); }
@@ -85,6 +97,9 @@ void view_fog_off(int32_t index);
 void view_apply_fog(void);
 gaddr view_screen(void);
 int32_t view_current_index(void);
+
+/* S15 b01: core/view_layout.c (view.c's static wrapper view_set_layout calls it through the guest address) */
+void view_init_layout(View *view, int32_t layout);
 
 /* S14 */
 void view_fog_on(int32_t index);
