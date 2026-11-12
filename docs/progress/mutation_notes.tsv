@@ -273,3 +273,53 @@ cxx_replace_scalar_call_nz:src/game/title.c:110:3:110:34	equivalent	title_init: 
 cxx_replace_scalar_call_zr:src/game/title.c:107:3:107:33	equivalent	title_init: the mover's first body_init is overwritten by body_reset and the damping fill later in the same function, before anything reads it
 cxx_assign_const:src/core/task.c:134:27:134:28	equivalent	S14: the root tree's updates_per_frame is written by game_frame (main.c) every frame before tasktree_update reads it; the 1 stored at attach time is never read
 cxx_add_to_sub:src/game/vmu.c:57:29:57:30	unreachable	S14: drive is always 0 (the routes have one VMU, A1), so + and - of drive * size agree; a second card (drive 1+) would reach it
+cxx_eq_to_ne:src/core/system.c:49:25:49:27	equivalent	S15: the debug log is never set up (its next and end words stay 0): with the flag test inverted the next test (next >= end) returns at once, so no word is written
+cxx_init_const:src/core/task.c:141:25:141:26	equivalent	S15: passes_left's initial value is overwritten by the loop's start (or restored from the unwind record on a rewind) before it is read
+cxx_replace_scalar_call_zr:src/core/view_setup.c:31:43:31:59	equivalent	S15: the View constructor (func_8C010BF2) only calls empty constructors and method_self on its members: constructing the views anywhere, or not at all, changes no byte
+cxx_replace_scalar_call_nz:src/core/view_setup.c:31:3:31:71	equivalent	S15: the View constructor only calls empty constructors (see 31:43): leaving the array construction out changes no byte
+cxx_replace_scalar_call_nz:src/core/view_setup.c:31:43:31:59	equivalent	S15: the View constructor only calls empty constructors (see 31:43): building them at another address changes no byte
+cxx_replace_scalar_call_zr:src/core/view_setup.c:48:13:48:29	unreachable	S15: every camera on the routes has roll 0 (f32_to_int(0) = 0); a rolled camera would reach it
+cxx_assign_const:src/game/stage.c:114:22:114:23	unreachable	S15: no caller passes a negative slot on the routes (the line runs for its test only); a contact chained into a new slot would reach it
+cxx_gt_to_ge:src/game/stage.c:155:44:155:45	equivalent	S15: in this program's data the word after set C's last state is 0 (no case of the switch): the extra pass changes nothing
+cxx_mul_to_div:src/game/vmu.c:57:47:57:48	unreachable	S15: drive is always 0 (one VMU, A1): drive * size = drive / size = 0; a second card would reach it
+cxx_lt_to_le:src/game/save.c:148:21:148:22	equivalent	S15: the seventh pass clears byte106, which the next line clears anyway
+cxx_lt_to_ge:src/game/save.c:148:21:148:22	unreachable	S15: save_reset runs on a record whose bytes 0x100-0x105 are already 0 (a new save); resetting a played record would reach it
+cxx_and_to_or:src/core/system.c:49:20:49:21	equivalent	S15: the debug log is never set up (next = end = 0): whatever the flag test, the next test returns
+cxx_add_to_sub:src/game/actor_types.c:135:35:135:36	equivalent	S15: the Burst destructor's this_adjust is 0: + and - agree
+cxx_replace_scalar_call_zr:src/game/course_env.c:109:53:109:69	unreachable	S15: the VS routes race course 0; VS on another course would reach it
+cxx_lt_to_le:src/game/game.c:120:35:120:36	unreachable	S15: no scene asks for mode MODE_COUNT (13)
+cxx_assign_const:src/game/good_night.c:327:13:327:14	unreachable	S15: the goodnight route presses no LEFT / RIGHT on the save choice
+cxx_ge_to_gt:src/game/good_night.c:161:16:161:18	equivalent	S15: game_language() is always 1 in this build (game/save.c), and languages 0 and 1 share the English files
+cxx_init_const:src/game/good_night.c:129:17:129:18	equivalent	S15: the initial value of `frame` is overwritten by the allocation (or restored from the unwind record) before it is read
+cxx_ne_to_eq:src/game/good_night.c:319:56:319:58	unreachable	S15: the goodnight route presses no LEFT / RIGHT on the save choice
+cxx_replace_scalar_call_zr:src/game/good_night.c:143:5:143:58	equivalent	S15: body_init and body_reset leave the cursor in the same state, and its damping and position are written right after
+cxx_replace_scalar_call_zr:src/game/good_night.c:311:5:311:24	equivalent	S15: an empty method (the original calls it; it does nothing)
+cxx_replace_scalar_call_nz:src/game/good_night.c:143:5:143:58	equivalent	S15: body_init and body_reset leave the cursor in the same state, and its damping and position are written right after
+cxx_remove_void_call:src/game/good_night.c:169:3:169:22	equivalent	S15: the sound set is already 0 when GOOD NIGHT starts (the house uses set 0)
+cxx_lt_to_le:src/game/good_night.c:289:37:289:38	unreachable	S15: the route's A presses fall far from the timer's boundaries (240 / 540 left); A at the boundary frame would reach it
+cxx_replace_scalar_call_zr:src/game/good_night.c:405:56:405:73	unreachable	S15: the shown character's placement has 0 for these angles; another character (score table a's best) would reach it
+cxx_replace_scalar_call_zr:src/game/good_night.c:160:22:160:37	equivalent	S15: game_language() is always 1 in this build (game/save.c), and languages 0 and 1 share the English files
+cxx_remove_void_call:src/game/good_night.c:153:3:153:21	equivalent	S15: body_init and body_reset leave the cursor in the same state, and its damping and position are written right after
+cxx_remove_void_call:src/game/good_night.c:176:3:177:98	equivalent	S15: the camera set at construction is replaced by the draw's njSetView every frame before it is used
+cxx_lt_to_le:src/game/good_night.c:289:20:289:21	unreachable	S15: the route's A presses fall far from the timer's boundaries (240 / 540 left); A at the boundary frame would reach it
+cxx_replace_scalar_call_zr:src/game/good_night.c:313:9:313:34	unreachable	S15: the goodnight route presses no LEFT / RIGHT on the save choice
+cxx_replace_scalar_call_nz:src/game/good_night.c:313:9:313:34	unreachable	S15: the goodnight route presses no LEFT / RIGHT on the save choice
+cxx_replace_scalar_call_zr:src/game/good_night.c:231:22:231:37	equivalent	S15: game_language() is always 1; languages 0 and 1 share their label strings
+cxx_lt_to_le:src/game/good_night.c:365:37:365:38	unreachable	S15: the route's A presses fall far from the timer's boundaries (240 / 540 left); A at the boundary frame would reach it
+cxx_replace_scalar_call_zr:src/game/good_night.c:405:18:405:35	unreachable	S15: the shown character's placement has 0 for these angles; another character (score table a's best) would reach it
+cxx_lt_to_le:src/game/good_night.c:365:20:365:21	unreachable	S15: the route's A presses fall far from the timer's boundaries (240 / 540 left); A at the boundary frame would reach it
+cxx_replace_scalar_call_nz:src/game/good_night.c:311:5:311:24	equivalent	S15: an empty method (the original calls it; it does nothing)
+cxx_replace_scalar_call_zr:src/game/good_night.c:319:16:319:42	unreachable	S15: the goodnight route presses no LEFT / RIGHT on the save choice
+cxx_assign_const:src/game/good_night.c:482:24:482:25	equivalent	S15: in this runtime the HLE mwPlyInitSofdec does not read the frame-count mode
+cxx_le_to_lt:src/game/good_night.c:161:33:161:35	equivalent	S15: game_language() is always 1 in this build (game/save.c), and languages 0 and 1 share the English files
+cxx_replace_scalar_call_nz:src/game/menu_screens.c:401:11:401:41	unreachable	S15: every character is available on the routes; a locked one would reach it
+cxx_ge_to_gt:src/game/menu_screens.c:444:27:444:29	unreachable	S15: the profile is drawn only for characters 0-7
+cxx_replace_scalar_call_zr:src/game/menu_screens.c:447:74:447:89	equivalent	S15: game_language() is always 1; languages 0 and 1 share their profile strings
+cxx_assign_const:src/game/race_scene.c:487:29:487:30	unreachable	S15: syMalloc never fails on the routes
+cxx_remove_void_call:src/game/race_scene.c:343:5:343:89	equivalent	S15: the array's constructor is empty (Vec3)
+cxx_assign_const:src/game/race_scene.c:481:29:481:30	unreachable	S15: syMalloc never fails on the routes
+cxx_remove_void_call:src/game/racer_actions.c:233:5:233:19	equivalent	S15: an empty method (the original calls it; it does nothing)
+cxx_lt_to_le:src/game/save.c:99:25:99:26	unreachable	S15: with the routes' poked scores the best is entry 4 (33), above entry 0 and score_b[0]; a table whose best is entry 0 or 8 would reach it
+cxx_init_const:src/game/save.c:99:20:99:21	equivalent	S15: starting at entry 0 only compares entry 0 with itself
+cxx_init_const:src/game/save.c:98:18:98:19	unreachable	S15: with the routes' poked scores the best is entry 4 (33), above entry 0 and score_b[0]; a table whose best is entry 0 or 8 would reach it
+cxx_lt_to_le:src/game/save.c:134:21:134:22	unreachable	S15: save_reset runs on a new record whose bytes are already 0; resetting a played record would reach it

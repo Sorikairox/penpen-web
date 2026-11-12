@@ -2,6 +2,48 @@
 
 Newest session first. Read `docs/port/PLAN.md` (disc facts, survey, approach, phases, rules) before working.
 
+## S15 — 2026-11-12/13: the Mull debt (m2, m3, m4), the lead's resumable scenes, nine delegated batches, a cheaper Mull gate
+
+The user's goal: "Don't stop until all the code is ported". All guest code ran in `--network none --read-only
+--cap-drop ALL --security-opt no-new-privileges --tmpfs /tmp` containers; `git log --all -- port/gen` stays empty;
+dumps and staging stayed in the gitignored `port_work/`. Design and numbers: `docs/port/DECOMP.md` 16.
+
+1. **Mull** (16.1): m2 (S14's refactored set again), m3 (the S15 code merged first + save.c / system.c with new route
+   inputs), m4 (the S15 code merged later + the S14 files S15 changed): combined with S14's row (actor_types.c from the
+   re-measuring run m6), **59 files, 4 703 mutants: 3 813 killed, 26 equivalent, 609 unreached, 255 survived (open):
+   81.5 %, reach 93.7 %**. 50 survivors
+   classified by id this session (`mutation_notes.tsv`); route inputs added to kill others (explore / goodnight poke
+   the score tables, goodnight runs on 2000-06-15). Still without a result: 30 files (16.1).
+2. **Gate cost** (16.2, the lead's request): survivors were ~82 % of Mull's time; the gate now orders routes by kills
+   per second, runs Mull's pass on at most 3 routes (file exports only), and only those partial survivors get the
+   full final pass on every covering route; partial-pass time-outs / stalls are not kills; duplicate call-replacement
+   mutants are skipped once one is killed (counted apart). Measured on actor_types.c: 59.4 s per mutant before, 59.2 s after: **no gain** (the true survivors still pay the full final pass; the old gate's time-out kills under load were partly false: ~19 on that file). The snapshot start (the first item) is not
+   done: the HLE state outside guest RAM must be serialised first.
+3. **Lead**: GOOD NIGHT's construction (resumable) and mode 4's start, the movie scene's update and Sofdec loop
+   (resumable), the RaceScene's construction (resumable) and destructor; the RaceSetup setters renamed (they were
+   S14's "SetupMenu" setters); flyer_pose's parent stack bounded to the original's 5 slots.
+4. **Delegated** (brief `port_work/s15/WRITER_BRIEF.md`): b08, b07, b05, b03, b04, b01, b09, b06, c05 merged:
+   the actor group and factory, actor types 1 / 2 / 3 / 0x20 / 0x2D, the course's ground and environment, the racer's
+   actions / base / draw / squash / camera update, the race views and race start per mode, the menus' screens, logos,
+   save progress, the RTC, the motion player's draw, effect pushes. The difftest caught 4 writer bugs on merge (16.3:
+   a setter mapped to the wrong field, an extra dereference, an untested S13 helper, racer_camera_start: kept
+   unexported, to find).
+
+**Progress: 3 079 of 4 010 game functions (76.78 %), 135 372 of 301 130 bytes (44.95 %)** (S14: 2 938 / 104 420,
+34.68 %). Raw offsets: 47. Routes: 12 (unchanged), 1 640 game functions run.
+
+Tests (end of S15): difftest over **12 routes, 114 757 samples: 0 FAIL**; pure vs hand **identical frame lines on all
+12 routes, native and wasm; native = wasm**; sh4 **257 / 0**; mixer **26 / 0**; harness **5 736 / 0 / 207**;
+`GEN=genhand tools/rtw.sh build` + `check` **OK**; screenshots from the hand build (title f500, PenPen House f900,
+race f3000 of the route) look right.
+
+Not verified: Mull on 30 files (16.1) and 255 open survivors; the new gate's snapshot start (not built); the browser
+e2e; racer_camera_start (C, unexported) and system_language (S13, unexported) differ from the originals somewhere.
+
+Next (DECOMP.md 16.4): (1) Mull: serialise the HLE state for a snapshot start, then the 30 files, then the open
+survivors; (2) the 82 reached functions left and the SetupMenu's construction func_8C022D80; (3) routes for the
+2 370 unreached functions.
+
 ## S14 — 2026-11-12: typed classes for the S13 code, Mull on S13's code with a two-pass gate, unlock routes, more functions
 
 The user's goal: "Don't stop until all the code is ported" (sessions back to back). All guest code ran in

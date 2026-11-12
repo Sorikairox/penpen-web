@@ -94,10 +94,10 @@
 8c01506e	boot:5 cup2:6 cup3:6 cup4:6 demo:5 explore:6 reset:5 route:5 vs2:2 vs4:4
 8c01509a	boot:160 cup2:192 cup3:192 cup4:192 demo:160 explore:192 reset:160 route:160 vs2:64 vs4:128
 8c01513c	boot:5 demo:5 explore:5 reset:5 route:5
-8c01521e	boot:6 cup2:12188 cup3:12188 cup4:12188 demo:3 explore:36786 goodnight:1848 reset:7428 route:30388 vs2:8734 vs4:23098
+8c01521e	boot:6 cup2:12188 cup3:12188 cup4:12188 demo:3 explore:38381 goodnight:1848 reset:7428 route:30388 vs2:8734 vs4:23098
 8c015224	boot:1 cup2:1 cup3:1 cup4:1 demo:1 explore:1 goodnight:1 inputs:1 reset:1 route:1 vs2:1 vs4:1
 8c01529a	cup2:841 cup3:841 cup4:841 explore:11391 goodnight:1483 reset:586 route:742 vs2:2530 vs4:1330
-8c015756	explore:3389
+8c015756	explore:4984
 8c015826	cup2:9794 cup3:9794 cup4:9794 explore:26458 reset:5034 route:27994 vs2:4828 vs4:19312
 8c015aa8	boot:2 cup2:798 cup3:798 cup4:798 demo:1 explore:2313 goodnight:616 reset:798 route:798 vs2:1302 vs4:1262
 8c015b52	boot:2 cup2:798 cup3:798 cup4:798 demo:1 explore:2313 goodnight:616 reset:798 route:798 vs2:1302 vs4:1262
@@ -332,7 +332,7 @@
 8c0228f8	explore:259
 8c0228fe	cup2:6444 cup3:6444 cup4:6444 explore:13335 goodnight:3465 reset:5985 route:5985 vs2:2849 vs4:3129
 8c022904	cup2:200 cup3:200 cup4:200 explore:338 reset:200 route:200 vs2:550 vs4:510
-8c022926	cup2:9884 cup3:9884 cup4:9884 explore:39214 goodnight:5940 reset:9723 route:9723 vs2:7433 vs4:10275
+8c022926	cup2:9884 cup3:9884 cup4:9884 explore:39533 goodnight:5940 reset:9723 route:9723 vs2:7433 vs4:10275
 8c02292c	cup2:3 cup3:3 cup4:3 explore:9 goodnight:3 reset:3 route:3 vs2:3 vs4:3
 8c022932	cup2:6844 cup3:6844 cup4:6844 explore:14372 goodnight:3465 reset:6385 route:6385 vs2:3949 vs4:4149
 8c02295e	cup2:16 cup3:16 cup4:16 explore:48 goodnight:16 reset:16 route:16 vs2:16 vs4:16
@@ -1687,7 +1687,7 @@
 8c062440	boot:2 cup2:2 cup3:2 cup4:2 demo:2 explore:2 goodnight:2 inputs:2 reset:2 route:2 vs2:2 vs4:2
 8c062452	boot:2 cup2:2 cup3:2 cup4:2 demo:2 explore:2 goodnight:2 inputs:2 reset:2 route:2 vs2:2 vs4:2
 8c062464	boot:354 cup2:124 cup3:124 cup4:132 demo:114 explore:21891 goodnight:4 reset:116 route:116 vs2:114 vs4:114
-8c062518	cup2:17656 cup3:17896 cup4:17476 explore:60927 goodnight:4 reset:9316 route:48676 vs2:6514 vs4:20998
+8c062518	cup2:17656 cup3:17896 cup4:17476 explore:62522 goodnight:4 reset:9316 route:48676 vs2:6514 vs4:20998
 8c0625e0	boot:93260 cup2:41429 cup3:41646 cup4:39630 demo:17977 explore:59016 goodnight:9542 inputs:3729 reset:28755 route:82368 vs2:31539 vs4:102041
 8c0625ec	boot:920430 cup2:313950 cup3:297975 cup4:290629 demo:50052 explore:250073 goodnight:131 inputs:12 reset:113718 route:623506 vs2:193230 vs4:478667
 8c0625fe	boot:36000 cup2:18456 cup3:18462 cup4:18456 demo:3730 explore:16015 reset:8580 route:40980 vs2:6192 vs4:40480
@@ -1727,7 +1727,7 @@
 8c063d18	boot:16004 cup2:6604 cup3:6604 cup4:6604 demo:6804 explore:14004 goodnight:5204 inputs:2004 reset:7204 route:12004 vs2:8004 vs4:8004
 8c0647b4	boot:169400 cup2:80505 cup3:89444 cup4:79387 demo:3710 explore:50831 goodnight:4571 inputs:572 reset:22462 route:182079 vs2:15457 vs4:47577
 8c064994	boot:162299 cup2:76139 cup3:88526 cup4:70347 demo:3710 explore:47683 goodnight:4571 inputs:572 reset:20435 route:172539 vs2:15454 vs4:42547
-8c064a98	boot:82117 cup2:37311 cup3:50364 cup4:32204 demo:3339 explore:20915 goodnight:4553 inputs:572 reset:7545 route:77477 vs2:11075 vs4:18513
+8c064a98	boot:82117 cup2:37311 cup3:50364 cup4:32204 demo:3339 explore:20915 goodnight:5745 inputs:572 reset:7545 route:77477 vs2:11075 vs4:18513
 8c064b58	boot:8630 cup2:4788 cup3:720 cup4:2820 demo:21 explore:2156 goodnight:4 inputs:1 reset:686 route:7539 vs2:31 vs4:33
 8c064bf8	boot:64016 cup2:26416 cup3:26416 cup4:26416 demo:27216 explore:56016 goodnight:20816 inputs:8016 reset:28816 route:48016 vs2:32016 vs4:32016
 8c064c9c	boot:64016 cup2:26416 cup3:26416 cup4:26416 demo:27216 explore:56016 goodnight:20816 inputs:8016 reset:28816 route:48016 vs2:32016 vs4:32016
@@ -1767,9 +1767,9 @@
 8c0c3328	boot:25996 cup2:12525 cup3:12525 cup4:12525 demo:5262 explore:14841 goodnight:2596 inputs:999 reset:7886 route:26486 vs2:8779 vs4:15807
 8c0c3b30	boot:18439 cup2:9662 cup3:11190 cup4:8987 demo:5249 explore:14958 goodnight:3194 inputs:1000 reset:7873 route:14876 vs2:12424 vs4:36016
 8c0c3d04	boot:2305258 cup2:804726 cup3:1661560 cup4:839287 demo:129426 explore:726494 reset:326811 route:2347267 vs2:328105 vs4:750925
-8c0c3d4c	boot:578150 cup2:627074 cup3:596971 cup4:529116 demo:104772 explore:966992 goodnight:164268 inputs:4568 reset:438743 route:742039 vs2:509546 vs4:1416612
-8c0c3d90	boot:578150 cup2:627074 cup3:596971 cup4:529116 demo:104772 explore:966992 goodnight:164268 inputs:4568 reset:438743 route:742039 vs2:509546 vs4:1416612
-8c0c3e14	boot:297540 cup2:426229 cup3:392706 cup4:338055 demo:55518 explore:603516 goodnight:118097 inputs:1713 reset:284918 route:395085 vs2:257386 vs4:826620
+8c0c3d4c	boot:578150 cup2:627074 cup3:596971 cup4:529116 demo:104772 explore:966992 goodnight:162480 inputs:4568 reset:438743 route:742039 vs2:509546 vs4:1416612
+8c0c3d90	boot:578150 cup2:627074 cup3:596971 cup4:529116 demo:104772 explore:966992 goodnight:162480 inputs:4568 reset:438743 route:742039 vs2:509546 vs4:1416612
+8c0c3e14	boot:297540 cup2:426229 cup3:392706 cup4:338055 demo:55518 explore:603516 goodnight:116905 inputs:1713 reset:284918 route:395085 vs2:257386 vs4:826620
 8c0c3fe8	boot:75615 cup2:20035 cup3:15963 cup4:83314 demo:10826 explore:21539 goodnight:5233 inputs:2142 reset:11921 route:35281 vs2:16487 vs4:22755
 8c0c407c	boot:81818 cup2:31082 cup3:23919 cup4:91274 demo:12700 explore:34070 goodnight:5233 inputs:2142 reset:15644 route:52124 vs2:30402 vs4:51154
 8c0c4118	boot:10440 cup2:6364 cup3:7892 cup4:5689 demo:1850 explore:7963 reset:4275 route:8878 vs2:6740 vs4:26960
@@ -1779,7 +1779,7 @@
 8c0c487c	boot:164001 cup2:60920 cup3:126837 cup4:55296 demo:17146 explore:68796 reset:39554 route:176969 vs2:25312 vs4:62161
 8c0c4890	boot:20880 cup2:12728 cup3:15784 cup4:11378 demo:3700 explore:15926 reset:8550 route:17756 vs2:13480 vs4:53920
 8c0c4904	boot:57589 cup2:35190 cup3:29571 cup4:89852 demo:11131 explore:36463 goodnight:2039 inputs:1142 reset:16677 route:58600 vs2:33571 vs4:73865
-8c0c4978	boot:342283 cup2:437895 cup3:408482 cup4:358644 demo:65598 explore:627081 goodnight:123235 inputs:3284 reset:295350 route:428893 vs2:262135 vs4:825543
+8c0c4978	boot:342283 cup2:437895 cup3:408482 cup4:358644 demo:65598 explore:627081 goodnight:121447 inputs:3284 reset:295350 route:428893 vs2:262135 vs4:825543
 8c0c49e0	boot:50147 cup2:10991 cup3:12504 cup4:72486 demo:1872 explore:8302 reset:4497 route:20697 vs2:3662 vs4:7278
 8c0c4a4c	boot:2425606 cup2:857382 cup3:1766330 cup4:883987 demo:130510 explore:753964 reset:338291 route:2467744 vs2:339211 vs4:808178
 8c0c4a70	boot:17686 cup2:6979 cup3:2602 cup4:7263 demo:382 explore:8596 goodnight:616 reset:2954 route:17256 vs2:4680 vs4:8018
