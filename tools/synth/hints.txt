@@ -4136,3 +4136,46 @@ nopoke
 for 8c062988
 farg 0 0 -0 0.5 -0.5 -1 -2.75 -5e9 1e20 inf -inf nan
 nopoke
+# S19 batch u (functions.tsv's gap functions)
+for 8c01bb0c
+# this: TitleScene (mode 2's scene; game/title.h, construction func_8C01B23C); state (0x28) 0..4 picks the draw
+# (0 fade, 1 logo, 2-4 menu); texlist (0x98) must be the title's NJS_TEXLIST
+
+for 8c01ca24
+# this: TitleScene (game/title.h) in a menu state; choice (0x30) 0 1 2 3 10 11 12 (another value draws the pointer
+# toward stale stack words); menu_page (0x64) 0 / 1 / 2; controllers (0x6C) 1..4; model[0..2], motion[2] must be loaded
+
+for 8c01a4fe
+# this: LogoScene (mode 0's scene, construction func_8C01A386, game/logos.h); fade (0x34) 0..1
+
+for 8c046d78
+# this: Pieces (type 5, constructor 8c046c50 on the factory's memory, game/actor.h), r5 = an ActorPlacement of type 5;
+# param (held) 0 / 1 matters (0 kicks every piece without a delay)
+
+for 8c0475f4
+# this: Spinner (type 0x0E, constructor 8c047576), r5 = an ActorPlacement of type 0x0E: param 0..3 (model 12 + param)
+
+for 8c04956c
+# this: ActorType1C (constructor 8c0494f6) with a model set / texlist / motion entries from the group file (param bit
+# 16), r5 = an ActorPlacement of type 0x1C: param bits 8-11 index the model set, bits 0-3 the motion table (keep small)
+
+for 8c05964a
+# this: ActorType25 (constructor 8c0595d0) with the group file's entries (param bit 16), r5 = an ActorPlacement of
+# type 0x25: param bits 8-11 the model, bits 0-3 the motion entry (keep small)
+
+for 8c058cdc
+# this: ActorType26 (constructor 8c058c2a) with the group file's entries, r5 = an ActorPlacement of type 0x26: param
+# bits 8-11 the model, bits 0-3 word30 (0 / 1: the reset's table)
+
+for 8c04bcb4
+# this: ActorType06 (constructor 8c04bbee: its burst at 0x64 must be a Burst), r5 = an ActorPlacement of type 6
+
+for 8c05520e
+# this: Flock (type 0x29, constructor 8c055132), r5 = an ActorPlacement of type 0x29: param bits 0-7 the body count
+# (keep it 0..12); base.flags (0x08) bit 1 set: the bodies (0x40) must already be an array of count Bodies
+
+for 8c05c054
+# this: Rings (type 0x2C, constructor 8c05bfc6), r5 = an ActorPlacement of type 0x2C: param 0 / 1 (0 sets the drift)
+
+for 8c047c58
+# this: Chain (type 0x1D, constructor 8c04795c, init 8c0479ec); the per-view draw (needs a draw context: a view drawing)

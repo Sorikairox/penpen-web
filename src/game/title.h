@@ -62,5 +62,10 @@ static inline TitleScene *title_at(gaddr a) { return (TitleScene *)hw_ptr(a); }
 
 /* game/title_draw.c */
 void title_draw_logo(gaddr scene);
+/* game/title_fade.c (S19 u: declared here for title_draw) */
+void title_draw_fade(gaddr scene);
+/* S19 u: game/title_menu.c */
+void title_draw(gaddr scene);
+void title_draw_menu(gaddr scene);
 
 #endif

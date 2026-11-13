@@ -1,6 +1,6 @@
 /* Pen Pen port, S17 (r2): the title scene's logo drawn (game/title_draw.c): the logo's shape motion, the sprites under
  * it, the back model's layers, the star, and (until the logo stands) a cover sprite. The scene is game/title.h's
- * TitleScene; title_draw_logo is reached through a tail call of the scene's draw (func_8C01BB0C, still translated). */
+ * TitleScene; title_draw_logo is reached through a tail call of the scene's draw (func_8C01BB0C: title_draw, game/title_menu.c). */
 #include "hw.h"
 #include "sdk.h"
 #include "title.h"

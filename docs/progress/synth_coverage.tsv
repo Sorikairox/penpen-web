@@ -324,6 +324,7 @@ address	c_function	bases	returned	kept	pass	fail	covered_bytes	insn_bytes	note	r
 8c01a3ee	scene_construct	12	0	0	0	0	0	22		h1
 8c01a436	mode0_scene_destruct	8	574	1	1	0	18	18		n3
 8c01a448	logo_scene_update	10	393	12	12	0	156	182		s18dv09
+8c01a4fe	logo_scene_draw	10	336	1	1	0	142	440		s19u
 8c01a6b6	race_setup_init	12	1396	8	8	0	522	522		h1
 8c01a8de	scene_construct	12	570	1	1	0	22	22		h1
 8c01a920	race_setup_destruct	8	601	1	1	0	18	18		n3
@@ -357,11 +358,13 @@ address	c_function	bases	returned	kept	pass	fail	covered_bytes	insn_bytes	note	r
 8c01b7ee	title_destroy	10	437	1	1	0	36	36		n1
 8c01b812	title_destruct	8	465	1	1	0	18	18		n3
 8c01b858	title_update	10	940	12	12	0	478	640		s18dx0
+8c01bb0c	title_draw	10	327	2	2	0	54	70		s19u
 8c01bb52	title_fade_in_step	10	795	2	2	0	30	30		n3
 8c01bb70	title_logo	11	707	8	8	0	552	690		n1
-8c01bef8	title_intro	12	60	12	12	0	646	1362		s18dz0
+8c01bef8	title_intro	12	11	8	8	0	436	1362		s19re
 8c01c5e8	title_draw_fade	8	556	1	1	0	86	86		n3
 8c01c668	title_draw_logo	10	855	10	10	0	732	732		s18dw0
+8c01ca24	title_draw_menu	8	265	1	1	0	478	1424		s19u
 8c01cfb8	vec3_diff	8	497	1	1	0	34	34		h1
 8c01cfee	RETF	8	570	1	1	0	6	6		h1
 8c01cff4	vec3_add	8	534	1	1	0	26	26		h1
@@ -992,9 +995,9 @@ address	c_function	bases	returned	kept	pass	fail	covered_bytes	insn_bytes	note	r
 8c03c67a	RETF	8	355	1	1	0	22	22		n1
 8c03c698	panel_get	10	601	1	1	0	6	6		h1
 8c03c69e	racer_camera_update	10	492	9	9	0	82	316		s18dw2
-8c03c804	racer_camera_start	12	572	9	9	0	352	354		s18dz2
-8c03c99c	-	10	554	3	3	0	402	482		s18n3
-8c03cbc2	racer_camera_intro	10	535	2	2	0	312	312		h1
+8c03c804	racer_camera_start	12	20	8	8	0	342	354		s19re
+8c03c99c	racer_camera_finish	10	490	7	7	0	402	482		s19re
+8c03cbc2	racer_camera_intro	10	569	2	2	0	312	312		s19re
 8c03cd4c	racer_camera_follow	12	588	8	8	0	536	654		s18dw2
 8c03d02a	racer_camera_high	10	632	2	2	0	564	564		h1
 8c03d2c4	-	10	550	1	1	0	502	572		s18n3
@@ -1277,6 +1280,7 @@ address	c_function	bases	returned	kept	pass	fail	covered_bytes	insn_bytes	note	r
 8c046a50	RETF	10	560	1	1	0	6	6		h1
 8c046a56	RETF	10	553	1	1	0	6	6		n1
 8c046a5c	RETF	10	557	1	1	0	6	6		h1
+8c046a86	vec3_fill	10	382	1	1	0	16	16		s19u
 8c046aa4	field_set_f32	10	560	1	1	0	6	6		h1
 8c046aaa	field_set_f32	10	557	1	1	0	6	6		h1
 8c046ab0	field_set_f32	10	563	1	1	0	6	6		h1
@@ -1293,6 +1297,7 @@ address	c_function	bases	returned	kept	pass	fail	covered_bytes	insn_bytes	note	r
 8c046bde	pieces_base_construct	10	562	1	1	0	114	114		h1
 8c046cf8	pieces_destroy_self	8	427	1	1	0	18	18		n1
 8c046d0a	piece_construct	10	553	1	1	0	110	110		h1
+8c046d78	pieces_init	10	93	1	1	0	480	552		s19u
 8c046fa0	piece_kick	12	443	1	1	0	102	102		h1
 8c047006	pieces_update	10	625	9	9	0	330	878		s18dz0
 8c0473c2	pieces_draw	10	473	8	8	0	80	182		s18dz2
@@ -1313,8 +1318,11 @@ address	c_function	bases	returned	kept	pass	fail	covered_bytes	insn_bytes	note	r
 8c047576	actor_type0e_construct	11	573	1	1	0	30	30		h1
 8c047598	empty_delete	10	572	1	1	0	36	36		h1
 8c0475bc	empty_destroy_self	8	601	1	1	0	18	18		n1
+8c0475f4	spinner_init	10	268	1	1	0	74	74		s19u
 8c04763e	f32_add_to	10	550	1	1	0	16	16		h1
 8c04764e	spinner_draw	8	647	9	9	0	104	104		s18dy1
+8c0476e4	method_self	10	400	1	1	0	4	4		s19u
+8c0476e8	vec3_copy	10	341	1	1	0	20	54		s19u
 8c04772c	RETF	8	568	1	1	0	6	6		n1
 8c047732	RETF	8	565	1	1	0	6	6		h1
 8c047752	vec3_set	8	569	1	1	0	10	10		h1
@@ -1332,6 +1340,7 @@ address	c_function	bases	returned	kept	pass	fail	covered_bytes	insn_bytes	note	r
 8c0479b0	actor_b_destroy_self	8	510	8	8	0	18	18		s18dv07
 8c0479ec	chain_init	10	503	8	8	0	382	382		s18dv00
 8c047b88	chain_update	10	500	8	8	0	156	156		s18dv07
+8c047c58	chain_draw_view	10	335	1	1	0	402	490		s19u
 8c047e42	vec3_set	8	570	1	1	0	14	14		h1
 8c047e50	RETF	8	573	1	1	0	6	6		n1
 8c047e56	RETF	8	578	1	1	0	6	6		h1
@@ -1459,6 +1468,7 @@ address	c_function	bases	returned	kept	pass	fail	covered_bytes	insn_bytes	note	r
 8c0494f6	actor_type1c_construct	11	569	1	1	0	28	28		h1
 8c049516	empty_delete	10	574	1	1	0	36	36		h1
 8c04953a	empty_destroy_self	8	601	1	1	0	18	18		n1
+8c04956c	actor_type1c_init	10	240	2	2	0	186	200		s19u
 8c049640	type1c_draw	10	631	9	9	0	218	218		s18dv00
 8c049758	vec3_diff	8	514	1	1	0	34	34		h1
 8c049788	RETF	8	569	1	1	0	6	6		n1
@@ -1482,6 +1492,8 @@ address	c_function	bases	returned	kept	pass	fail	covered_bytes	insn_bytes	note	r
 8c0499ba	field_addr	8	601	1	1	0	6	6		h1
 8c0499c0	vec3_copy_bytes	8	529	1	1	0	20	20		h1
 8c0499d4	body_reset	10	569	1	1	0	58	58		h1
+8c049a0e	vec3_set	8	376	1	1	0	12	12		s19u
+8c049a1a	vec3_fill	10	374	1	1	0	14	14		s19u
 8c049a28	vec3_add	8	525	1	1	0	32	32		h1
 8c049b1a	course_env_set_push	8	524	1	1	0	20	20		n1
 8c049b2e	vec3_add	8	517	1	1	0	34	34		h1
@@ -1588,6 +1600,7 @@ address	c_function	bases	returned	kept	pass	fail	covered_bytes	insn_bytes	note	r
 8c04bc38	actor_type06_destroy	8	544	1	1	0	58	58		n6
 8c04bc72	actor_type06_delete	8	591	2	2	0	36	36		n6
 8c04bc96	actor_type06_destroy_self	8	592	1	1	0	18	18		n6
+8c04bcb4	actor_type06_init	10	246	1	1	0	352	388		s19u
 8c04be38	actor_type06_update	10	317	10	10	0	422	312		s18dv9
 8c04c02a	-	8	427	3	3	0	146	146		s18n5
 8c04c0e4	vec3_diff	8	498	1	1	0	34	34		h1
@@ -1817,6 +1830,14 @@ address	c_function	bases	returned	kept	pass	fail	covered_bytes	insn_bytes	note	r
 8c04f8ba	RETF	8	572	1	1	0	4	4		h1
 8c04f8de	f32_add_to	10	551	1	1	0	10	10		h1
 8c04f8fc	body_reset	10	564	1	1	0	58	58		h1
+8c04f936	vec3_set	8	373	1	1	0	12	12		s19u
+8c04f942	vec3_fill	8	377	1	1	0	14	14		s19u
+8c04f950	contacts_set_radius	8	364	1	1	0	6	6		s19u
+8c04f956	contacts_set_cell	8	373	1	1	0	4	4		s19u
+8c04f95a	contacts_set_mass	8	363	1	1	0	6	6		s19u
+8c04f960	contacts_set_unknown18	8	377	1	1	0	6	6		s19u
+8c04f966	contacts_set_unknown1c	8	352	1	1	0	4	4		s19u
+8c04f96a	field_reset_2c	8	368	1	1	0	12	158		s19u
 8c04fa18	wobbler_base_construct	10	616	8	8	0	156	156		s18dv06
 8c04fab4	wobbler_construct	12	559	1	1	0	28	28		h1
 8c04fad0	wobbler_destroy	8	599	1	1	0	22	22		n6
@@ -1853,6 +1874,8 @@ address	c_function	bases	returned	kept	pass	fail	covered_bytes	insn_bytes	note	r
 8c050204	RETF	8	575	1	1	0	4	4		h1
 8c050228	body1_pull_angle	10	552	1	1	0	28	28		h1
 8c05028c	RETF	10	530	1	1	0	6	6		h1
+8c0502b0	body_reset	10	366	1	1	0	58	58		s19u
+8c0502ea	vec3_fill	10	367	1	1	0	14	14		s19u
 8c0502f8	vec3_add	10	543	1	1	0	34	34		h1
 8c05031a	f32_add_to	8	550	1	1	0	10	10		h1
 8c050324	body_pull	8	520	1	1	0	108	108		h1
@@ -2098,6 +2121,7 @@ address	c_function	bases	returned	kept	pass	fail	covered_bytes	insn_bytes	note	r
 8c055150	flock_destroy	8	507	2	2	0	32	32		n9
 8c055198	flock_delete	8	611	8	8	0	36	36		s18dv12b
 8c0551bc	flock_destroy_self	8	554	1	1	0	18	18		n9
+8c05520e	flock_init	10	307	2	2	0	422	426		s19u
 8c0553b8	flock_update	10	624	11	11	0	170	170		s18dy0
 8c0554ae	flock_draw	8	577	8	8	0	58	126		s18dx1
 8c055544	vec3_diff_crossed_tail	8	512	1	1	0	30	30		s18pieces
@@ -2220,10 +2244,12 @@ address	c_function	bases	returned	kept	pass	fail	covered_bytes	insn_bytes	note	r
 8c057446	matrix_rotate_y	11	601	1	1	0	16	16		h1
 8c057456	matrix_rotate_z	11	601	1	1	0	16	16		h1
 8c057466	RETF	10	565	1	1	0	4	4		h1
+8c057506	vec3_set	10	368	1	1	0	4	4		s19u
 8c057604	vec3_add	8	507	1	1	0	34	34		h1
 8c057626	contacts_holder_destroy	8	480	1	1	0	10	10		h1
 8c057630	contacts_holder_destroy_self	8	468	1	1	0	28	28		h1
 8c057656	race_scene_view_cell	11	595	2	2	0	48	48		h3
+8c05768c	text_set_color	10	400	1	1	0	12	12		s19u
 8c0576be	sign_base_construct	10	560	1	1	0	130	130		h1
 8c0577e4	sign_destroy_self	8	599	1	1	0	18	18		n9
 8c057af2	sign_update	10	75	12	12	0	246	888		s18div2
@@ -2301,6 +2327,7 @@ address	c_function	bases	returned	kept	pass	fail	covered_bytes	insn_bytes	note	r
 8c058c80	actor_type26_destroy	8	599	1	1	0	26	26		n9
 8c058c9a	actor_type26_delete	8	589	1	1	0	36	36		n9
 8c058cbe	actor_type26_destroy_self	8	587	1	1	0	18	18		n9
+8c058cdc	actor_type26_init	10	0	0	0	0	0	572		s19u
 8c058f18	actor_type26_update	10	441	7	7	0	78	78		s18dv11
 8c058f84	actor_type26_draw	6	381	1	1	0	138	138		s18nv
 8c05900e	actor_type26_reset	10	647	8	8	0	78	78		s18dv01
@@ -2323,6 +2350,7 @@ address	c_function	bases	returned	kept	pass	fail	covered_bytes	insn_bytes	note	r
 8c0595ec	method_empty	8	601	1	1	0	4	4		h1
 8c059614	empty_delete	8	601	1	1	0	36	36		n9
 8c059638	empty_destroy_self	8	601	1	1	0	18	18		n9
+8c05964a	actor_type25_init	10	240	1	1	0	252	268		s19u
 8c059780	-	8	389	1	1	0	152	152		s18n5
 8c059844	vec3_copy	10	543	1	1	0	20	20		h1
 8c059858	vec3_diff	8	486	1	1	0	34	34		h1
@@ -2484,6 +2512,7 @@ address	c_function	bases	returned	kept	pass	fail	covered_bytes	insn_bytes	note	r
 8c05bfe2	rings_destroy	8	591	1	1	0	20	20		n10
 8c05bff6	rings_delete	8	594	1	1	0	36	36		n10
 8c05c01a	rings_destroy_self	8	599	1	1	0	18	18		n10
+8c05c054	rings_init	10	300	2	2	0	356	404		s19u
 8c05c1e8	rings_update	10	472	1	1	0	130	130		h1
 8c05c26a	-	8	490	1	1	0	370	370		s18n5
 8c05c424	contact_take_other_velocity	8	324	1	1	0	24	24		n10
@@ -2593,7 +2622,7 @@ address	c_function	bases	returned	kept	pass	fail	covered_bytes	insn_bytes	note	r
 8c05d268	-	10	0	0	0	0	0	612		s18n5
 8c05d520	-	10	695	10	10	0	952	1874		s18n5
 8c05dd40	actor_type30_draw	6	0	0	0	0	0	732		s18nv
-8c05e098	-	8	415	1	1	0	96	198		s18n5
+8c05e098	actor_type30_pose_node	8	402	7	7	0	132	198		s19re
 8c05e1f0	object_draw_model_l1	8	561	1	1	0	14	14		n10
 8c05e1fe	-	8	266	6	6	0	294	330		s18b05c
 8c05e36c	actor_type30_reset	8	601	1	1	0	54	56		n10
@@ -2642,6 +2671,7 @@ address	c_function	bases	returned	kept	pass	fail	covered_bytes	insn_bytes	note	r
 8c05ec10	method_self	8	601	1	1	0	4	4		h1
 8c05ec14	body_reset	8	543	1	1	0	58	58		n10
 8c05ec4e	vec3_set	8	556	1	1	0	8	8		n10
+8c05ec5a	vec3_fill	10	374	1	1	0	14	14		s19u
 8c05ec68	body_pull	8	535	1	1	0	108	108		h1
 8c05ed20	vec3_add	8	530	1	1	0	34	34		h1
 8c05ed42	contacts_holder_destroy	8	476	1	1	0	10	10		h1

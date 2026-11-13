@@ -169,12 +169,12 @@ HW_SIZE(ActorType10, 0x13C);
 #define TYPE26_TIMERS 2
 typedef struct ActorType26 {
   Actor base;               /* 0x000 */
-  uint8_t pad_028[0x02C - 0x028];
+  int32_t kind;             /* 0x028: S19 u: the placement's param bits 8-11: which model of the model set */
   int32_t motion;           /* 0x02C: S18 b05: the entry of `motions` it is drawn with */
   int32_t word30;           /* 0x030: picks the reset's table (0: 0x8C099428 and word100 = word88); S18 b05: also
                              * the frame's speed (0: 1, else 0.5) and its particles' growth and timer */
   f32 frame;                /* 0x034: S18 b05: the motion's frame (handed by address); a particle starts at 0 */
-  uint8_t pad_038[0x03C - 0x038];
+  f32 last_frame;           /* 0x038: S19 u: the motion's frame count - 1 (when the entry has a motion) */
   union {
     f32 f3c;                /* 0x03C: the reset's counter (as a float) */
     Vec3 angle;             /* 0x03C: S18 b05: about x, y, z (drawn turned z, y, x; x is the sprite's angle) */
@@ -202,6 +202,8 @@ typedef struct ActorType26 {
   gaddr second_vtable;      /* 0x118 */
 } ActorType26;
 HW_OFFSET(ActorType26, word30, 0x030);
+HW_OFFSET(ActorType26, kind, 0x028);
+HW_OFFSET(ActorType26, last_frame, 0x038);
 HW_OFFSET(ActorType26, motion, 0x02C);
 HW_OFFSET(ActorType26, frame, 0x034);
 HW_OFFSET(ActorType26, angle, 0x03C);

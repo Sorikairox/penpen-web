@@ -17,7 +17,7 @@ typedef struct ActorType06 {
   f32 yaw;                  /* 0x58: S18 b04: the first part's angle about y */
   int32_t state;            /* 0x5C: S18 b04: 0 waits for a player's touch, 1 the second part flies off spinning,
                              * 2 it has landed */
-  uint8_t pad_60[0x64 - 0x60];
+  uint32_t word60;          /* 0x60: S19 u: 0 at init */
   gaddr burst;              /* 0x64: Burst (20 particles) or 0 */
   Body body2;               /* 0x68: S18 b04: the second part */
   f32 spin;                 /* 0x98: S18 b04: the second part's angle about x while it flies */
@@ -30,6 +30,7 @@ HW_OFFSET(ActorType06, body, 0x28);
 HW_OFFSET(ActorType06, burst, 0x64);
 HW_OFFSET(ActorType06, yaw, 0x58);
 HW_OFFSET(ActorType06, state, 0x5C);
+HW_OFFSET(ActorType06, word60, 0x60);
 HW_OFFSET(ActorType06, spin, 0x98);
 HW_OFFSET(ActorType06, touchable, 0x9C);
 HW_OFFSET(ActorType06, body2, 0x68);

@@ -389,6 +389,7 @@
 8c01a1f2	54	game_start_mode_scene	src/game/game.c	resumable
 8c01a248	52	game_start_mode_scene	src/game/game.c	resumable
 8c01a27c	50	game_start_mode_scene	src/game/game.c	resumable
+8c01a2ae	42	game_start_mode_scene	src/game/game.c	resumable
 8c01a2d8	44	game_start_mode_scene	src/game/game.c	resumable
 8c01a324	34	vec3_diff	src/copies/core/vec.c	plain
 8c01a346	6	RETF	src/copies/core/ninja_thunks.c	plain
@@ -404,6 +405,7 @@
 8c01a412	36	logo_scene_delete	src/game/logos.c	plain
 8c01a436	18	mode0_scene_destruct	src/core/inline_b02.c	plain
 8c01a448	182	logo_scene_update	src/game/logos.c	plain
+8c01a4fe	440	logo_scene_draw	src/game/logos_draw.c	plain
 8c01a6b6	552	race_setup_init	src/game/race_setup_init.c	plain
 8c01a8de	22	scene_construct	src/game/race_scene.c	resumable
 8c01a8f4	8	race_setup_clear	src/core/accessors.c	plain
@@ -477,11 +479,13 @@
 8c01b7ee	36	title_destroy	src/game/title.c	plain
 8c01b812	18	title_destruct	src/core/inline_b02.c	plain
 8c01b858	682	title_update	src/game/title.c	plain
+8c01bb0c	70	title_draw	src/game/title_menu.c	plain
 8c01bb52	30	title_fade_in_step	src/game/title_fade.c	plain
 8c01bb70	904	title_logo	src/game/title.c	plain
 8c01bef8	1714	title_intro	src/game/title.c	plain
 8c01c5e8	86	title_draw_fade	src/game/title_fade.c	plain
 8c01c668	872	title_draw_logo	src/game/title_draw.c	plain
+8c01ca24	1424	title_draw_menu	src/game/title_menu.c	plain
 8c01cfb4	4	method_self	src/copies/core/inline.c	plain
 8c01cfb8	34	vec3_diff	src/copies/core/vec.c	plain
 8c01cfda	14	vec3_set	src/copies/core/vec.c	plain
@@ -1632,6 +1636,7 @@
 8c041dd0	74	course_cell_corners	src/game/course_positions.c	plain
 8c041f70	18	course_start_position	src/game/course_positions.c	plain
 8c041f8c	116	course_finish_position	src/game/course_positions.c	plain
+8c042000	100	(empty)	src/game/course_positions.c	fragment
 8c042064	26	RETF	src/game/course.c	plain
 8c04207e	418	course_tv_camera	src/game/course_camera.c	plain
 8c042250	4	method_self	src/copies/core/inline.c	plain
@@ -1969,6 +1974,7 @@
 8c046a62	12	vec3_zero	src/copies/core/vec.c	plain
 8c046a6e	12	vec3_zero	src/copies/core/vec.c	plain
 8c046a7a	12	vec3_zero	src/copies/core/vec.c	plain
+8c046a86	16	vec3_fill	src/core/inline_u.c	plain
 8c046aa4	6	field_set_f32	src/copies/core/inline.c	plain
 8c046aaa	6	field_set_f32	src/copies/core/inline.c	plain
 8c046ab0	6	field_set_f32	src/copies/core/inline.c	plain
@@ -1995,6 +2001,7 @@
 8c046cd4	36	pieces_delete	src/game/actor_pieces.c	plain
 8c046cf8	18	pieces_destroy_self	src/game/actor_lifetimes.c	plain
 8c046d0a	110	piece_construct	src/game/actor_pieces.c	plain
+8c046d78	552	pieces_init	src/game/actor_pieces_init.c	plain
 8c046fa0	102	piece_kick	src/game/actor.c	plain
 8c047006	956	pieces_update	src/game/actor_pieces_update.c	plain
 8c0473c2	190	pieces_draw	src/game/actor.c	plain
@@ -2017,8 +2024,11 @@
 8c047594	4	method_empty	src/copies/core/inline.c	plain
 8c047598	36	empty_delete	src/game/actor.c	plain
 8c0475bc	18	empty_destroy_self	src/game/actor_lifetimes.c	plain
+8c0475f4	74	spinner_init	src/game/actor_spinner_init.c	plain
 8c04763e	16	f32_add_to	src/game/actor.c	plain
 8c04764e	104	spinner_draw	src/game/actor_spinner.c	plain
+8c0476e4	4	method_self	src/core/inline_u.c	plain
+8c0476e8	54	vec3_copy	src/core/inline_u.c	plain
 8c04771e	14	vec3_set	src/copies/core/vec.c	plain
 8c04772c	6	RETF	src/core/ninja_thunks_b.c	plain
 8c047732	6	RETF	src/copies/core/ninja.c	plain
@@ -2056,6 +2066,7 @@
 8c0479b0	18	actor_b_destroy_self	src/game/actor_lifetimes.c	plain
 8c0479ec	412	chain_init	src/game/actor.c	plain
 8c047b88	156	chain_update	src/game/actor_misc.c	plain
+8c047c58	490	chain_draw_view	src/game/actor_chain_draw.c	plain
 8c047e42	14	vec3_set	src/copies/core/vec.c	plain
 8c047e50	6	RETF	src/core/ninja_thunks_b.c	plain
 8c047e56	6	RETF	src/copies/core/ninja.c	plain
@@ -2193,6 +2204,7 @@
 8c049512	4	method_empty	src/copies/core/inline.c	plain
 8c049516	36	empty_delete	src/game/actor.c	plain
 8c04953a	18	empty_destroy_self	src/game/actor_lifetimes.c	plain
+8c04956c	200	actor_type1c_init	src/game/actor_type1c_init.c	plain
 8c049634	12	f32_add_to	src/copies/core/vec.c	plain
 8c049640	262	type1c_draw	src/game/actor_misc.c	plain
 8c049754	4	method_self	src/copies/core/inline.c	plain
@@ -2243,6 +2255,8 @@
 8c0499ba	6	field_addr	src/copies/core/inline.c	plain
 8c0499c0	20	vec3_copy_bytes	src/copies/core/vec.c	plain
 8c0499d4	58	body_reset	src/game/actor.c	plain
+8c049a0e	12	vec3_set	src/core/inline_u.c	plain
+8c049a1a	14	vec3_fill	src/core/inline_u.c	plain
 8c049a28	32	vec3_add	src/copies/core/vec.c	plain
 8c049a48	108	body_pull	src/copies/core/vec.c	plain
 8c049ab4	6	field_set_f32	src/copies/core/inline.c	plain
@@ -2385,6 +2399,7 @@
 8c04bc38	58	actor_type06_destroy	src/game/actor_type06.c	plain
 8c04bc72	36	actor_type06_delete	src/game/actor_type06.c	plain
 8c04bc96	18	actor_type06_destroy_self	src/game/actor_type06.c	plain
+8c04bcb4	388	actor_type06_init	src/game/actor_type06_init.c	plain
 8c04be38	498	actor_type06_update	src/game/actor_type06_b04.c	plain
 8c04c02a	176	actor_type06_draw	src/game/actor_type06_b04.c	plain
 8c04c0e4	34	vec3_diff	src/copies/core/vec.c	plain
@@ -2677,6 +2692,14 @@
 8c04f8e8	16	body1_pull	src/copies/core/vec.c	plain
 8c04f8f8	4	method_self	src/copies/core/inline.c	plain
 8c04f8fc	58	body_reset	src/game/actor_bodies.c	plain
+8c04f936	12	vec3_set	src/core/inline_u.c	plain
+8c04f942	14	vec3_fill	src/core/inline_u.c	plain
+8c04f950	6	contacts_set_radius	src/core/inline_u.c	plain
+8c04f956	4	contacts_set_cell	src/core/inline_u.c	plain
+8c04f95a	6	contacts_set_mass	src/core/inline_u.c	plain
+8c04f960	6	contacts_set_unknown18	src/core/inline_u.c	plain
+8c04f966	4	contacts_set_unknown1c	src/core/inline_u.c	plain
+8c04f96a	158	field_reset_2c	src/core/inline_u.c	plain
 8c04fa08	10	race_scene_slot_insert	src/copies/game/stage.c	plain
 8c04fa12	6	panel_get	src/copies/game/main.c	plain
 8c04fa18	156	wobbler_base_construct	src/game/actor_bodies.c	plain
@@ -2731,6 +2754,8 @@
 8c050292	6	RETF	src/copies/core/inline.c	plain
 8c050298	6	RETF	src/copies/core/inline.c	plain
 8c05029e	18	vec3_copy_bytes	src/copies/core/vec.c	plain
+8c0502b0	58	body_reset	src/core/inline_u.c	plain
+8c0502ea	14	vec3_fill	src/core/inline_u.c	plain
 8c0502f8	34	vec3_add	src/copies/core/vec.c	plain
 8c05031a	10	f32_add_to	src/copies/core/vec.c	plain
 8c050324	108	body_pull	src/copies/core/vec.c	plain
@@ -3072,6 +3097,7 @@
 8c055198	36	flock_delete	src/game/scenery_b07.c	plain
 8c0551bc	18	flock_destroy_self	src/game/scenery_b07.c	plain
 8c0551ce	64	body_reset	src/game/actor_gates.c	plain
+8c05520e	426	flock_init	src/game/actor_flock_init.c	plain
 8c0553b8	246	flock_update	src/game/actor_gates.c	plain
 8c0554ae	126	flock_draw	src/game/scenery_b07.c	plain
 8c055544	30	vec3_diff_crossed_tail	src/game/pieces_s18.c	plain
@@ -3267,6 +3293,7 @@
 8c0574ba	6	RETF	src/copies/core/inline.c	plain
 8c0574c0	58	body_reset	src/core/system.c	plain
 8c0574fa	8	vec3_set	src/game/actor_swimmer.c	plain
+8c057506	4	vec3_set	src/core/inline_u.c	plain
 8c057514	14	vec3_fill	src/copies/core/vec.c	plain
 8c057522	108	body_pull	src/copies/core/vec.c	plain
 8c05758e	4	field_set	src/copies/core/inline.c	plain
@@ -3284,6 +3311,7 @@
 8c05764c	10	race_scene_slot_insert	src/copies/game/stage.c	plain
 8c057656	48	race_scene_view_cell	src/game/actor_sign.c	plain
 8c057686	6	panel_get	src/copies/game/main.c	plain
+8c05768c	12	text_set_color	src/core/inline_u.c	plain
 8c057698	6	float4_set_tail	src/game/pieces_s18.c	plain
 8c05769e	32	setting_set	src/core/system.c	plain
 8c0576be	130	sign_base_construct	src/game/actor_sign.c	plain
@@ -3381,6 +3409,7 @@
 8c058c80	26	actor_type26_destroy	src/game/actor_types_b07.c	plain
 8c058c9a	36	actor_type26_delete	src/game/actor_types_b07.c	plain
 8c058cbe	18	actor_type26_destroy_self	src/game/actor_types_b07.c	plain
+8c058cdc	572	actor_type26_init	src/game/actor_type26_init.c	plain
 8c058f18	78	actor_type26_update	src/game/actor_type26.c	plain
 8c058f84	138	actor_type26_draw	src/game/actor_type26.c	plain
 8c05900e	78	actor_type26_reset	src/game/actor_types_b07.c	plain
@@ -3407,6 +3436,7 @@
 8c0595ec	4	method_empty	src/copies/core/inline.c	plain
 8c059614	36	empty_delete	src/game/scenery_b07.c	plain
 8c059638	18	empty_destroy_self	src/game/scenery_b07.c	plain
+8c05964a	268	actor_type25_init	src/game/actor_type25_init.c	plain
 8c059756	12	actor_type25_tick	src/game/actor_flyer.c	plain
 8c059780	152	actor_type25_draw	src/game/actor_type25.c	plain
 8c059844	20	vec3_copy	src/copies/core/vec.c	plain
@@ -3641,6 +3671,7 @@
 8c05bfe2	20	rings_destroy	src/game/scenery_b08.c	plain
 8c05bff6	36	rings_delete	src/game/scenery_b08.c	plain
 8c05c01a	18	rings_destroy_self	src/game/scenery_b08.c	plain
+8c05c054	404	rings_init	src/game/actor_rings_init.c	plain
 8c05c1e8	130	rings_update	src/game/actor_swingers.c	plain
 8c05c26a	442	rings_draw	src/game/actor_rings_draw.c	plain
 8c05c424	24	contact_take_other_velocity	src/game/scenery_b08.c	plain
@@ -3817,6 +3848,7 @@
 8c05ec10	4	method_self	src/copies/core/inline.c	plain
 8c05ec14	58	body_reset	src/game/scenery_b08.c	plain
 8c05ec4e	8	vec3_set	src/game/scenery_b08.c	plain
+8c05ec5a	14	vec3_fill	src/core/inline_u.c	plain
 8c05ec68	108	body_pull	src/copies/core/vec.c	plain
 8c05ed0c	20	course_env_set_push	src/copies/game/scenery_inline.c	plain
 8c05ed20	34	vec3_add	src/copies/core/vec.c	plain
@@ -3834,9 +3866,12 @@
 8c05f08c	36	actor_type31_delete	src/game/actor_types_b08.c	plain
 8c05f0b0	18	actor_type31_destroy_self	src/game/actor_types_b08.c	plain
 8c05f0c8	608	actor_type31_init	src/game/actor_type31.c	plain
+8c05f380	364	actor_type31_update	src/game/actor_type31.c	plain
 8c05f4ec	76	actor_type31_draw	src/game/actor_types_b08.c	plain
 8c05f550	242	actor_type31_wander	src/game/actor_type31.c	plain
+8c05f642	198	actor_type31_face_player	src/game/actor_type31.c	plain
 8c05f708	98	actor_type31_start_near	src/game/actor_types_b08.c	plain
+8c05f7b0	204	actor_type31_hold	src/game/actor_type31.c	plain
 8c05f87c	98	actor_type31_start_release	src/game/actor_types_b08.c	plain
 8c05f91c	240	actor_type31_step_items	src/game/actor_type31.c	plain
 8c05fa30	538	actor_type31_place_item	src/game/actor_type31.c	plain
@@ -4004,3 +4039,15 @@
 8c062388	32	debug_log_word	src/core/system.c	plain
 8c0623b4	58	system_language	src/core/system.c	plain
 8c0623ee	70	video_mode	src/core/video_mode.c	plain
+8c062848	58	RETF	src/lib/shc_math.c	plain
+8c062898	58	RETF	src/lib/shc_math.c	plain
+8c0628e8	58	RETF	src/lib/shc_math.c	plain
+8c062988	58	RETF	src/lib/shc_math.c	plain
+8c063494	20	RETF	src/lib/shc_math.c	plain
+8c0634b0	208	RETF	src/lib/shc_math.c	plain
+8c0635a4	70	RETF	src/lib/shc_math.c	plain
+8c0635fc	78	RETF	src/lib/shc_math.c	plain
+8c0647b4	400	RETF	src/lib/shc_math.c	plain
+8c064994	228	RETF	src/lib/shc_math.c	plain
+8c064a98	158	RETF	src/lib/shc_math.c	plain
+8c064d98	32	RETF	src/lib/shc_math.c	plain

@@ -160,8 +160,9 @@ typedef struct Piece {
   };
   int32_t sound_timer;      /* 0x60: S16 b06: updates before a contact may sound again (60) */
   Contacts contacts;        /* 0x64: S14 b10: owned by the body, radius 10, capacity 3 */
-  uint8_t pad_b8[0xBC - 0xB8];
+  int32_t contacts_word;    /* 0xB8: S19 u: 4 at init */
 } Piece;
+HW_OFFSET(Piece, contacts_word, 0xB8);
 HW_OFFSET(Piece, tip, 0x3C);
 HW_OFFSET(Piece, state, 0x4C);
 HW_OFFSET(Piece, size, 0x5C);
@@ -179,7 +180,8 @@ typedef struct Pieces {
   int32_t cell_turn;        /* 0xB3C: S16 b06: the piece whose cell is refreshed next */
   Body body;                /* 0xB40: S14 b10 */
   Contacts contacts;        /* 0xB70: owned by the body, radius 16, capacity 4 */
-  uint8_t pad_bc4[0xBCC - 0xBC4];
+  int32_t contacts_word;    /* 0xBC4: S19 u: 4 at init */
+  uint32_t word_bc8;        /* 0xBC8: S19 u: 0 at init */
   int32_t held;             /* 0xBCC: S16 b06: while set, the pieces' fall delays do not count down */
   gaddr second_vtable;      /* 0xBD0 */
 } Pieces;
@@ -189,6 +191,8 @@ HW_OFFSET(Pieces, contacts, 0xB70);
 HW_OFFSET(Pieces, state, 0x28);
 HW_OFFSET(Pieces, cell_turn, 0xB3C);
 HW_OFFSET(Pieces, held, 0xBCC);
+HW_OFFSET(Pieces, contacts_word, 0xBC4);
+HW_OFFSET(Pieces, word_bc8, 0xBC8);
 HW_SIZE(Pieces, 0xBD4);
 
 /* type 0x1F (constructor func_8C048476): three parts: part 0 (drawn twice, the second time turned half a turn) and
@@ -225,10 +229,13 @@ HW_SIZE(MotionEntry, 12);
 /* S14 b10: type 0x1C draws a model with one of its motions (func_8C049640) */
 typedef struct ActorType1C {
   Actor base;               /* 0x00 */
-  uint8_t pad_28[0x34 - 0x28];
-  int32_t motion;           /* 0x34: the entry of the motion table */
+  uint8_t pad_28[0x2C - 0x28];
+  int32_t kind;             /* 0x2C: S19 u: the placement's param bits 8-11: which model of the model set */
+  uint8_t pad_30[0x34 - 0x30];
+  int32_t motion;           /* 0x34: the entry of the motion table (S19 u: the param's bits 0-3) */
   f32 frame;                /* 0x38: the motion's frame (handed by address) */
-  uint8_t pad_3c[0x48 - 0x3C];
+  f32 last_frame;           /* 0x3C: S19 u: the motion's frame count - 1 (when the entry has a motion) */
+  uint8_t pad_40[0x48 - 0x40];
   Vec3 angle;               /* 0x48: about x, y, z (drawn turned z, x, y) */
   gaddr object;             /* 0x54: NJS_OBJECT */
   gaddr texlist;            /* 0x58 */
@@ -238,6 +245,8 @@ typedef struct ActorType1C {
   gaddr second_vtable;      /* 0x8C */
 } ActorType1C;
 HW_OFFSET(ActorType1C, motion, 0x34);
+HW_OFFSET(ActorType1C, kind, 0x2C);
+HW_OFFSET(ActorType1C, last_frame, 0x3C);
 HW_OFFSET(ActorType1C, angle, 0x48);
 HW_OFFSET(ActorType1C, motions, 0x5C);
 HW_OFFSET(ActorType1C, position, 0x80);
@@ -833,15 +842,22 @@ typedef struct Flock {
   int32_t state;            /* 0x28: 0 waiting, 1 flying, 2 gone */
   int32_t count;            /* 0x2C: bodies */
   int32_t trigger_cell;     /* 0x30: the course cell a player must reach */
-  uint8_t pad_34[0x38 - 0x34];
-  f32 height;               /* 0x38: a body 500 above it stops */
-  uint8_t pad_3c[0x40 - 0x3C];
+  union {
+    Vec3 start;             /* 0x34: S19 u: the placement's position (the bodies start around it) */
+    struct {
+      f32 start_x;          /* 0x34 */
+      f32 height;           /* 0x38: a body 500 above it stops */
+      f32 start_z;          /* 0x3C */
+    };
+  };
   gaddr bodies;             /* 0x40: Body[count] (operator new[], each built by func_8C0551CE) */
   NjSprite sprite;          /* 0x44: S17 b07: drawn twice at each body (func_8C0554AE) */
   gaddr second_vtable;      /* 0x64 */
 } Flock;
 HW_OFFSET(Flock, trigger_cell, 0x30);
 HW_OFFSET(Flock, height, 0x38);
+HW_OFFSET(Flock, start, 0x34);
+HW_OFFSET(Flock, start_z, 0x3C);
 HW_OFFSET(Flock, bodies, 0x40);
 HW_OFFSET(Flock, sprite, 0x44);
 HW_OFFSET(Flock, second_vtable, 0x64);
@@ -990,11 +1006,13 @@ HW_SIZE(Buoy, 0xDC);
  * written */
 typedef struct ActorType25 {
   Actor base;               /* 0x00 */
-  uint8_t pad_28[0x30 - 0x28];
+  uint8_t pad_28[0x2C - 0x28];
+  int32_t kind;             /* 0x2C: S19 u: the placement's param bits 8-11: which model of the model set */
   int32_t motion;           /* 0x30: S18 b05: the entry of `motions` it is drawn with */
-  uint8_t pad_34[0x44 - 0x34];
+  int32_t first_motion;     /* 0x34: S19 u: the param's bits 0-3 (as motion at init) */
+  uint8_t pad_38[0x44 - 0x38];
   f32 clock;                /* 0x44: + 1 a tick; S18 b05: the motion's frame (handed by address) */
-  uint8_t pad_48[0x4C - 0x48];
+  f32 last_frame;           /* 0x48: S19 u: the motion's frame count - 1 (when the entry has a motion) */
   f32 scale;                /* 0x4C: S18 b05: drawn scaled by it on all three axes */
   Vec3 angle;               /* 0x50: S18 b05: about x, y, z (drawn turned z, x, y) */
   Body body;                /* 0x5C */
@@ -1004,6 +1022,9 @@ typedef struct ActorType25 {
   gaddr second_vtable;      /* 0x98 */
 } ActorType25;
 HW_OFFSET(ActorType25, motion, 0x30);
+HW_OFFSET(ActorType25, kind, 0x2C);
+HW_OFFSET(ActorType25, first_motion, 0x34);
+HW_OFFSET(ActorType25, last_frame, 0x48);
 HW_OFFSET(ActorType25, scale, 0x4C);
 HW_OFFSET(ActorType25, angle, 0x50);
 HW_OFFSET(ActorType25, object, 0x8C);
@@ -1174,12 +1195,12 @@ HW_SIZE(Sparkles, 0xEC);
 #define RINGS 40
 typedef struct Rings {
   Actor base;               /* 0x000 */
-  uint8_t pad_028[0x02C - 0x028];
+  uint32_t param;           /* 0x028: S19 u: the placement's param (0: the drift below is set) */
   Body body;                /* 0x02C: the contacts' owner */
   Vec3 angle;               /* 0x05C: S18 b05: the rings' plane, about x, y, z (Ninja units, as floats) */
   Contacts contacts;        /* 0x068: radius 40, capacity 8 */
   int32_t contacts_word;    /* 0x0BC */
-  uint8_t pad_0c0[0x0CC - 0x0C0];
+  Vec3 drift;               /* 0x0C0: S19 u: (-0.7, 0.669, 0.247) * 5.8333 when param is 0 (else not set) */
   Body1 sizes[RINGS];       /* 0x0CC */
   f32 turns[RINGS];         /* 0x34C: Ninja units */
   gaddr second_vtable;      /* 0x3EC */
@@ -1188,6 +1209,8 @@ HW_OFFSET(Rings, body, 0x02C);
 HW_OFFSET(Rings, angle, 0x05C);
 HW_OFFSET(Rings, contacts, 0x068);
 HW_OFFSET(Rings, contacts_word, 0x0BC);
+HW_OFFSET(Rings, param, 0x028);
+HW_OFFSET(Rings, drift, 0x0C0);
 HW_OFFSET(Rings, sizes, 0x0CC);
 HW_OFFSET(Rings, turns, 0x34C);
 HW_SIZE(Rings, 0x3F0);
