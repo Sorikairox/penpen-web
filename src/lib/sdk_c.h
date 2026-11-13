@@ -38,5 +38,11 @@ void nj_set_view(gaddr view);
 void nj_control_3d(uint32_t flags);
 void nj_set_constant_material(gaddr argb);
 gaddr nj_read_chunk_file(gaddr data, gaddr offset_io, gaddr type_out);
+/* Ninja's motion reader (ninja/motion.c, S22) */
+void nj_motion_setup(gaddr motion, f32 frame);
+void nj_motion_step_a(gaddr out, int32_t how);
+void nj_motion_step_b(gaddr out, int32_t how);
+void nj_motion_step_c(gaddr out, int32_t how);
+void nj_motion_end(void);
 
 #endif

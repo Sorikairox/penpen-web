@@ -443,12 +443,13 @@ HW_EXPORT(8c05d520, actor_type30_update(ARG0))
 /* ---- the draw ---- */
 
 /* SDK motion calls (port/symbols/sdk_calls.tsv; Ninja's motion state is global) */
-static void nj_MotionSetup(gaddr motion, f32 frame) { FARGS1(frame); CALL1(0x8C0A484Cu, motion); }
+/* S22: the motion reader is hand-written C (src/lib/ninja/motion.c; HLE stubs before) */
+static void nj_MotionSetup(gaddr motion, f32 frame) { nj_motion_setup(motion, frame); }
 static void nj_ShapeOnly(gaddr shape, int32_t flags, f32 frame) { FARGS1(frame); CALL2(0x8C0CE0E4u, shape, flags); }
-static void nj_MotionStepA(gaddr out, int32_t n) { CALL2(0x8C0A4D98u, out, n); } /* a node's position */
-static void nj_MotionStepB(gaddr out, int32_t n) { CALL2(0x8C0A4E44u, out, n); } /* its angles */
-static void nj_MotionStepC(gaddr out, int32_t n) { CALL2(0x8C0A4F2Cu, out, n); } /* its scale */
-static void nj_MotionEnd(void) { CALL0(0x8C0A4FF8u); }
+static void nj_MotionStepA(gaddr out, int32_t n) { nj_motion_step_a(out, n); } /* a node's position */
+static void nj_MotionStepB(gaddr out, int32_t n) { nj_motion_step_b(out, n); } /* its angles */
+static void nj_MotionStepC(gaddr out, int32_t n) { nj_motion_step_c(out, n); } /* its scale */
+static void nj_MotionEnd(void) { nj_motion_end(); }
 static void njRotateZXY(gaddr m, int32_t x, int32_t y, int32_t z) { CALL4(0x8C0C4118u, m, x, y, z); }
 
 #define TYPE30_SHAPE_FLAGS  0x29

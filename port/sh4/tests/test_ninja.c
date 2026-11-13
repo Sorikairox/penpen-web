@@ -5,7 +5,7 @@
  * C's export adapter (f_<address>) from the same state on another copy, then compares XF0-XF15, FR0 / r0, the
  * scratch RAM the functions write, and Ninja's globals. Runs ONLY in the sandboxed container (it executes the disc's
  * code); prints counts and the failing function addresses only.
- *   test_ninja 1ST_READ.BIN [cases]   exit status: the number of failing functions (0 = pass) */
+ *   test_ninja 1ST_READ.BIN [cases] [motion]   (motion: only the motion reader's cases, S22); exit status: the number of failing functions (0 = pass) */
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -33,6 +33,10 @@ uint32_t hw_call(gaddr fn, int n, uint32_t a0, uint32_t a1, uint32_t a2, uint32_
   printf("ninja test: the C called %08x\n", fn);
   exit(99);
 }
+void hw_fragment_entered(uint32_t addr, uint32_t parent) {
+  printf("ninja test: fragment %08x of %08x entered\n", addr, parent);
+  exit(99);
+}
 gaddr hw_stack_alloc(uint32_t bytes) { hw_cpu->r[15] -= (bytes + 3) & ~3u; return hw_cpu->r[15]; }
 void hw_stack_free(uint32_t bytes) { hw_cpu->r[15] += (bytes + 3) & ~3u; }
 
@@ -42,6 +46,7 @@ F(8c0c3168) F(8c0c31c4) F(8c0c3230) F(8c0c3308) F(8c0c3328) F(8c0c3b30) F(8c0c3d
 F(8c0c3e14) F(8c0c3fe8) F(8c0c407c) F(8c0c42ec) F(8c0c4118) F(8c0c4388) F(8c0c47bc) F(8c0c470c) F(8c0c487c)
 F(8c0c4868) F(8c0c4890) F(8c0c4904) F(8c0c4978) F(8c0c49e0) F(8c0c4a4c) F(8c10c750) F(8c0c4bc4) F(8c0c4a70)
 F(8c0c4c00) F(8c0c4bd0)
+F(8c0a484c) F(8c0a4d98) F(8c0a4e44) F(8c0a4f2c) F(8c0a4ff8) /* S22: the motion reader (motion.c) */
 /* argument kinds: M a matrix (0 = XMTRX or a RAM scratch), V a vector scratch, O an output scratch, A an angle,
  * f a float in FR4.., n a small count */
 static const struct { uint32_t addr; hw_fn fn; const char *args; char ret; } T[] = {
@@ -84,6 +89,7 @@ static uint32_t rnd_angle(void) {
 }
 
 static uint8_t *ram0, *ramA, *ramB;
+static uint32_t f2u_test(float x) { uint32_t u; memcpy(&u, &x, 4); return u; }
 static int run_original(SH4 *c, uint32_t addr) {
   c->pc = addr;
   c->pr = MAGIC;
@@ -103,8 +109,136 @@ static int differ(const SH4 *a, const SH4 *b, char ret) {
   return 0;
 }
 
+/* S22: the motion reader (src/lib/ninja/motion.c). A case builds an NJS_MOTION in scratch RAM (1-3 nodes; element
+ * count 0-5 and the 0xC0 bits; type bits; 1-5 keys per element, frames mostly ascending, sometimes not; float and
+ * angle values), then runs Setup (motion or 0; a frame inside, at or past the end, special values) and, per node,
+ * StepA / StepB / StepC (how 0 or 1) and End, on both sides, comparing after every call: the reader's globals, the
+ * outputs, errno, XMTRX. */
+#define MOT 0x8C202000u   /* NJS_MOTION */
+#define MDATA 0x8C202010u /* 3 nodes x 4 elements x 8 bytes */
+#define KEYS 0x8C202100u  /* 3 x 4 key arrays of 5 keys (16 bytes) */
+#define MOUT 0x8C202500u  /* outputs */
+#define MOT_END 0x8C202540u
+#define MSTATE 0x8C1EFAE0u /* 0x8C1EFAE0-0x8C1EFB40 (fn pointers, state, element count, type) */
+static int motion_differ(const SH4 *a, const SH4 *b) {
+  if (memcmp(a->xf.u, b->xf.u, sizeof a->xf.u)) return 1;
+  if (memcmp(ramA + (MSTATE & 0xFFFFFF), ramB + (MSTATE & 0xFFFFFF), 0x60)) return 2;
+  if (memcmp(ramA + 0x1EFCE8, ramB + 0x1EFCE8, 2)) return 3;
+  if (memcmp(ramA + (MOT & 0xFFFFFF), ramB + (MOT & 0xFFFFFF), MOT_END - MOT)) return 4;
+  if (memcmp(ramA + 0x1BAC68, ramB + 0x1BAC68, 4)) return 5;
+  return 0;
+}
+static uint32_t rnd_key_value(int angle) {
+  if (!angle) return rnd() % 4 ? (((120u + rnd() % 14u) << 23) | (rnd() & 0x7FFFFFu) | (rnd() & 1u) << 31) : rnd_float();
+  return rnd() % 4 ? (uint32_t)((int32_t)(rnd() % 0x20000u) - 0x10000) : rnd_angle();
+}
+static long motion_test(long cases, long *checks) {
+  static const uint32_t fn[5] = {0x8C0A484Cu, 0x8C0A4D98u, 0x8C0A4E44u, 0x8C0A4F2Cu, 0x8C0A4FF8u};
+  static const hw_fn hf[5] = {f_8c0a484c, f_8c0a4d98, f_8c0a4e44, f_8c0a4f2c, f_8c0a4ff8};
+  long fails[5] = {0};
+  int first[5] = {0};
+  /* both RAMs copied once; a case rewrites everything it reads (its motion, the state, the stack's area is the
+     original's business and both sides start from the same words) and resets the regions the calls write */
+  memcpy(ramA, ram0, 16 << 20);
+  memcpy(ramB, ram0, 16 << 20);
+  for (long n = 0; n < cases; n++) {
+    if (getenv("MDEBUG")) printf("ninja test debug case %ld\n", n);
+    sh4_ram = ramA;
+    /* the element count and the type bits agree (as in the game's motions: a step reads the slots its type bits
+       count, the counts must be counts); a count other than 1-4 keeps the earlier node layout (3 here) */
+    uint32_t elements = rnd() % 8 ? 1 + rnd() % 4 : rnd() % 2 * 5;
+    uint32_t ne_layout = elements >= 1 && elements <= 4 ? elements : 3;
+    uint32_t inp = elements | (rnd() % 4 ? 0 : (rnd() % 4) << 6);
+    uint32_t type = ne_layout == 4 ? 0xFu : ne_layout == 3 ? 7u : ne_layout == 2 ? (rnd() % 3 == 0 ? 6u : rnd() % 2 ? 3u : 5u)
+                  : (rnd() % 3 == 0 ? 1u : rnd() % 2 ? 2u : 4u);
+    type |= rnd() % 4 ? 0 : (rnd() & 0xFFF0u);
+    uint32_t nbf = 1 + rnd() % 200;
+    for (uint32_t node = 0; node < 3; node++)
+      for (uint32_t e = 0; e < 4; e++) {
+        uint32_t ka = KEYS + (node * 4 + e) * 5 * 16, nk = 1 + rnd() % 5, fr = rnd() % 3;
+        for (uint32_t k = 0; k < 5; k++) {
+          wr32(ka + k * 16, fr);
+          fr += rnd() % 6 ? 1 + rnd() % 40 : 0;
+          if (rnd() % 16 == 0) fr = rnd() % 64;
+          for (int i = 0; i < 3; i++) wr32(ka + k * 16 + 4 + 4u * (uint32_t)i, rnd_key_value(e == 1));
+        }
+        /* entry layout: elements pointers, then elements counts (as many as fit in 4 + 4 words) */
+        uint32_t ne = ne_layout;
+        if (e < ne) {
+          wr32(MDATA + node * 8 * ne + 4 * e, ka);
+          wr32(MDATA + node * 8 * ne + 4 * ne + 4 * e, rnd() % 32 ? nk : 0);
+        }
+      }
+    wr32(MOT, MDATA); wr32(MOT + 4, nbf); wr16(MOT + 8, (uint16_t)type); wr16(MOT + 10, (uint16_t)inp);
+    for (uint32_t a = MOUT; a < MOT_END; a += 4) wr32(a, rnd_float());
+    /* the state as an earlier motion left it (a Setup that returns early keeps it) */
+    wr32(0x8C1EFB00u, MDATA); wr32(0x8C1EFB04u, MDATA); wr32(0x8C1EFB08u, MDATA + 4 * ne_layout);
+    wr32(0x8C1EFB18u, rnd() % 8 ? 0 : 0x8C201000u);
+    wr16(0x8C1EFB38u, (uint16_t)ne_layout); wr16(0x8C1EFB3Au, (uint16_t)type);
+    wr32(0x8C1EFB0Cu, rnd_float());
+    for (uint32_t a = 0x8C201000u; a < 0x8C201100u; a += 4) wr32(a, rnd_float());
+    wr32(0x8C1BAC68u, 0);
+    sh4_ram = ram0;
+    /* the regions the case wrote or the calls may write: the motion and outputs, the state, the reader's matrix,
+       errno, the stack below STACK */
+    static const uint32_t region[][2] = {{MOT, MOT_END}, {MSTATE, MSTATE + 0x60}, {0x8C1EFCE8u, 0x8C1EFCECu},
+                                         {0x8C201000u, 0x8C201100u}, {0x8C1BAC68u, 0x8C1BAC6Cu},
+                                         {STACK - 0x400u, STACK}, {NJ_GLOBALS, NJ_GLOBALS + 0xC0}};
+    for (unsigned r = 0; r < sizeof region / sizeof region[0]; r++)
+      memcpy(ramB + (region[r][0] & 0xFFFFFF), ramA + (region[r][0] & 0xFFFFFF), region[r][1] - region[r][0]);
+    SH4 base;
+    sh4_reset(&base);
+    base.fpscr = 0x00040001u;
+    base.r[15] = STACK;
+    for (int i = 0; i < 16; i++) base.xf.u[i] = rnd_float();
+    SH4 a = base, b = base;
+    /* the calls: Setup, then per node StepA / B / C and End */
+    int calls[1 + 3 * 4], nc = 0;
+    calls[nc++] = 0;
+    /* a step only for the elements the type has (as the game calls them: a step past them reads the next node's
+       words as counts) */
+    for (int node = 0; node < 3; node++) {
+      if (type & 1) calls[nc++] = 1;
+      if (type & 2) calls[nc++] = 2;
+      if (type & 4) calls[nc++] = 3;
+      calls[nc++] = 4;
+    }
+    for (int k = 0; k < nc; k++) {
+      int t = calls[k];
+      if (t == 0) {
+        uint32_t m = rnd() % 8 ? MOT : 0, fk = rnd() % 8;
+        uint32_t f = fk == 0 ? rnd_float() : fk == 1 ? 0x3F800000u * 0 : fk == 2 ? f2u_test((float)nbf) : f2u_test((float)(rnd() % (nbf * 4)) * 0.25f);
+        a.r[4] = b.r[4] = m;
+        a.fr.u[4] = b.fr.u[4] = f;
+      } else if (t <= 3) {
+        a.r[4] = b.r[4] = MOUT + 16u * (uint32_t)(t - 1);
+        a.r[5] = b.r[5] = rnd() % 2;
+      }
+      sh4_ram = ramA;
+      int ea = run_original(&a, fn[t]);
+      if (getenv("MDEBUG") && n < 3) printf("ninja test debug case %ld call %d fn %08x ea %d pc %08x\n", n, k, fn[t], ea, a.pc);
+      sh4_ram = ramB;
+      b.pc = fn[t];
+      b.pr = MAGIC;
+      hw_cpu = &b;
+      hf[t](&b);
+      sh4_ram = ram0;
+      (*checks)++;
+      int d = ea ? 9 : motion_differ(&a, &b);
+      if (d) { if (!fails[t]) first[t] = d; fails[t]++; break; }
+      /* the callee-saved registers and r15 are the original's business; keep the C side's in step */
+      for (int r = 8; r < 16; r++) b.r[r] = a.r[r];
+    }
+  }
+  long failing = 0;
+  for (int t = 0; t < 5; t++)
+    if (fails[t]) { failing++; printf("ninja test %08x: %ld motion cases differ (first: kind %d)\n", fn[t], fails[t], first[t]); }
+  return failing;
+}
+
 int main(int argc, char **argv) {
   long cases = argc > 2 ? atol(argv[2]) : 2000;
+  if (getenv("MDEBUG")) setvbuf(stdout, 0, _IONBF, 0);
   ram0 = calloc(1, 16 << 20); ramA = malloc(16 << 20); ramB = malloc(16 << 20);
   FILE *f = argc > 1 ? fopen(argv[1], "rb") : 0;
   if (!f || !fread(ram0 + 0x10000, 1, (16 << 20) - 0x10000, f)) { printf("ninja test: no 1ST_READ.BIN\n"); return 99; }
@@ -112,7 +246,8 @@ int main(int argc, char **argv) {
   sh4_init_tables();
   int failing = 0;
   long checks = 0;
-  for (int t = 0; t < NT; t++) {
+  int only_motion = argc > 3 && !strcmp(argv[3], "motion"); /* S22: the motion reader's cases alone */
+  for (int t = 0; t < NT && !only_motion; t++) {
     long fails = 0;
     int first = -1;
     for (long n = 0; n < cases; n++) {
@@ -158,6 +293,7 @@ int main(int argc, char **argv) {
     }
     if (fails) { failing++; printf("ninja test %08x: %ld of %ld cases differ (first: kind %d)\n", T[t].addr, fails, cases, first); }
   }
-  printf("ninja test: %d functions, %ld cases, %d functions differ\n", NT, checks, failing);
+  failing += motion_test(cases, &checks);
+  printf("ninja test: %d functions, %ld cases, %d functions differ\n", only_motion ? 5 : NT + 5, checks, failing);
   return failing;
 }
