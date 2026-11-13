@@ -1,0 +1,9 @@
+# S17: synth hints (tools/synth.py --spec-extra): per function (address, or name:C_FUNCTION for every export of that C
+# function, the identical copies included), candidate arguments where a random value is no input the game can give
+# (an index the original bounds by its callers' constants). Format: DECOMP.md 18.
+for name:race_scene_slot_insert
+# the slot: -1 (a new slot) or one of the 0x40 slots of the scene's SlotList
+arg 2 ffffffff 0 1 2 3 4 5 6 7 8 9 a f 10 20 3f
+for name:race_scene_view_focus
+# a view index: 0-7 (RaceScene.focus has RACE_RACERS entries)
+arg 1 0 1 2 3 4 5 6 7

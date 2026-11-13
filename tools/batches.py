@@ -3,7 +3,7 @@
 
   batches.py REPO OUTDIR [KB]      (COVER_EXTRA="f1 f2": more coverage, fncover's "rt cover" lines)
 
-"Left" = game functions (port/symbols/functions.tsv) that some route runs (docs/progress/fn_coverage.tsv) and that
+"Left" = game functions (port/symbols/functions.tsv) that some route runs (S17: ALL=1, every one) (docs/progress/fn_coverage.tsv) and that
 src/ does not export yet (commented-out exports count as left). Each gets a level: 0 when every direct callee
 (port_work/s13/calls.txt) is written or outside the game, n when it calls level n-1 functions of the list. The list
 is cut by address into batches of about KB kilobytes of code (default 11); for each batch OUTDIR gets NAME_list.txt
@@ -44,7 +44,9 @@ def main():
     cov = {l.split('\t')[0] for l in open(os.path.join(repo, 'docs/progress/fn_coverage.tsv')) if not l.startswith('#')}
     for extra in os.environ.get('COVER_EXTRA', '').split():  # S14: "rt cover ADDR ..." lines of candidate routes
         cov |= {l.split()[2] for l in open(extra) if l.startswith('rt cover 8')}
-    left = {a: n for a, n in fn.items() if a in cov and a not in done}
+    # S17: ALL=1 cuts the unreached functions too (the synthetic samples test them: DECOMP.md 18); SKIP="a b": leave out
+    skip = set(os.environ.get('SKIP', '').split())
+    left = {a: n for a, n in fn.items() if (a in cov or os.environ.get('ALL')) and a not in done and a not in skip}
     calls = {}
     for l in open(os.path.join(repo, 'port_work/s13/calls.txt')):
         f = l.split()
@@ -58,6 +60,15 @@ def main():
         k += 1
     dec = split_dump(os.path.join(repo, 'port_work/s14/dump/decomp.txt'))
     asm = split_dump(os.path.join(repo, 'port_work/s14/dump/asm.txt'))
+    # S17: the later dumps (decomp2 / asm of the functions the first dumps lacked: port_work/s17/dump)
+    for extra in ('port_work/s14/dump/decomp2.txt', 'port_work/s17/dump/decomp.txt'):
+        if os.path.exists(os.path.join(repo, extra)):
+            for k, v in split_dump(os.path.join(repo, extra)).items():
+                dec.setdefault(k, v)
+    for extra in ('port_work/s14/dump/asm2.txt', 'port_work/s17/dump/asm.txt'):
+        if os.path.exists(os.path.join(repo, extra)):
+            for k, v in split_dump(os.path.join(repo, extra)).items():
+                asm.setdefault(k, v)
     os.makedirs(out, exist_ok=True)
     order, batches, cur, acc = sorted(left), [], [], 0
     for a in order:

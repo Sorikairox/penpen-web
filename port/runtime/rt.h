@@ -30,6 +30,7 @@ int disc_track(int num, uint32_t *lba, uint32_t *count, int *flags); /* S7: CDDA
 typedef void (*hle_fn)(SH4 *c);
 hle_fn hle_find(uint32_t a);  /* HLE function for a (counted), else 0 (guest code or unknown) */
 int hle_known(uint32_t a);    /* a has an HLE function (not counted) */
+const char *hle_name(uint32_t a); /* S17: its name, or 0 */
 uint32_t hle_tmu_count(void); /* the frame-driven TMU0 count (syTmrGetCount, TCNT0 reads) */
 uint32_t hle_rtc(void);       /* S8: the RTC, seconds since 1950-01-01 local: the start value + the frames' time */
 extern uint32_t hle_rtc_base;
@@ -72,6 +73,10 @@ void hwt_summary(void);
 int hwt_set(const char *opt);
 int hwt_corpus(const char *opt); /* S16: --hwcorpus DIR:K */
 int hwt_replay(const char *list); /* S16: --hwreplay LIST */
+int hwt_synth(const char *spec); /* S17: --hwsynth SPEC (with --hwcorpus DIR:K): synthetic samples */
+extern int hwt_synth_hw;          /* S17: the job lets the function write hardware registers */
+extern int hwt_synth_odd;         /* S17: the recording pass touched memory no real pointer does */
+extern int hwt_synth_live;        /* S17: a synthetic sample's recording pass runs (rt_stop ends the sample) */
 extern int hle_digest_nostack;
 /* S11: the argument registers the running HLE function touched (bits 4-7); the difftest compares only those */
 extern uint32_t hle_arg_mask;

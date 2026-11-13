@@ -62,6 +62,9 @@ def main():
         log('control', 'times', ' '.join('%s=%.1fs' % kv for kv in sorted(took.items())), '-', '-', '-')
         return 0
     key = mutant[0]
+    if info.get('ids') is not None and key not in set(info['ids']):  # S17: --ids: only the listed mutants
+        log(key, 'skipped', '-', '-', '-', '0s')
+        return 0
     k = info.get('sample', 1)
     if k > 1 and int(hashlib.sha1(key.encode()).hexdigest(), 16) % k:
         log(key, 'skipped', '-', '-', '-', '0s')

@@ -68,6 +68,8 @@ hle_fn hle_find(uint32_t a) {
   return 0;
 }
 int hle_known(uint32_t a) { hle_ent *e = lookup(a); return e && e->fn; }
+/* S17: the HLE function's name (the synthetic samples refuse the frame's end, njWaitVSync) */
+const char *hle_name(uint32_t a) { hle_ent *e = lookup(a); return e ? e->name : 0; }
 
 #define R(i) HLE_R(i) /* S11: marks the argument registers read (rt.h) */
 /* the last calls, dumped when the run stops (to see what led to a fault) */

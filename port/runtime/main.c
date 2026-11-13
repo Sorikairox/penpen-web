@@ -10,7 +10,8 @@
  * --digest-nostack 0|1 (the RAM digest leaves out the stack area 0x8C00C000-0x8C00F3FF: hand-written functions keep
  * no frames on the guest stack, docs/port/DECOMP.md 6). S16: --hwcorpus DIR:K (with --hwtest: keep up to K passing
  * samples per function in DIR), --hwreplay LIST (native: replay the listed samples with this build and exit;
- * difftest.c, DECOMP.md 17). */
+ * difftest.c, DECOMP.md 17). S17: --hwsynth SPEC (native, with --hwcorpus DIR:K: synthetic samples of the functions
+ * SPEC names, from corpus snapshots, kept in DIR; difftest.c, DECOMP.md 18). */
 #include "rt.h"
 #include "hle_io.h"
 #include "vmu.h"
@@ -150,7 +151,7 @@ static void wav_close(void) { if (wav) { wav_drain(); wav_header(); fclose(wav);
 int main(int argc, char **argv) {
   signal(SIGSEGV, crash_handler);
   signal(SIGBUS, crash_handler);
-  const char *replay = 0;
+  const char *replay = 0, *synth = 0;
   hle_max_frames = 3; hle_verbose = 600; hle_digest_every = 1; hle_frame_log = 1; /* the S3/S4 test defaults */
   for (int i = 1; i < argc; i++) {
     if (!strcmp(argv[i], "--disc")) disc_dir = argv[++i];
@@ -171,6 +172,7 @@ int main(int argc, char **argv) {
     else if (!strcmp(argv[i], "--hwtest")) { if (hwt_set(argv[++i]) < 0) return 2; }
     else if (!strcmp(argv[i], "--hwcorpus")) { if (hwt_corpus(argv[++i]) < 0) return 2; }
     else if (!strcmp(argv[i], "--hwreplay")) replay = argv[++i];
+    else if (!strcmp(argv[i], "--hwsynth")) synth = argv[++i];
     else if (!strcmp(argv[i], "--digest-nostack")) hle_digest_nostack = atoi(argv[++i]);
     else if (!strcmp(argv[i], "--force-interp")) { extern uint32_t rt_force_interp; rt_force_interp = (uint32_t)strtoul(argv[++i], 0, 16); }
   }
@@ -183,6 +185,7 @@ int main(int argc, char **argv) {
   atexit(ram_dump_write);
   rtw_start();
   if (replay) { fflush(stdout); exit(hwt_replay(replay)); }
+  if (synth) { fflush(stdout); exit(hwt_synth(synth)); }
   for (;;) { rtw_frame(); vmu_store(); wav_drain(); }
 }
 #else

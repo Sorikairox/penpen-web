@@ -33,11 +33,15 @@ int hwt_begin(SH4 *c, uint32_t addr) { (void)c; (void)addr; return 0; }
 void hwt_end(int sample) { (void)sample; }
 void hwt_abandon(void) {}
 int hwt_replay(const char *list) { (void)list; return 2; }
+int hwt_synth(const char *spec) { (void)spec; return 2; }
+int hwt_synth_odd, hwt_synth_hw;
+int hwt_synth_live;
 int hwt_corpus(const char *opt) { (void)opt; return -1; }
 void hwt_summary(void) {}
 int hwt_set(const char *opt) { (void)opt; return -1; }
 #else
 #include <setjmp.h>
+#include <signal.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <time.h>
@@ -81,7 +85,7 @@ typedef struct {
   uint32_t inside; /* passing samples of other hand-written functions that ran this one's original code */
   char why[128];
 } hwt_stat;
-#define NST 1024
+#define NST 8192 /* S17: the synthetic samples test every hand-written function in one run */
 static hwt_stat st[NST];
 static int nst;
 static hwt_stat *stat_of(uint32_t a) {
@@ -158,8 +162,10 @@ static int cur_sample, sample_ids; /* a sample may span frames (the call yields)
 
 /* ---- one side's log ---- */
 typedef struct { uint32_t t, arity, fargs, a[8]; } call_ent; /* a[4..7]: FR4-FR7 */
+#define CX_N 9
 #define CALLS_MAX 8192
-typedef struct { call_ent call[CALLS_MAX]; int n, diverged, io_reads; uint32_t io_hash, io_n; } side_log;
+/* S17: cx: what a draw call's HLE sees at the moment of the call besides its registers (the draw context, ctx_of) */
+typedef struct { call_ent call[CALLS_MAX]; uint32_t cx[CALLS_MAX][CX_N]; int n, diverged, io_reads; uint32_t io_hash, io_n; } side_log;
 static side_log log_a, log_b, *slog;
 static int replay_diffs; /* S16: --hwreplay's debug output (PENPEN_REPLAY_DIFFS=N: N differing words; above 100: HLE calls too) */
 static jmp_buf sbx_jb;
@@ -186,6 +192,48 @@ void hwt_io_write(uint32_t a, uint32_t v, int size) {
   slog->io_n++;
 }
 
+/* S17: the draw context of an HLE draw call. The difftest compared a draw call by its registers only, so what it draws
+ * from memory was seen only in the RAM at the sample's end: a sprite whose position is set, drawn, then set again for
+ * the next digit, or a matrix pushed, moved, drawn with and popped, left no trace (Mull survivors in race_draw.c,
+ * time_draw). For the Ninja draw functions, cx holds at the call: [0] the current matrix (njInitMatrix's stack top,
+ * 48 bytes; the 3D draws only) and the render state the HLE reads (njControl3D, the constant attribute / material, the texture list),
+ * [1..4] 32 bytes at r4..r7 when that register points into RAM outside the stack (the sprite, the model, the
+ * vertices), [5] FR4 for the draws that read it (the priority, the motion frame). Compared per call like the
+ * arguments (the pointer words only for the registers the call uses). */
+static int draw_kind(uint32_t a) {
+  static uint32_t ca[64], ck[64];
+  static int cn;
+  for (int i = 0; i < cn; i++) if (ca[i] == a) return (int)ck[i];
+  const char *n = hle_name(a);
+  int k = 0;
+  if (n && (!strncmp(n, "njDraw", 6) || !strncmp(n, "nj_Model", 8) || !strncmp(n, "nj_Object", 9) ||
+            !strncmp(n, "nj_Motion", 9) || !strncmp(n, "nj_ShapeMotion", 14) || !strcmp(n, "njCnkModDrawModel")))
+    k = 1 | (!strcmp(n, "njDrawSprite2D") || !strcmp(n, "njDrawPolygon") || !strncmp(n, "nj_Motion", 9) ||
+             !strncmp(n, "nj_ShapeMotion", 14) ? 2 : 0) | (strncmp(n, "njDraw", 6) || !strcmp(n, "njDrawSprite3D") ? 4 : 0);
+  if (cn < 64) { ca[cn] = a; ck[cn] = (uint32_t)k; cn++; }
+  return k;
+}
+static uint32_t mem_hash(uint32_t h, uint32_t a, uint32_t n) {
+  for (uint32_t i = 0; i < n; i += 4) h = hsh(h ^ rd32(a + i));
+  return h;
+}
+static int in_stack(uint32_t w) { uint32_t p = w & 0x1FFFFFFFu; return p >= 0x0C00C000u && p < 0x0C00F400u; }
+static void ctx_of(SH4 *c, uint32_t a, uint32_t *cx) {
+  memset(cx, 0, sizeof(uint32_t) * CX_N);
+  int k = draw_kind(a);
+  if (!k) return;
+  uint32_t m = rd32(0x8C1EF2B8u); /* NJG_CURMATRIX: the 3D draws only (a 2D draw does not read it) */
+  cx[0] = !(k & 4) ? 0x50u : sh4_is_ram(m) ? mem_hash(0x51u, m, 48) | 1 : 0x52u;
+  cx[6] = rd32(0x8C1EF2ECu);             /* njControl3D */
+  cx[7] = mem_hash(0x53u, 0x8C1EF320u, 24); /* constant attribute and-/or-masks, constant material */
+  cx[8] = stack_token(rd32(0x8C1823F0u)); /* the texture list (one on the stack: a token, DECOMP.md 6) */
+  for (int i = 0; i < 4; i++) {
+    uint32_t p = c->r[4 + i];
+    cx[1 + i] = sh4_is_ram(p) && !in_stack(p) && (p & 0xFFFFFF) + 32 <= (16u << 20) ? mem_hash(0x77u, p & ~3u, 32) | 1 : 0;
+  }
+  cx[5] = k & 2 ? c->fr.u[4] : 0;
+}
+
 /* an HLE call in the sandbox: logged, then answered from the live record */
 static void sbx_hle(SH4 *c, uint32_t a, int arity, int fargs) {
   int k = slog->n++;
@@ -193,6 +241,7 @@ static void sbx_hle(SH4 *c, uint32_t a, int arity, int fargs) {
     call_ent *e = &slog->call[k];
     e->t = a; e->arity = arity < 0 ? 4 : (uint32_t)arity; e->fargs = (uint32_t)fargs;
     for (int i = 0; i < 4; i++) { e->a[i] = c->r[4 + i]; e->a[4 + i] = c->fr.u[4 + i]; }
+    ctx_of(c, a, slog->cx[k]);
   }
   uint32_t h = hsh(a ^ hsh((uint32_t)k + 0x1234u));
   if (replay_diffs > 100) rt_log("hw replay hle %d %08x (recorded %08x)", k, a, k < rec_n && k < REC_MAX ? rec[k].t : 0);
@@ -336,16 +385,19 @@ static void fail(const char *fmt, uint32_t x, uint32_t y, uint32_t z) {
   }
 }
 
+int hwt_synth_sideb; /* S17: a synthetic sample's side B runs (a host fault there is the sample's FAIL, synth.c) */
 static int run_side_b(SH4 *b) {
   rt_fn f = rt_lookup(cur->addr);
-  volatile int code = setjmp(sbx_jb);
-  if (code == 0) { f(b); return END_RET; }
+  volatile int code = sigsetjmp(sbx_jb, 1);
+  if (code == 0) { f(b); hwt_synth_sideb = 0; return END_RET; }
+  hwt_synth_sideb = 0;
   return code;
 }
 
 /* side B (the hand-written function, from the snapshot buf_s / snap) and the comparison with side A (a, ea, at_a,
  * log_a, buf_a). Returns 1 when the sample passes. S16: shared by the live difftest and the offline replay. */
 static SH4 side_a_cpu, side_b_cpu;
+static int cx_a_known = 1; /* S17: side A's draw contexts are known (live, or a sample with them) */
 static int side_b_compare(int ea, uint32_t at_a) {
   SH4 *a = &side_a_cpu, *b = &side_b_cpu;
   uint8_t *ram = sh4_ram;
@@ -391,6 +443,16 @@ static int side_b_compare(int ea, uint32_t at_a) {
         fail("hle call to %x arg %x %x", x->t, i, x->a[i] ^ y->a[i]);
         return 0;
       }
+    /* S17: the draw context (ctx_of); a sample recorded before S17 has none for side A (cx_a_known 0) */
+    if (cx_a_known) {
+      const uint32_t *p = log_a.cx[k], *q = log_b.cx[k];
+      if (p[0] != q[0]) { fail("hle draw %x matrix %x", x->t, p[0] ^ q[0], 0); return 0; }
+      for (uint32_t i = 6; i < CX_N; i++)
+        if (p[i] != q[i]) { fail("hle call %x (draw) render state %x: %x", (uint32_t)k, i, p[i] ^ q[i]); return 0; }
+      for (uint32_t i = 0; i < 4; i++)
+        if ((used >> (4 + i) & 1) && p[1 + i] != q[1 + i]) { fail("hle draw %x memory at arg %x %x", x->t, i, p[1 + i] ^ q[1 + i]); return 0; }
+      if (p[5] != q[5]) { fail("hle draw %x fr4 %x", x->t, p[5] ^ q[5], 0); return 0; }
+    }
     /* S13: the float arguments hand-written code passed (FARGS: FR4 ...) */
     for (uint32_t i = 0; i < y->fargs && i < 4; i++)
       if (x->a[4 + i] != y->a[4 + i]) { fail("hle call to %x fr%x %x", x->t, 4 + i, x->a[4 + i] ^ y->a[4 + i]); return 0; }
@@ -423,12 +485,21 @@ static int side_b_compare(int ea, uint32_t at_a) {
 }
 
 static void corpus_keep(int ea, uint32_t at_a, uint32_t cost);
+static int synth_keep; /* S17: the synthetic run chooses its samples itself (by new coverage of the original) */
 
+/* side A from the snapshot (the recorded HLE results replayed), then side B and the comparison; a passing sample goes
+ * to the corpus. Returns 1 pass, 0 FAIL, -1 not judged (too long). S17: shared by the live difftest and the synthetic
+ * samples (hwt_synth) */
+static int sample_judge(void);
 void hwt_end(int sample) {
   if (sample != cur_sample || !hwt_recording) return; /* given up meanwhile */
   hwt_recording = 0;
   cur_sample = 0;
-  if (rec_n > REC_MAX) { cur->longrun++; return; }
+  sample_judge();
+}
+static int sample_judge(void) {
+  if (rec_n > REC_MAX) { cur->longrun++; return -1; }
+  cx_a_known = 1; /* side A runs here: its draw contexts are computed */
   uint8_t *ram = sh4_ram;
   SH4 *save_cpu = hw_cpu;
   SH4 *a = &side_a_cpu;
@@ -448,7 +519,7 @@ void hwt_end(int sample) {
   rt_sandbox = 0;
   sh4_ram = ram;
   hw_cpu = save_cpu;
-  if (ea == END_BUDGET) { cur->longrun++; cur->samples--; return; }
+  if (ea == END_BUDGET) { cur->longrun++; cur->samples--; return -1; }
   struct timespec t0, t1;
   clock_gettime(CLOCK_MONOTONIC, &t0);
   int passed = side_b_compare(ea, at_a);
@@ -461,6 +532,7 @@ void hwt_end(int sample) {
     }
     corpus_keep(ea, at_a, (uint32_t)((t1.tv_sec - t0.tv_sec) * 1000000 + (t1.tv_nsec - t0.tv_nsec) / 1000));
   }
+  return passed;
 }
 
 /* ---- S16: the sample corpus (--hwcorpus DIR:K) and its offline replay (--hwreplay LIST) ----
@@ -539,7 +611,7 @@ static void corpus_keep(int ea, uint32_t at_a, uint32_t cost) {
   int seen = 0;
   for (uint32_t i = 0; i < k->kept; i++) seen |= k->sig[i] == sig;
   /* the first; a new path; else one in 8 at random (by the sample id), the last slot kept for a new path */
-  if (k->kept && seen && (hsh((uint32_t)sample_ids ^ 0xC0FFEEu) & 7 || (int)k->kept >= corpus_k - 1)) return;
+  if (!synth_keep && k->kept && seen && (hsh((uint32_t)sample_ids ^ 0xC0FFEEu) & 7 || (int)k->kept >= corpus_k - 1)) return;
   char path[600];
   uint32_t id = corpus_n++;
   snprintf(path, sizeof path, "%s/s%06u.smp", corpus_dir, id);
@@ -553,7 +625,7 @@ static void corpus_keep(int ea, uint32_t at_a, uint32_t cost) {
   }
   uint32_t hdr[16] = {0x31535050u /* PPS1 */, (uint32_t)sizeof(SH4), cur->addr, cur_frame, cur->calls,
                       (uint32_t)rec_n, stk_n, (uint32_t)iorec_n, memrec_n, mempool_n, (uint32_t)log_a.n, na,
-                      (uint32_t)ent_n, cost, sig, 0};
+                      (uint32_t)ent_n, cost, sig, 1 /* S17: the draw contexts follow */};
   wr(f, hdr, sizeof hdr);
   wr(f, &snap, sizeof snap);
   wr(f, rec, sizeof *rec * (size_t)rec_n);
@@ -571,6 +643,7 @@ static void corpus_keep(int ea, uint32_t at_a, uint32_t cost) {
   wr(f, snap_pages, sizeof snap_pages);
   wr(f, a_pages, sizeof a_pages[0] * na);
   wr(f, ent, sizeof ent[0] * (size_t)ent_n);
+  wr(f, log_a.cx, sizeof log_a.cx[0] * (size_t)(log_a.n < CALLS_MAX ? log_a.n : CALLS_MAX));
   int bad = ferror(f);
   bad |= fclose(f);
   if (bad) { rt_log("hw corpus write failed"); corpus_k = 0; return; }
@@ -633,6 +706,13 @@ static int replay_load(const char *path, int *ea, uint32_t *at_a) {
   ok = ok && rd(f, ea_hdr, sizeof ea_hdr) && rd(f, &side_a_cpu, sizeof side_a_cpu) && rd(f, io, sizeof io) &&
        rd(f, log_a.call, sizeof log_a.call[0] * (size_t)(log_a.n < CALLS_MAX ? log_a.n : CALLS_MAX)) &&
        rd(f, snap_pages, sizeof snap_pages) && rd(f, a_pages, sizeof a_pages[0] * hdr[11]);
+  /* S17: the draw contexts (hdr[15] bit 0), after the list of entered functions */
+  cx_a_known = ok && (hdr[15] & 1);
+  if (cx_a_known) {
+    static uint32_t skip_ent[ENT_MAX];
+    ok = rd(f, skip_ent, sizeof skip_ent[0] * hdr[12]) &&
+         rd(f, log_a.cx, sizeof log_a.cx[0] * (size_t)(log_a.n < CALLS_MAX ? log_a.n : CALLS_MAX));
+  }
   fclose(f);
   if (!ok) return 1;
   *ea = ea_hdr[0]; *at_a = (uint32_t)ea_hdr[1];
@@ -667,6 +747,424 @@ int hwt_replay(const char *list) {
   fclose(l);
   rt_log("hw replay done %d failed %d unreadable %d", n, failed, bad);
   return failed ? 1 : 0;
+}
+
+/* ---- S17: synthetic samples (--hwsynth SPEC with --hwcorpus DIR:K; docs/port/DECOMP.md 18) ----
+ * The routes reach 1 640 of the game's 4 010 functions; a hand-written function no route runs has no live sample.
+ * A synthetic sample is made the way a live one is, from a real state that the game did not give that function:
+ *   1. a base: the snapshot (CPU + guest RAM) of a corpus sample (a race frame, a menu frame, ...);
+ *   2. optional prelude calls on it (the ORIGINAL code, interpreted, the HLE live): e.g. the actor factory builds an
+ *      object of the class under test, then its init method runs on a placement;
+ *   3. the arguments: from the spec's candidates, else from the base's own objects: its registers, the pointers on its
+ *      stack (the callers' live objects), the objects whose vtable holds the function (its class), small integers;
+ *      the input may also poke words of an argument's object or of a global the function's literal pool names;
+ *   4. the recording pass: the ORIGINAL code, interpreted from that state, with the HLE live: its results are recorded
+ *      exactly as for a live sample (the HLE's r0 / stack out-parameters / RAM it filled, the hardware reads);
+ *   5. then the live difftest's own judgement (sample_judge): side A (the original, interpreted, HLE replayed) and side
+ *      B (the hand-written function, HLE replayed) from the snapshot, compared; a passing sample joins the corpus.
+ * The inputs are chosen by a small coverage-guided search: an input is kept when its recording pass ran an instruction
+ * of the function's original code that no kept input ran (an AFL-like queue of kept inputs is mutated: one argument,
+ * one poke). What it proves: the hand-written function equals the original on these states, which are real objects in
+ * real scenes but not necessarily states the game ever reaches with this call (a poke may make a combination the game
+ * never makes). What it does not: that the game calls it this way; a frame's end (njWaitVSync) inside the call refuses
+ * the input. The samples are ordinary corpus samples: --hwreplay and the Mull gate use them like live ones. */
+int hwt_synth_live;
+#define SY_BASES 12
+#define SY_PRE 6
+#define SY_CAND 64
+#define SY_POOL 2048
+#define SY_POKES 6
+#define SY_QUEUE 64
+typedef struct { int base; uint32_t a[4], f[4]; int np; uint32_t pa[SY_POKES], pv[SY_POKES]; } sy_input;
+static struct {
+  uint32_t fn, end, insn, iters, keep, seed, steps;
+  int nbase;
+  char base[SY_BASES][512];
+  int npre;
+  uint32_t pre[SY_PRE][5];         /* function, 4 arguments (a value; see sy_value) */
+  int ncand[4], nfcand[4];
+  uint32_t cand[4][SY_CAND], fcand[4][SY_CAND];
+} sj;
+static uint8_t *sy_prep[SY_BASES];     /* each base after its prelude */
+static SH4 sy_cpu[SY_BASES];
+static uint32_t sy_preret[SY_BASES][SY_PRE];
+static uint32_t sy_pool[SY_BASES][SY_POOL], sy_npool[SY_BASES];
+static uint32_t sy_cls[SY_BASES][256], sy_ncls[SY_BASES]; /* objects of the function's class (by its vtable slot) */
+static uint32_t sy_glob[64], sy_nglob;                      /* globals the function's literal pool names */
+static uint32_t sy_offs[128], sy_noffs;   /* field offsets the function's instructions use (displacements, immediates) */
+static uint32_t sy_consts[64], sy_nconsts; /* small constants it compares with or loads (cmp/eq #imm, mov #imm) */
+int hwt_synth_hw;  /* the job's `hw` line: the function may write hardware registers */
+int hwt_synth_odd; /* the recording pass touched memory no real pointer does (rt.c): the input is refused */
+static uint8_t *sy_cov, *sy_cov_it;
+static uint64_t sy_rs;
+static uint32_t sy_rnd(void) { sy_rs ^= sy_rs << 13; sy_rs ^= sy_rs >> 7; sy_rs ^= sy_rs << 17; return (uint32_t)(sy_rs >> 11); }
+
+/* a spec value: hex, or $k / $k+hex / $k-hex = the k-th prelude call's result (plus an offset) of the base */
+static uint32_t sy_value(const char *t, int base) {
+  if (t[0] == '$') {
+    char *e;
+    int k = (int)strtol(t + 1, &e, 10);
+    uint32_t v = k >= 0 && k < SY_PRE ? sy_preret[base][k] : 0;
+    if (*e == '+') v += (uint32_t)strtoul(e + 1, 0, 16);
+    if (*e == '-') v -= (uint32_t)strtoul(e + 1, 0, 16);
+    return v;
+  }
+  return (uint32_t)strtoul(t, 0, 16);
+}
+static char sy_ctext[4][SY_CAND][24], sy_pretext[SY_PRE][4][24];
+
+/* the recording pass: the original code interpreted from c->pc until it returns to ret with the stack back at sp; HLE
+ * calls run live (recorded when hwt_recording is set: rt_call's hooks); the function's instructions run are marked */
+static int sy_run(SH4 *c, uint32_t ret, uint32_t sp, int64_t steps, uint8_t *cov) {
+  while (steps-- > 0) {
+    uint32_t pc = RT_NORM(c->pc);
+    if (cov && pc >= sj.fn && pc < sj.end) cov[(pc - sj.fn) >> 1] = 1;
+    int r = sh4_step(c);
+    if (r) { sbx_at = c->fault; return r == -1 ? END_ILLEGAL : r == -3 ? END_SLOT : END_UNSUP; }
+    if (c->last == SH4_BR_NONE) continue;
+    /* a delayed branch ran its slot in the same step (bt / bf have none: their next instruction is marked when it runs) */
+    if (cov && pc + 2 >= sj.fn && pc + 2 < sj.end && RT_NORM(c->pc) != pc + 2) {
+      uint16_t op; memcpy(&op, sh4_ram + (pc & 0xFFFFFF), 2);
+      if ((op & 0xFD00) != 0x8900) cov[(pc + 2 - sj.fn) >> 1] = 1; /* not bt / bf (0x89xx / 0x8Bxx) */
+    }
+    if (c->last == SH4_BR_RET && c->pc == ret && c->r[15] >= sp) return END_RET;
+    uint32_t t = RT_NORM(c->pc);
+    if (c->last != SH4_BR_RET && hle_known(t)) {
+      const char *nm = hle_name(t);
+      if (nm && !strcmp(nm, "njWaitVSync")) return END_STOP; /* the frame would end inside the call */
+      int last = (int)c->last;
+      rt_call(c, t);
+      if (rt_unw) { rt_unw = 0; return END_STOP; }
+      c->last = (uint32_t)last;
+      if (last != SH4_BR_CALL && c->pc == ret && c->r[15] >= sp) return END_RET;
+    }
+  }
+  sbx_at = c->pc;
+  return END_BUDGET;
+}
+static void sy_alarm(int sig) { (void)sig; if (hwt_synth_live) siglongjmp(sbx_jb, END_STOP); }
+/* a host fault inside the recording pass (an HLE function indexing its own tables with a value no real call gives):
+   the input is refused; outside it, the runtime's crash report (main.c) */
+static struct sigaction sy_old_segv, sy_old_bus;
+static int sy_faults, sy_bfaults;
+static void sy_fault(int sig) {
+  if (hwt_synth_live) { sy_faults++; siglongjmp(sbx_jb, END_STOP); }
+  if (hwt_synth_sideb) { sy_bfaults++; siglongjmp(sbx_jb, END_ILLEGAL + 100); } /* side B's host fault: a FAIL */
+  sigaction(sig, sig == SIGSEGV ? &sy_old_segv : &sy_old_bus, 0);
+  raise(sig);
+}
+#define SY_RET 0x8C000F04u /* the return address the synthetic call gets: never executed */
+/* one guarded run of the original code on ram (rt_stop and HLE trouble end it); returns the end code */
+static int sy_guarded(SH4 *c, uint8_t *ram, int record, uint8_t *cov, int64_t steps) {
+  uint8_t *save = sh4_ram;
+  sh4_ram = ram;
+  if (record) {
+    rec_n = 0; stk_n = 0; iorec_n = 0; memrec_n = mempool_n = mem_call_first = 0; mem_lost = 0;
+    rec_depth = rt_hle_depth;
+    hwt_recording = 1;
+  }
+  hwt_synth_live = 1;
+  int depth = rt_hle_depth;
+  /* an HLE function given a state no real call gives may loop for ever (a count read through the wrong object): a
+     2 s alarm ends the pass (sigsetjmp: the handler's longjmp restores the signal mask) */
+  volatile int code = sigsetjmp(sbx_jb, 1);
+  if (code == 0) {
+    static int installed;
+    if (!installed) {
+      struct sigaction sa;
+      memset(&sa, 0, sizeof sa);
+      sa.sa_handler = sy_fault;
+      sa.sa_flags = SA_NODEFER;
+      sigaction(SIGSEGV, &sa, &sy_old_segv);
+      sigaction(SIGBUS, &sa, &sy_old_bus);
+      installed = 1;
+    }
+    signal(SIGALRM, sy_alarm);
+    alarm(2);
+    code = sy_run(c, SY_RET, c->r[15], steps, cov);
+  }
+  alarm(0);
+  rt_hle_depth = depth;
+  hwt_synth_live = 0;
+  hwt_recording = 0;
+  rt_sandbox = 0;
+  sh4_ram = save;
+  return code;
+}
+static int sy_is_ram(uint32_t w) { return (w >> 24) == 0x8C && (w & 0xFFFFFF) >= 0x10000; }
+static void sy_pool_add(int b, uint32_t v) {
+  if (sy_npool[b] >= SY_POOL) return;
+  for (uint32_t i = 0; i < sy_npool[b]; i++) if (sy_pool[b][i] == v) return;
+  sy_pool[b][sy_npool[b]++] = v;
+}
+/* a base: its snapshot, the prelude, the pools */
+static int sy_base(int b) {
+  int ea; uint32_t at;
+  if (replay_load(sj.base[b], &ea, &at)) { rt_log("hw synth base unreadable %s", sj.base[b]); return -1; }
+  if (!sy_prep[b] && !(sy_prep[b] = malloc(16u << 20))) return -1;
+  memcpy(sy_prep[b], buf_s, 16u << 20);
+  SH4 c = snap;
+  for (int k = 0; k < sj.npre; k++) {
+    SH4 p = c;
+    p.pc = sj.pre[k][0]; p.pr = SY_RET;
+    for (int i = 0; i < 4; i++) p.r[4 + i] = sy_value(sy_pretext[k][i], b);
+    int e = sy_guarded(&p, sy_prep[b], 0, 0, 50000000);
+    if (e != END_RET) { rt_log("hw synth prelude %d (%08x) of base %d ended %d at %08x", k, sj.pre[k][0], b, e, sbx_at); return -1; }
+    sy_preret[b][k] = p.r[0];
+  }
+  sy_cpu[b] = c;
+  sy_npool[b] = 0;
+  for (int i = 0; i < 15; i++) if (sy_is_ram(c.r[i])) sy_pool_add(b, c.r[i]);
+  for (int k = 0; k < sj.npre; k++) if (sy_is_ram(sy_preret[b][k])) sy_pool_add(b, sy_preret[b][k]);
+  for (uint32_t a = c.r[15] & 0xFFFFFC; a < 0x00F400 && a >= 0x00C000; a += 4) {
+    uint32_t w; memcpy(&w, sy_prep[b] + a, 4);
+    if (sy_is_ram(w) && (w & 0xFFFFFF) >= 0x0A0000) sy_pool_add(b, w & ~3u);
+  }
+  /* the function's class: words of RAM holding its address are vtable slots {fn, adjust}; objects point (at their
+     vtable field) to the start of such a vtable, up to 16 slots before; `this` = the field - its offset + adjust */
+  sy_ncls[b] = 0;
+  const uint32_t *w = (const uint32_t *)sy_prep[b];
+  for (uint32_t i = 0x10000 / 4; i + 1 < (16u << 20) / 4 && sy_ncls[b] < 256; i++) {
+    if (w[i] != sj.fn) continue;
+    uint32_t slot = 0x8C000000u | (i * 4), adj = w[i + 1];
+    if (adj > 0x1000 && adj < 0xFFFFF000u) continue;
+    for (uint32_t s = 0; s < 16 && sy_ncls[b] < 256; s++) {
+      uint32_t vt = slot - 8 * s;
+      for (uint32_t j = 0x10000 / 4; j < (16u << 20) / 4 && sy_ncls[b] < 256; j++) {
+        if (w[j] != vt) continue;
+        uint32_t field = 0x8C000000u | (j * 4);
+        static const uint32_t offs[] = {0x20, 0x24, 0x00, 0x04, 0x28, 0x2C, 0x30, 0x1C};
+        for (int o = 0; o < 8 && sy_ncls[b] < 256; o++) sy_cls[b][sy_ncls[b]++] = field - offs[o] + adj;
+      }
+    }
+  }
+  return 0;
+}
+static const uint32_t sy_small[] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 0xFFFFFFFFu, 0x10, 0x20, 0xFF, 0x100, 9, 10, 12, 16};
+static const float sy_floats[] = {0.0f, 1.0f, -1.0f, 0.5f, 2.0f, 10.0f, 100.0f, -100.0f, 1000.0f, 0.1f, 3.0f, 60.0f};
+/* a value that would be a pointer into RAM only through a mirror (0x0D-0x0F, 0x8E...) or unaligned: no real object is
+   there (the interpreter masks the low bits where the SH-4 would raise an address error): a small number instead */
+static uint32_t sy_sane(uint32_t v) {
+  if (sh4_is_ram(v) && ((v & 3) || ((v >> 24) & 0x1F) != 0x0C)) return v & 0xFF;
+  if (v >= 0xE0000000u && v < 0xFFFF0000u) return v & 0xFF; /* the SH-4's own area: no object either */
+  return v;
+}
+static uint32_t sy_pick_arg_(int b, int i);
+static uint32_t sy_pick_arg(int b, int i) { return sy_sane(sy_pick_arg_(b, i)); }
+static uint32_t sy_pick_arg_(int b, int i) {
+  if (sj.ncand[i]) return sy_value(sy_ctext[i][sy_rnd() % (uint32_t)sj.ncand[i]], b); /* the spec's candidates only */
+  uint32_t k = sy_rnd() % 16;
+  if (k < 5 && sy_ncls[b] && (i == 0 || k < 2)) return sy_cls[b][sy_rnd() % sy_ncls[b]];
+  if (k < 10 && sy_npool[b]) return sy_pool[b][sy_rnd() % sy_npool[b]];
+  if (k < 11) return sy_small[sy_rnd() % (sizeof sy_small / 4)];
+  if (k < 12) return sy_rnd() & 1 ? sy_rnd() & 0x7FFFFFFFu : sy_rnd() & 0xFFFF; /* a number of any size (dates) */
+  if (k < 13 && sy_nconsts) return sy_consts[sy_rnd() % sy_nconsts];
+  return sy_cpu[b].r[4 + i];
+}
+static uint32_t sy_pick_farg(int b, int i) {
+  if (sj.nfcand[i]) return sj.fcand[i][sy_rnd() % (uint32_t)sj.nfcand[i]];
+  if (sy_rnd() & 1) return sy_cpu[b].fr.u[4 + i];
+  float f = sy_floats[sy_rnd() % (sizeof sy_floats / 4)];
+  uint32_t u; memcpy(&u, &f, 4);
+  return u;
+}
+static void sy_fresh(sy_input *in, const int *ok) {
+  do in->base = (int)(sy_rnd() % (uint32_t)sj.nbase); while (!ok[in->base]);
+  for (int i = 0; i < 4; i++) { in->a[i] = sy_pick_arg(in->base, i); in->f[i] = sy_pick_farg(in->base, i); }
+  in->np = 0;
+}
+static void sy_mutate(sy_input *in) {
+  int n = 1 + (int)(sy_rnd() % 2);
+  while (n--) {
+    uint32_t k = sy_rnd() % 8;
+    if (k < 2) { int i = (int)(sy_rnd() % 4); in->a[i] = sy_pick_arg(in->base, i); }
+    else if (k < 3) { int i = (int)(sy_rnd() % 4); in->f[i] = sy_pick_farg(in->base, i); }
+    else if (k < 7 && in->np < SY_POKES) {
+      /* a poke: a word of an argument's object, or a global the function names */
+      uint32_t at;
+      if (sy_nglob && (sy_rnd() & 1)) at = sy_glob[sy_rnd() % sy_nglob] + 4 * (sy_rnd() % 4);
+      else {
+        uint32_t p = in->a[sy_rnd() % 4];
+        if (!sy_is_ram(p)) p = in->a[0];
+        if (!sy_is_ram(p)) continue;
+        at = (p & ~3u) + (sy_noffs && sy_rnd() % 4 ? sy_offs[sy_rnd() % sy_noffs] : 4 * (sy_rnd() % (sy_rnd() & 1 ? 32 : 128)));
+      }
+      uint32_t old;
+      memcpy(&old, sy_prep[in->base] + (at & 0xFFFFFC), 4);
+      uint32_t v, r = sy_rnd() % 10;
+      if (r < 2) v = sy_small[sy_rnd() % (sizeof sy_small / 4)];
+      else if (r < 4) v = sy_nconsts ? sy_consts[sy_rnd() % sy_nconsts] : 0;
+      else if (r < 5) v = old ^ (1u << (sy_rnd() % 32));
+      else if (r < 6) v = old + 1;
+      else if (r < 7) v = old - 1;
+      else if (r < 8 && sy_npool[in->base]) v = sy_pool[in->base][sy_rnd() % sy_npool[in->base]];
+      else { float f = sy_floats[sy_rnd() % (sizeof sy_floats / 4)]; memcpy(&v, &f, 4); }
+      in->pa[in->np] = at; in->pv[in->np] = sy_sane(v); in->np++;
+    } else if (in->np) in->np--;
+  }
+}
+/* the snapshot of an input: the base after its prelude, its pokes; the CPU with the arguments */
+static void sy_apply(const sy_input *in, uint8_t *ram, SH4 *c) {
+  memcpy(ram, sy_prep[in->base], 16u << 20);
+  for (int i = 0; i < in->np; i++) memcpy(ram + (in->pa[i] & 0xFFFFFC), &in->pv[i], 4);
+  *c = sy_cpu[in->base];
+  for (int i = 0; i < 4; i++) { c->r[4 + i] = in->a[i]; c->fr.u[4 + i] = in->f[i]; }
+  c->pc = sj.fn;
+  c->pr = SY_RET;
+}
+static void sy_describe(const sy_input *in, char *o, size_t n) {
+  int k = snprintf(o, n, "base %d args %08x %08x %08x %08x f %08x %08x %08x %08x pokes", in->base, in->a[0], in->a[1],
+                   in->a[2], in->a[3], in->f[0], in->f[1], in->f[2], in->f[3]);
+  for (int i = 0; i < in->np && k < (int)n - 20; i++) k += snprintf(o + k, n - (size_t)k, " %08x=%08x", in->pa[i], in->pv[i]);
+}
+static FILE *sy_log;
+static void sy_job(void) {
+  static sy_input queue[SY_QUEUE];
+  int nq = 0, ok[SY_BASES] = {0}, nok = 0;
+  uint32_t nh = (sj.end - sj.fn) / 2 + 1;
+  sy_cov = calloc(nh, 1); sy_cov_it = calloc(nh, 1);
+  sy_rs = 0x9E3779B97F4A7C15ull ^ ((uint64_t)sj.fn << 20) ^ sj.seed;
+  for (int i = 0; i < 4; i++) sy_rnd();
+  /* the globals the function's literal pool names (data words in its extent pointing into RAM outside the code) */
+  sy_nglob = 0;
+  for (uint32_t a = (sj.fn + 3) & ~3u; a + 4 <= sj.end && sy_nglob < 64; a += 4) {
+    uint32_t w; memcpy(&w, sh4_ram + (a & 0xFFFFFF), 4);
+    if (sy_is_ram(w) && (w & 0xFFFFFF) >= 0x057000) sy_glob[sy_nglob++] = w & ~3u;
+  }
+  /* the field offsets and constants of its instructions (a literal pool decodes as noise: harmless) */
+  sy_noffs = sy_nconsts = 0;
+#define SY_ADD(arr, n, max, v) do { uint32_t v_ = (v); int s_ = 0; for (uint32_t q_ = 0; q_ < n; q_++) s_ |= arr[q_] == v_; if (!s_ && n < max) arr[n++] = v_; } while (0)
+  for (uint32_t a = sj.fn; a + 2 <= sj.end; a += 2) {
+    uint16_t op; memcpy(&op, sh4_ram + (a & 0xFFFFFF), 2);
+    uint32_t hi = op >> 12, d4 = op & 15, i8 = op & 0xFF;
+    if (hi == 5 || hi == 1) SY_ADD(sy_offs, sy_noffs, 128, d4 * 4);                       /* mov.l @(disp,Rm) / Rm,@(disp,Rn) */
+    else if ((op & 0xFE00) == 0x8400 || (op & 0xFE00) == 0x8000) SY_ADD(sy_offs, sy_noffs, 128, (d4 << ((op >> 8) & 1)) & ~3u);
+    else if (hi == 0xE) { int32_t v = (int8_t)i8; if (v > 0) SY_ADD(sy_offs, sy_noffs, 128, (uint32_t)v & ~3u); SY_ADD(sy_consts, sy_nconsts, 64, (uint32_t)v); }
+    else if (hi == 9) { uint16_t lw; memcpy(&lw, sh4_ram + ((a + 4 + i8 * 2) & 0xFFFFFF), 2);
+      if (lw < 0x2000) SY_ADD(sy_offs, sy_noffs, 128, lw & ~3u);
+      SY_ADD(sy_consts, sy_nconsts, 64, (uint32_t)(int32_t)(int16_t)lw); }
+    else if ((op & 0xFF00) == 0x8800) SY_ADD(sy_consts, sy_nconsts, 64, (uint32_t)(int32_t)(int8_t)i8); /* cmp/eq #imm,r0 */
+    else if ((op & 0xFF00) == 0xC800) SY_ADD(sy_consts, sy_nconsts, 64, i8);                           /* tst #imm,r0 */
+  }
+#undef SY_ADD
+  for (int b = 0; b < sj.nbase; b++) if (!sy_base(b)) { ok[b] = 1; nok++; }
+  cur = stat_of(sj.fn);
+  uint32_t kept = 0, pass = 0, failn = 0, rets = 0, covered = 0, judged = 0, odd = 0;
+  int64_t steps = sj.steps ? sj.steps : 2000000;
+  char why0[128] = "";
+  /* S17: a job ends after ITERS inputs, KEEP kept samples, 600 inputs in a row that ran no new code (after the first
+     kept one), or 20 s */
+  struct timespec tj0, tj;
+  clock_gettime(CLOCK_MONOTONIC, &tj0);
+  uint32_t stale = 0;
+  for (uint32_t it = 0; nok && cur && it < sj.iters && kept < sj.keep; it++) {
+    if (kept && ++stale > 600) break;
+    if ((it & 15) == 15) {
+      clock_gettime(CLOCK_MONOTONIC, &tj);
+      if (tj.tv_sec - tj0.tv_sec > 20) break;
+    }
+    sy_input in;
+    if (nq && sy_rnd() % 4) { in = queue[sy_rnd() % (uint32_t)nq]; sy_mutate(&in); }
+    else { sy_fresh(&in, ok); if (sy_rnd() & 1) sy_mutate(&in); }
+    SH4 c;
+    sy_apply(&in, buf_a, &c);
+    memset(sy_cov_it, 0, nh);
+    hwt_synth_odd = 0;
+    int e = sy_guarded(&c, buf_a, 1, sy_cov_it, steps);
+    if (e != END_RET) continue;
+    if (hwt_synth_odd) { odd++; continue; }
+    rets++;
+    int fresh = 0;
+    for (uint32_t i = 0; i < nh; i++) if (sy_cov_it[i] && !sy_cov[i]) fresh++;
+    if (!fresh) continue;
+    /* new code of the original ran: judge this input like a live sample */
+    sy_apply(&in, buf_s, &snap);
+    cur->why[0] = 0;
+    cur_frame = 0;
+    synth_keep = 1;
+    hwt_synth_sideb = 1; /* cleared by run_side_b; only side B's faults are caught as FAILs */
+    int v = sample_judge();
+    hwt_synth_sideb = 0;
+    synth_keep = 0;
+    judged++;
+    char d[400];
+    sy_describe(&in, d, sizeof d);
+    if (v == 1) {
+      for (uint32_t i = 0; i < nh; i++) if (sy_cov_it[i] && !sy_cov[i]) { sy_cov[i] = 1; covered++; }
+      if (nq < SY_QUEUE) queue[nq++] = in;
+      else queue[sy_rnd() % SY_QUEUE] = in;
+      kept++; pass++; stale = 0;
+      if (sy_log) fprintf(sy_log, "%08x\tpass\t%s\t%s\n", sj.fn, sj.base[in.base], d);
+    } else if (v == 0) {
+      failn++;
+      if (!why0[0]) memcpy(why0, cur->why, sizeof why0);
+      rt_log("hw synth FAIL %08x it %u: %s; %s", sj.fn, it, cur->why, d);
+      if (sy_log) fprintf(sy_log, "%08x\tFAIL\t%s\t%s\t%s\n", sj.fn, sj.base[in.base], d, cur->why);
+      if (failn >= 3) break;
+    }
+  }
+  /* coverage in instruction bytes of the original (the extent's halfwords that ran, of insn bytes) */
+  rt_log("hw synth %08x bases %d iters %u returned %u odd %u judged %u kept %u pass %u fail %u cover %u/%u%s%s", sj.fn,
+         nok, sj.iters, rets, odd, judged, kept, pass, failn, covered * 2, sj.insn, failn ? ": " : "", why0);
+  if (sy_log) fflush(sy_log);
+  free(sy_cov); free(sy_cov_it);
+}
+/* SPEC: jobs, each
+ *   job FN END INSN_BYTES ITERS KEEP SEED [STEPS]
+ *   base CORPUS_SAMPLE_PATH          (1-8)
+ *   pre FN A0 A1 A2 A3               (0-6: prelude calls on each base; $k = the k-th call's result)
+ *   arg I V V ...                    (candidates for argument I: hex, $k, $k+hex)
+ *   farg I F F ...                   (float candidates)
+ *   end */
+int hwt_synth(const char *spec) {
+  if (hwt_alloc() < 0 || !corpus_k) { rt_log("hw synth: needs --hwcorpus DIR:K"); return 2; }
+  FILE *f = fopen(spec, "r");
+  if (!f) { rt_log("hw synth: no spec"); return 2; }
+  char path[600];
+  snprintf(path, sizeof path, "%s/synth.tsv", corpus_dir);
+  sy_log = fopen(path, "a");
+  char line[4096];
+  int njobs = 0;
+  while (fgets(line, sizeof line, f)) {
+    char *tok[80];
+    int n = 0;
+    for (char *p = strtok(line, " \t\r\n"); p && n < 80; p = strtok(0, " \t\r\n")) tok[n++] = p;
+    if (!n || tok[0][0] == '#') continue;
+    if (!strcmp(tok[0], "job") && n >= 7) {
+      memset(&sj, 0, sizeof sj);
+      hwt_synth_hw = 0;
+      sj.fn = (uint32_t)strtoul(tok[1], 0, 16); sj.end = (uint32_t)strtoul(tok[2], 0, 16);
+      sj.insn = (uint32_t)strtoul(tok[3], 0, 10); sj.iters = (uint32_t)strtoul(tok[4], 0, 10);
+      sj.keep = (uint32_t)strtoul(tok[5], 0, 10); sj.seed = (uint32_t)strtoul(tok[6], 0, 10);
+      if (n > 7) sj.steps = (uint32_t)strtoul(tok[7], 0, 10);
+      sj.fn = RT_NORM(sj.fn); sj.end = RT_NORM(sj.end);
+    } else if (!strcmp(tok[0], "hw")) {
+      hwt_synth_hw = 1;
+    } else if (!strcmp(tok[0], "base") && n == 2 && sj.nbase < SY_BASES) {
+      snprintf(sj.base[sj.nbase++], sizeof sj.base[0], "%s", tok[1]);
+    } else if (!strcmp(tok[0], "pre") && n == 6 && sj.npre < SY_PRE) {
+      sj.pre[sj.npre][0] = (uint32_t)strtoul(tok[1], 0, 16);
+      for (int i = 0; i < 4; i++) snprintf(sy_pretext[sj.npre][i], 24, "%s", tok[2 + i]);
+      sj.npre++;
+    } else if (!strcmp(tok[0], "arg") && n >= 3) {
+      int i = atoi(tok[1]) & 3;
+      for (int k = 2; k < n && sj.ncand[i] < SY_CAND; k++) snprintf(sy_ctext[i][sj.ncand[i]++], 24, "%s", tok[k]);
+    } else if (!strcmp(tok[0], "farg") && n >= 3) {
+      int i = atoi(tok[1]) & 3;
+      for (int k = 2; k < n && sj.nfcand[i] < SY_CAND; k++) { float x = strtof(tok[k], 0); memcpy(&sj.fcand[i][sj.nfcand[i]++], &x, 4); }
+    } else if (!strcmp(tok[0], "end")) {
+      rt_log("hw synth job %d %08x", njobs, sj.fn);
+      fflush(stdout);
+      if (sj.fn && sj.nbase && rt_lookup(sj.fn)) sy_job();
+      else rt_log("hw synth %08x skipped (no base or not a function of this build)", sj.fn);
+      njobs++;
+      fflush(stdout);
+    }
+  }
+  fclose(f);
+  if (sy_log) fclose(sy_log);
+  rt_log("hw synth done %d jobs (host faults inside recording passes, inputs refused: %d; host faults of side B, FAILs: %d)", njobs, sy_faults, sy_bfaults);
+  return 0;
 }
 
 void hwt_summary(void) {

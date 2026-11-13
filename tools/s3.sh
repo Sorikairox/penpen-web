@@ -14,6 +14,7 @@
 #                               (RANGES=all: on the SDK code too; MUTS="2 7": a subset)
 #   tools/s3.sh mutate [args]   S12 (first pipeline, retired): rebuild per mutant (tools/mut_worker.py)
 #   tools/s3.sh mull [args]     S12: mutation testing with Mull (tools/mull_run.py in the penpen-mull:1 image)
+#   tools/s3.sh linecov [ROOTS [P]]  S17: per-sample line coverage of src/ over the replay corpora (tools/linecov.py)
 #   tools/s3.sh native [args]   build + run the boot natively (disc read from penpen-disc); NOBUILD=1: run only
 #   tools/s3.sh wasm [args]     build the boot as wasm32 + run it in node (disc read by the node host)
 # Every container that sees disc-derived data runs with --network none --read-only --cap-drop ALL; the
@@ -95,8 +96,14 @@ case "${1:-}" in
   mull)
     # S12: Mull (tools/mull_run.py, image penpen-mull:1 from docker/mull): every mutant of src/ in one build
     shift
-    box -v penpen-disc:/disc:ro -v penpen-build:/build:ro -v penpen-corpus:/corpus:ro -e CF="$CF" -v "${MUTSRC:-$REPO/src}":/mutsrc:ro -e SRC=/mutsrc \
+    # S17: IDS=FILE mounts a list of mutant ids at /ids.txt (pass --ids /ids.txt: only those run)
+    box -v penpen-disc:/disc:ro -v penpen-build:/build:ro -v penpen-corpus:/corpus:ro -e CF="$CF" -v "${MUTSRC:-$REPO/src}":/mutsrc:ro -e SRC=/mutsrc ${IDS:+-v $IDS:/ids.txt:ro} \
       ${MULL_IMAGE:-penpen-mull:1} python3 -I /src/tools/mull_run.py /src/tools/routes.tsv "$@" 2>&1 | filt ;;
+  linecov)
+    # S17: per-sample line coverage of src/ over corpora of the replay gate (tools/linecov.py: src/ with gcc --coverage,
+    # every sample replayed); ROOTS default /corpus/c5,/corpus/syn
+    shift
+    box -v penpen-disc:/disc:ro -v penpen-build:/build:ro -v penpen-corpus:/corpus:ro $IMG python3 -I /src/tools/linecov.py "${1:-/corpus/c5,/corpus/syn}" ${2:-6} 2>&1 | grep -aE '^lc [ -~]*$' || true ;;
   native)
     # S14: NOBUILD=1 runs the build that is there (several runs in parallel after one build: tools/s11.sh test)
     shift

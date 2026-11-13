@@ -40,6 +40,7 @@ void rt_log(const char *fmt, ...) {
 
 void rt_stop(const char *why) {
   if (rt_sandbox) { rt_log("hw sandbox stop: %s", why); hwt_sandbox_abort(7, 0); }
+  if (hwt_synth_live) { rt_log("hw synth stop: %s", why); hwt_sandbox_abort(7, 0); }
   rt_log("boot stop: %s", why);
   hle_ring_dump();
   rt_summary();
@@ -82,7 +83,17 @@ static uint32_t io_read_live(uint32_t a) {
   return io[i].v;
 }
 /* S11: a difftest sample records the hardware reads of the live call; its sandbox sides replay them */
+/* S17: during a synthetic sample's recording pass, an access no real pointer makes (the BIOS ROM / flash area and the
+ * unassigned space, VRAM / the TA through a broken pointer: anything but the Holly / G2 / AICA / RTC registers, the
+ * AICA's RAM and the SH-4's own area) refuses the input; so does any write outside RAM (game code writes no hardware
+ * register but through the SDK; a job may allow it: hwt_synth_hw) */
+static int io_odd(uint32_t a) {
+  uint32_t p = a & 0x1FFFFFFFu;
+  if (a >= 0xE0000000u) return 0;                                   /* store queues, the SH-4's own registers */
+  return !((p >= 0x005F0000u && p < 0x00720000u) || (p >= 0x00800000u && p < 0x00A00000u)); /* Holly, G2, AICA, RTC */
+}
 static uint32_t io_read(uint32_t a) {
+  if (hwt_synth_live && io_odd(a)) hwt_synth_odd++;
   if (rt_sandbox) return hwt_io_read(a & ~3u);
   uint32_t v = io_read_live(a);
   if (hwt_recording) hwt_record_io(a & ~3u, v);
@@ -97,7 +108,7 @@ static void io_write(uint32_t a, uint32_t v, int size) {
 }
 /* S11: in a difftest sandbox (difftest.c) hardware accesses touch nothing real: reads replay the live call's (else
  * a fixed value per address), writes are logged per side and compared */
-#define SBX_IO_W(a, v, n) if (rt_sandbox) { hwt_io_write(a, v, n); return; }
+#define SBX_IO_W(a, v, n) if (hwt_synth_live && !hwt_synth_hw) hwt_synth_odd++; if (rt_sandbox) { hwt_io_write(a, v, n); return; }
 uint32_t sh4_io_r32(uint32_t a) { return io_read(a); }
 uint16_t sh4_io_r16(uint32_t a) { return (uint16_t)(io_read(a) >> ((a & 2) * 8)); }
 uint8_t sh4_io_r8(uint32_t a) { return (uint8_t)(io_read(a) >> ((a & 3) * 8)); }

@@ -22,8 +22,13 @@ MAX_COST_US = 4000000  # side B's recorded time per mutant (the replay also load
 
 
 def load_index(root):
-    """[(path, addr, cost_us, entered set)] over every route of the corpus"""
+    """[(path, addr, cost_us, entered set)] over every route of the corpus; S17: ROOT may be several, comma-separated
+    (a route corpus and the synthetic samples' /corpus/syn: tools/synth.py)"""
     out = []
+    if ',' in root:
+        for r in root.split(','):
+            out += load_index(r)
+        return out
     if not os.path.isdir(root):
         return out
     for route in sorted(os.listdir(root)):

@@ -4,7 +4,7 @@ container of tools/s3.sh mull (it runs the disc's code): --network none, --read-
 --security-opt no-new-privileges; everything it writes goes to the container's /tmp.
 
   python3 -I mull_run.py ROUTES.tsv [--workers N] [--digest K] [--budget B] [--dry-run 1] [--only REGEX]
-                         [--sample K]
+                         [--sample K] [--ids FILE]
   --workers: mutants run in parallel (6: this machine has 10 cores; more made runs slower, S12);
   --only: mutate only src/ files matching REGEX (relative to src/); --sample K: a pilot, every K-th mutant (by a
   hash of its id) is run, the others are logged "skipped" (not a score).
@@ -154,7 +154,10 @@ def main():
             if os.path.exists(p):
                 addrs += re.findall(r'^HW_EXPORT[A-Z_]*\((8c[0-9a-f]{6}),', open(p).read(), re.M)
         exports[rel] = addrs
-    json.dump({'cov': cov, 'times': times, 'digest': digest, 'budget': budget, 'sample': sample, 'exports': exports},
+    # S17: --ids FILE: only these mutants run (the open survivors again); the others are logged "skipped"
+    ids = sorted({l.strip() for l in open(opts['--ids']) if l.strip()}) if '--ids' in opts else None
+    json.dump({'cov': cov, 'times': times, 'digest': digest, 'budget': budget, 'sample': sample, 'exports': exports,
+               'ids': ids},
               open(M + '/cov.json', 'w'))
     for k in sorted({k for c in cov.values() for k in c}):
         say('cov', 'src/' + k, ' '.join('%s=%d' % (r['name'], cov[r['name']].get(k, 0)) for r in routes))
