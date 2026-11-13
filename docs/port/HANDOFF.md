@@ -2,6 +2,60 @@
 
 Newest session first. Read `docs/port/PLAN.md` (disc facts, survey, approach, phases, rules) before working.
 
+## S18 — 2026-11-13: the last functions (six delegated batches), fragments, routes for modes 9 / 11 / 12 and the first courses, frame-passing preludes, test gaps closed
+
+The user's goal: "Don't stop until all the code is ported". All guest code ran in `--network none --read-only
+--cap-drop ALL --security-opt no-new-privileges --tmpfs /tmp` containers; `git log --all -- port/gen` stays empty;
+corpora (guest RAM) only in the Docker volume `penpen-corpus`. Design and numbers: `docs/port/DECOMP.md` 19.
+
+1. **Functions** (19.1): six delegated batches (b01-b06, brief `port_work/s18/WRITER_BRIEF.md`: S17's + S18
+   additions) and two single ones (c44, the owner scene's construction), the lead's cast viewer construction
+   (resumable); every file merged, compiled, difftested (route or synthetic) and replayed by the lead. The three
+   named: **func_8C0200E8** (the cast viewer's update, 4.6 KB: synthetic, through a frame-passing prelude that
+   builds the scene), **func_8C02AF9C** (the race ending: synthetic), **func_8C060706** (type 0x32's update).
+   **Fragments**: Ghidra's splits of a function (literal pools, epilogues reached by branches, tails after a call it
+   took for one that does not return, pool data) are declared with the new `HW_EXPORT_FRAGMENT(addr, parent)`
+   (hw.h): their translation is left out, the parent's C does the work, entering one alone stops the run.
+2. **Routes** (19.2): `options` (mode 12: next_mode poked on the title), `gallery` (mode 11: its files are not on
+   this disc: the scene's and two pictures' names poked to 4000config.pvm), `staffroll` (mode 9: phases' countdowns
+   poked; needed the new HLE njLoadTexture), `cup1b` `cup2b` `cup3b` (the cups' other course: DOWN on the course
+   map); **cup4b** (CSD) is not kept: pure and hand differ there (19.5).
+3. **Test paths** (19.3): synthetic preludes that pass frames (`frames`) and load files (`slow`, the drive attached
+   to the game's gdFs work area: every synthetic gdFsOpen had failed), stack arguments (`stk`), a later hint block
+   replaces an earlier one; the replay: side B's runaway is a FAIL (was a time-out), corpus directories 64 -> 1024
+   (later ones were silently "unreadable"), side A notes a function it falls into; the Mull gate gives a static
+   helper its callers' samples (was every sample of its file, cut at 160).
+4. **Bugs found** (19.4): see DECOMP 19.4.
+5. **Mutants** (19.6): see DECOMP 19.6.
+
+Progress / tests / not verified / next: DECOMP.md 19.
+
+**Progress: 4 005 of 4 010 game functions (99.88 %), 300 222 of 301 130 bytes (99.70 %)** (S17: 3 806, 77.55 %);
+50 of them are fragments (HW_EXPORT_FRAGMENT). Not ported (5, DECOMP 19.5): type 0x31's update / face_player / hold
+(C written, differ on cup4b), mode 11's start (C written: whole run identical, one sandbox sample differs),
+func_8C042000 (a piece of a parent that stays translated). Raw offsets: 47. Routes: 18 (S17: 12); the routes run 1 960 game functions (S17: 1 640).
+
+Never executed by a test: S17's 50 own (+ 101 copies) -> **13 own** (+ 93 copies, each with an executed identical
+member of its copy group, so their C runs): the cast viewer's and the owner scene's construction (resumable, dead or
+unrouted: a frame-passing prelude runs the original only), and code of courses / classes no kept
+route reaches (types 0x30 / 0x32's draws, the trail push, four contact responses, the contacts' posed builders). 37 of S17's 50 now run (routes or synthetic samples): the gallery and options scenes, the staff roll, mode 1's start
+(options now pokes mode 1 at 1900), the TrapSet, the racer actions and constructors, the owner scene's update.
+
+Tests (end of S18): difftest over the **18 routes, 52 622 samples: 0 FAIL**; corpora replay **0 FAIL** (c5 + syn:
+19 157 samples); synthetic: 2 702 functions with passing samples; pure vs hand **identical frame lines on all 18 routes, native and wasm; native = wasm**; sh4 **257 / 0**; mixer
+**26 / 0**; harness **5 736 / 0 / 207**; `GEN=genhand tools/rtw.sh build` + `check` **OK**; browser e2e **passed** (first run since S10; the hand build, 4 005 hand-written functions: logos, title, menu, house, selection, course, race start and race seen, the host's AudioWorklet playing, the VMU save found and loaded after the reload; 25.3 game frames/s in the race while Mull and the route comparison ran on the machine);
+screenshots from the e2e (title, PenPen House, race) look right. Mull on the S18 code (run n1, stopped at the session's end in its last files): 6 340 mutants of 73 files, 3 743 killed (3 475 by the replay), 363 survived, 2 234 uncovered, 49 equivalent: **59.5 %, reach 91.2 %** (DECOMP 19.6).
+
+Not verified: the cup4b divergence (CSD: pure and hand differ from frame 1765; not found, route not kept); the
+type 0x31 differences; mode 11's start (a replay effect: texture_load's out-parameter at another r15 offset than the original's, DECOMP 19.5); the writers' "unsure" notes
+(port_work/s18 reports, summarised in DECOMP 19); the 13 never-executed functions; the open mutants not classified
+(S17's 1 995 reached-but-invisible: 100 noted, 207 re-mutated in n1, 1 688 for an id run with the closed gaps; n1's 363 survivors beyond the rules).
+
+Next: (1) find the cup4b divergence (frame 1765: the hand build's errno becomes EDOM, the Rings actors' sizes / turns
+differ; a translated math caller gets an out-of-domain input from C code; the bisects by export groups were
+inconclusive: DECOMP 19.4), then type 0x31; mode 11's start after texture_load's C frame is laid out as the
+original's; (2) the open mutants by id with the closed gaps (19.6); (3) func_8C041F9C + 8C042000 together.
+
 ## S17 — 2026-11-13: synthetic samples (difftests and Mull kills without a route), the draw context, 689 more functions
 
 The user's goal: "Don't stop until all the code is ported". The functions no route reaches were the obstacle (no

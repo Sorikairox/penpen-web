@@ -123,7 +123,7 @@ address	c_function	bases	returned	kept	pass	fail	covered_bytes	insn_bytes	note	r
 8c0144bc	contacts_add_object_tree	8	344	1	1	0	42	54		n1
 8c0144f2	contacts_add_cnk_model	12	440	6	6	0	312	416		s18dv1
 8c0146bc	cnk_tree_strips	12	423	8	8	0	46	58		s18dw3
-8c0146f8	contacts_add_cnk_model_posed	8	0	0	0	0	0	410		s18dv1
+8c0146f8	contacts_add_cnk_model_posed	6	0	0	0	0	0	410		s18nv
 8c0148c4	contacts_add_object_posed	6	0	0	0	0	0	186		s18nv
 8c014980	cnk_triangle_under	11	832	9	9	0	182	272		s18dv2
 8c014a94	cnk_model_under	12	0	0	0	0	0	864		s18dv2
@@ -207,6 +207,7 @@ address	c_function	bases	returned	kept	pass	fail	covered_bytes	insn_bytes	note	r
 8c016b7a	text_draw_at_view	8	564	8	8	0	52	52		s18dv04
 8c016bae	text_draw_in_view	12	603	9	9	0	50	50		s18dv12b
 8c016bec	(empty)	8	0	0	0	0	0	52		s18dv2
+8c016c44	results_draw_banner_top	8	601	1	1	0	38	38		s18c44
 8c016d60	results_pulse_draw	10	621	6	6	0	38	38		s18dv2
 8c016e98	results_draw_banner_one	12	627	6	6	0	40	40		s18dv2
 8c016f20	(empty)	10	0	0	0	0	0	98		s18dv2
@@ -1795,7 +1796,7 @@ address	c_function	bases	returned	kept	pass	fail	covered_bytes	insn_bytes	note	r
 8c04f198	actor_type28_reset	10	620	8	8	0	60	60		s18dw1
 8c04f21c	actor_type28_free_blocks	8	1959	7	7	0	126	128		n6
 8c04f29c	actor_type28_step_particles	12	918	10	10	0	222	230		s18dv07
-8c04f3a2	actor_type28_draw_particles	8	0	0	0	0	0	212		s18dv10
+8c04f3a2	-	8	0	0	0	0	0	212		s18n5
 8c04f498	actor_type28_spray	12	505	7	7	0	226	188		s18dv10
 8c04f5b4	actor_type28_puff	9	688	7	7	1	310	310	ram 8cb61e00 00000000/bfcb5ffe	s18dv10
 8c04f750	vec3_diff	8	483	1	1	0	34	34		h1
@@ -1936,7 +1937,7 @@ address	c_function	bases	returned	kept	pass	fail	covered_bytes	insn_bytes	note	r
 8c052a50	actor_type0b_init	10	553	8	8	0	382	382		s18dy0
 8c052bf4	actor_type0b_update	8	874	3	3	0	118	124		n9
 8c052c70	actor_type0b_draw	8	340	1	1	0	132	132		s18rest
-8c052d20	actor_type0b_respond	8	0	0	0	0	0	218		s18dv10
+8c052d20	actor_type0b_respond	6	0	0	0	0	0	218		s18nv
 8c052ea0	vec3_diff	8	479	1	1	0	34	34		h1
 8c052ec2	vec3_set	8	571	1	1	0	14	14		h1
 8c052ed6	RETF	8	567	1	1	0	6	6		h1
@@ -1980,7 +1981,7 @@ address	c_function	bases	returned	kept	pass	fail	covered_bytes	insn_bytes	note	r
 8c0536a0	flap_init	10	620	2	2	0	306	306		h1
 8c0537e4	flap_update	10	769	10	10	0	450	450		s18dz0
 8c0539b4	flap_draw	8	358	1	1	0	62	62		s18rest
-8c053a1c	flap_respond	8	659	7	7	0	130	130		s18dv10
+8c053a1c	-	8	661	2	2	0	130	130		s18n5
 8c053aac	method_self	8	601	1	1	0	4	4		h1
 8c053ab0	vec3_copy	8	518	1	1	0	20	20		h1
 8c053ac4	vec3_diff	8	501	1	1	0	34	34		h1
@@ -2081,7 +2082,7 @@ address	c_function	bases	returned	kept	pass	fail	covered_bytes	insn_bytes	note	r
 8c054964	actor_type10_destroy_self	8	597	1	1	0	18	18		n9
 8c054976	actor_type10_init	10	698	7	7	0	380	380		s18dv11
 8c054b0a	actor_type10_update	10	489	10	10	0	378	814		s18dv11
-8c054ea0	actor_type10_draw	8	460	6	6	0	312	312		s18dv11
+8c054ea0	-	8	427	1	1	0	312	312		s18n5
 8c055014	vec3_diff	8	498	1	1	0	34	34		h1
 8c05504a	RETF	8	575	1	1	0	6	6		h1
 8c055050	vec3_add	8	541	1	1	0	26	26		h1
@@ -2156,7 +2157,7 @@ address	c_function	bases	returned	kept	pass	fail	covered_bytes	insn_bytes	note	r
 8c055b36	turning_gate_destroy_self	8	622	8	8	0	18	18		s18dv12b
 8c055c20	turning_gate_update	10	403	12	12	0	186	238		s18dv00
 8c055d38	turning_gate_draw	8	322	1	1	0	64	64		s18rest
-8c055d78	gate_respond	8	0	0	0	0	0	270		s18dv11
+8c055d78	gate_respond	6	0	0	0	0	0	270		s18nv
 8c055ebc	vec3_diff	8	509	1	1	0	34	34		h1
 8c055ef2	RETF	8	558	1	1	0	6	6		h1
 8c055ef8	vec3_add	8	534	1	1	0	26	26		h1
@@ -2178,7 +2179,7 @@ address	c_function	bases	returned	kept	pass	fail	covered_bytes	insn_bytes	note	r
 8c056138	geyser_destroy_self	8	601	1	1	0	18	18		n9
 8c05616c	geyser_init	10	377	3	3	0	372	372		h1
 8c056304	geyser_update	10	150	12	12	0	126	356		s18dz0
-8c056488	geyser_draw	8	455	7	7	0	154	154		s18dv11
+8c056488	-	8	499	2	2	0	154	154		s18n5
 8c056554	vec3_copy	8	535	1	1	0	20	20		h1
 8c056568	vec3_diff	8	490	1	1	0	34	34		h1
 8c05659e	RETF	8	573	1	1	0	6	6		h1
@@ -2207,7 +2208,7 @@ address	c_function	bases	returned	kept	pass	fail	covered_bytes	insn_bytes	note	r
 8c05692e	swimmer_destroy_self	8	642	8	8	0	18	18		s18dv12b
 8c056960	swimmer_init	10	365	2	2	0	724	740		h1
 8c056cac	swimmer_update	10	532	10	10	0	962	752		s18div1
-8c057160	swimmer_draw	8	936	9	9	0	384	384		s18dv11
+8c057160	-	8	702	4	4	0	384	384		s18n5
 8c057330	vec3_diff	8	515	1	1	0	34	34		h1
 8c057366	RETF	8	552	1	1	0	6	6		h1
 8c0573f4	task_construct	8	555	1	1	0	22	22		h1
@@ -2249,7 +2250,7 @@ address	c_function	bases	returned	kept	pass	fail	covered_bytes	insn_bytes	note	r
 8c05858e	buoy_destroy_self	8	598	1	1	0	18	18		n9
 8c0585c0	buoy_init	10	482	8	8	0	286	286		s18dv06
 8c0586de	buoy_update	10	677	9	9	0	198	198		s18dv06
-8c0587b8	buoy_draw	8	545	7	7	0	138	138		s18dv11
+8c0587b8	-	8	548	3	3	0	138	138		s18n5
 8c05886c	method_self	8	601	1	1	0	4	4		h1
 8c058870	vec3_diff	8	521	1	1	0	34	34		h1
 8c058892	vec3_set	8	568	1	1	0	14	14		h1
@@ -2305,7 +2306,7 @@ address	c_function	bases	returned	kept	pass	fail	covered_bytes	insn_bytes	note	r
 8c05900e	actor_type26_reset	10	647	8	8	0	78	78		s18dv01
 8c05905c	actor_type26_free_blocks	8	1088	3	3	0	76	80		n9
 8c0590f4	actor_type26_step_particles	11	432	8	8	0	148	158		s18dv11
-8c059192	actor_type26_draw_particles	8	0	0	0	0	0	232		s18dv11
+8c059192	actor_type26_draw_particles	6	0	0	0	0	0	232		s18nv
 8c05929c	actor_type26_spawn_particle	11	462	7	7	0	420	420		s18dv11
 8c0594ca	RETF	8	562	1	1	0	6	6		h1
 8c0594d0	vec3_add	8	552	1	1	0	26	26		h1
@@ -2322,7 +2323,7 @@ address	c_function	bases	returned	kept	pass	fail	covered_bytes	insn_bytes	note	r
 8c0595ec	method_empty	8	601	1	1	0	4	4		h1
 8c059614	empty_delete	8	601	1	1	0	36	36		n9
 8c059638	empty_destroy_self	8	601	1	1	0	18	18		n9
-8c059780	actor_type25_draw	8	409	6	6	0	152	152		s18dv12
+8c059780	-	8	389	1	1	0	152	152		s18n5
 8c059844	vec3_copy	10	543	1	1	0	20	20		h1
 8c059858	vec3_diff	8	486	1	1	0	34	34		h1
 8c05988e	RETF	8	578	1	1	0	6	6		h1
@@ -2386,11 +2387,11 @@ address	c_function	bases	returned	kept	pass	fail	covered_bytes	insn_bytes	note	r
 8c05a0cc	actor_type27_destroy	8	601	1	1	0	20	20		n9
 8c05a0e0	actor_type27_delete	8	601	1	1	0	36	36		n9
 8c05a104	actor_type27_destroy_self	8	601	1	1	0	18	18		n9
-8c05a148	actor_type27_init	10	459	6	6	0	286	286		s18dv12
-8c05a27c	actor_type27_update	10	797	9	9	0	382	392		s18dv12
-8c05a428	actor_type27_draw	8	472	6	6	0	36	90		s18dv12
+8c05a148	-	10	420	1	1	0	286	286		s18n5
+8c05a27c	-	10	1040	5	5	0	388	392		s18n5
+8c05a428	-	8	661	3	3	0	90	90		s18n5
 8c05a498	-	8	394	1	1	0	52	52		s18n5
-8c05a4cc	actor_type27_draw_part	8	428	6	6	0	282	298		s18dv12
+8c05a4cc	-	8	411	1	1	0	282	298		s18n5
 8c05a644	vec3_diff	8	505	1	1	0	34	34		h1
 8c05a666	vec3_set	8	570	1	1	0	14	14		h1
 8c05a67a	RETF	8	577	1	1	0	6	6		h1
@@ -2484,7 +2485,7 @@ address	c_function	bases	returned	kept	pass	fail	covered_bytes	insn_bytes	note	r
 8c05bff6	rings_delete	8	594	1	1	0	36	36		n10
 8c05c01a	rings_destroy_self	8	599	1	1	0	18	18		n10
 8c05c1e8	rings_update	10	472	1	1	0	130	130		h1
-8c05c26a	rings_draw	8	517	6	6	0	370	370		s18dv12
+8c05c26a	-	8	490	1	1	0	370	370		s18n5
 8c05c424	contact_take_other_velocity	8	324	1	1	0	24	24		n10
 8c05c460	method_self	8	601	1	1	0	4	4		h1
 8c05c464	vec3_diff	8	511	1	1	0	34	34		h1
@@ -2521,7 +2522,7 @@ address	c_function	bases	returned	kept	pass	fail	covered_bytes	insn_bytes	note	r
 8c05c738	actor_type2d_setup	10	528	3	3	0	230	230		h1
 8c05c81e	actor_type2d_step	10	385	12	12	0	316	512		s18div2
 8c05ca34	actor_type2d_draw	8	408	1	1	0	62	62		n10
-8c05caa8	type2d_respond	8	0	0	0	0	0	268		s18dv12
+8c05caa8	type2d_respond	6	0	0	0	0	0	268		s18nv
 8c05cbd0	method_self	8	601	1	1	0	4	4		h1
 8c05cbd4	vec3_diff	8	513	1	1	0	34	34		h1
 8c05cbf6	vec3_set	8	566	1	1	0	14	14		h1
@@ -2589,16 +2590,16 @@ address	c_function	bases	returned	kept	pass	fail	covered_bytes	insn_bytes	note	r
 8c05d200	actor_type30_destroy	8	601	1	1	0	32	32		n10
 8c05d220	actor_type30_delete	8	601	1	1	0	36	36		n10
 8c05d244	actor_type30_destroy_self	8	601	1	1	0	18	18		n10
-8c05d268	actor_type30_init	10	0	0	0	0	0	612		s18dv12
-8c05d520	actor_type30_update	10	145	10	10	0	576	1874		s18dv12
-8c05dd40	actor_type30_draw	8	0	0	0	0	0	732		s18dv12
-8c05e098	actor_type30_pose_node	8	505	7	7	0	132	198		s18dv12
+8c05d268	-	10	0	0	0	0	0	612		s18n5
+8c05d520	-	10	695	10	10	0	952	1874		s18n5
+8c05dd40	actor_type30_draw	6	0	0	0	0	0	732		s18nv
+8c05e098	-	8	415	1	1	0	96	198		s18n5
 8c05e1f0	object_draw_model_l1	8	561	1	1	0	14	14		n10
 8c05e1fe	-	8	266	6	6	0	294	330		s18b05c
 8c05e36c	actor_type30_reset	8	601	1	1	0	54	56		n10
 8c05e3c0	actor_type30_free_puffs	8	1481	8	8	0	128	128		n10
-8c05e440	actor_type30_step_puffs	10	236	10	10	0	272	370		s18dv12
-8c05e5ec	actor_type30_draw_puffs	8	368	6	6	0	178	388		s18dv12
+8c05e440	-	10	646	5	5	0	272	370		s18n5
+8c05e5ec	-	8	335	1	1	0	178	388		s18n5
 8c05e7bc	actor_type30_spawn_puff	10	621	8	8	0	134	134		s18dw1
 8c05e842	actor_type30_spawn_puff_b	10	595	8	8	0	168	168		s18dy2
 8c05e920	contact_push_out_soft	8	571	8	8	0	102	102		s18dv12b
@@ -2656,16 +2657,16 @@ address	c_function	bases	returned	kept	pass	fail	covered_bytes	insn_bytes	note	r
 8c05efd0	actor_type31_destroy	8	931	6	6	0	132	136		n10
 8c05f08c	actor_type31_delete	8	598	2	2	0	36	36		n10
 8c05f0b0	actor_type31_destroy_self	8	597	1	1	0	18	18		n10
-8c05f0c8	actor_type31_init	10	0	0	0	0	0	564		s18dv12
+8c05f0c8	-	10	0	0	0	0	0	564		s18n5
 8c05f380	-	4	224	4	4	3	240	346	ram 8cb2ef58 3e692665/c3a84a2c	s18t31
 8c05f4ec	actor_type31_draw	8	428	8	8	0	76	76		s18dy0
-8c05f550	actor_type31_wander	10	467	6	6	0	242	242		s18dv12
+8c05f550	-	4	498	1	1	0	242	242		s18t31
 8c05f642	-	4	408	2	2	0	150	150		s18t31
 8c05f708	actor_type31_start_near	8	380	1	1	0	24	98		n10
 8c05f7b0	-	4	3	0	0	3	0	204	ram 8cb2fe64 000000d1/0000000d	s18t31
 8c05f87c	actor_type31_start_release	4	493	2	2	0	98	98		s18t31
-8c05f91c	actor_type31_step_items	10	416	6	6	0	236	240		s18dv12
-8c05fa30	actor_type31_place_item	10	643	7	7	0	498	498		s18dv12
+8c05f91c	-	4	380	1	1	0	236	240		s18t31
+8c05fa30	-	4	540	4	4	0	498	498		s18t31
 8c05fc78	actor_type31_reset_items	10	496	8	8	0	142	144		s18dy0
 8c05fd2c	method_self	8	601	1	1	0	4	4		h1
 8c05fd30	vec3_copy	8	540	1	1	0	20	20		h1
@@ -2752,7 +2753,7 @@ address	c_function	bases	returned	kept	pass	fail	covered_bytes	insn_bytes	note	r
 8c06042e	actor_type32_delete	8	600	2	2	0	36	36		n11
 8c060452	actor_type32_destroy_self	8	597	1	1	0	18	18		n11
 8c060470	actor_type32_init	8	0	0	0	0	0	628		s18rest
-8c060706	actor_type32_update	10	574	10	10	0	652	1344		s18dv12
+8c060706	-	10	774	10	10	0	914	1344		s18n5
 8c060d1a	actor_type32_draw	8	0	0	0	0	0	320		s18rest
 8c060e7a	actor_type32_reset_ripples	8	601	1	1	0	46	46		n11
 8c060ea8	actor_type32_free_ripples	8	1128	6	6	0	110	112		n11
@@ -2797,5 +2798,5 @@ address	c_function	bases	returned	kept	pass	fail	covered_bytes	insn_bytes	note	r
 8c0622b8	date_weekday	12	601	1	1	0	60	60		h1
 8c0622f4	rtc_moon_age	12	619	8	8	0	72	72		s18dv05b
 8c062388	debug_log_word	10	601	1	1	0	12	32		h1
-8c0623b4	system_language	10	638	8	8	0	46	58		s18dv00
+8c0623b4	system_language	10	601	1	1	0	46	58		t8
 8c0623ee	video_mode	10	0	0	0	0	0	70		s18dv05b
