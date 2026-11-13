@@ -14,3 +14,6 @@
 8c030a66	race_scene_view_bit	synthetic samples of S17 h1 / h3 (and its copy 8c055634) with a bit index from the pool (a pointer value): the C indexes the row bits past guest RAM (a host fault on replay; the original reads a stray byte): removed from the corpus; a hint now gives 0-319
 8c03e14a	racer_draw	the same (an h1 sample on an object no racer: removed)
 8c01087c	pad_read_all	a d1 sample with a poked port count: the C indexes past guest RAM: removed
+8c0512a4	type19_step2	S18: two diverse samples (s18div2_0_0 s000004, s000007) removed from the corpus: recorded while a bisect build ran the translation for this function; on the C they FAIL with `this` not an ActorType19 (a title-scene object, a global block), as S17 judged
+8c04f5b4	actor_type28_puff	S18: one diverse FAIL on the title base: `this` (0x8CB62420) is no ActorType28 (no such actor in that scene), so its seven array pointers are arbitrary and alias; the C stores in the original's order as far as checked (kinds, spins, countdowns, values); judged outside the domain
+8c05a834	fence_draw	S18: one diverse FAIL on the title base: `this` (0x8CB4B460) is no Fence and the input poked its scene word; the model pointer then differs; 31 live samples of cup4 pass: judged outside the domain

@@ -2249,3 +2249,893 @@ stk 0 0 1 2 3 4 5 6 7
 stk 1 0 1 2
 farg 0 0
 
+
+# S18 (end): diverse runs for functions with many open mutants
+for 8c025cec
+diverse 8
+for 8c0265ec
+diverse 8
+for 8c01b23c
+diverse 8
+for 8c056cac
+diverse 8
+for 8c057ed2
+diverse 8
+for 8c04b5ac
+diverse 8
+for 8c04a1b2
+diverse 8
+for 8c048018
+diverse 8
+for 8c03fc68
+diverse 8
+for 8c059d46
+diverse 8
+for 8c0512a4
+diverse 8
+for 8c05c81e
+diverse 8
+for 8c01630e
+diverse 8
+for 8c0250e4
+diverse 8
+for 8c05ad58
+diverse 8
+for 8c05d074
+pre 8c043d4c 0 30 0 0
+arg 0 $0
+diverse 8
+for 8c02d150
+diverse 8
+for 8c057af2
+diverse 8
+for 8c02dc26
+diverse 8
+for 8c01aa58
+diverse 8
+for 8c032abc
+# the race scene's player 0 (a Racer) past the finish line
+arg 0 [[8c096230]+4c]
+for 8c010184
+diverse 6
+for 8c01022c
+diverse 6
+for 8c011b1a
+diverse 6
+for 8c012362
+diverse 6
+for 8c0123b2
+diverse 6
+for 8c012568
+diverse 6
+for 8c012678
+diverse 6
+for 8c012960
+diverse 6
+for 8c012acc
+diverse 6
+for 8c01431e
+diverse 6
+for 8c0144f2
+diverse 6
+for 8c0146f8
+diverse 6
+for 8c0148c4
+diverse 6
+for 8c014980
+diverse 6
+for 8c014a94
+diverse 6
+for 8c014e20
+diverse 6
+for 8c0158ca
+arg 0 0 40 200
+arg 1 0 60 100
+arg 2 0 7 10 42 99 ffffffff
+arg 3 10 20 32 33 48 64
+diverse 6
+for 8c015b52
+diverse 6
+for 8c016792
+diverse 6
+for 8c016bec
+diverse 6
+for 8c016d60
+diverse 6
+for 8c016e98
+diverse 6
+for 8c016f20
+diverse 6
+for 8c016fd4
+diverse 6
+for 8c017054
+diverse 6
+for 8c0170f8
+diverse 6
+for 8c01711c
+diverse 6
+for 8c01723e
+arg 0 0 1
+diverse 6
+for 8c0173e8
+arg 0 0 1 2 3 4
+diverse 6
+for 8c017ac8
+arg 0 0 1 2 3 4
+diverse 6
+for 8c017d40
+arg 0 0 1 2 3 4
+diverse 6
+for 8c018010
+arg 0 0 1 2 3 4
+diverse 6
+for 8c0182d4
+arg 0 0 1 2 3 4
+diverse 6
+for 8c01859c
+arg 0 0 1 2 3
+diverse 6
+for 8c018774
+arg 0 0 1 2 3
+diverse 6
+for 8c018f7c
+diverse 6
+for 8c019bb4
+arg 0 0 1 2 3 4 5 6 7
+diverse 6
+for 8c01a120
+diverse 6
+for 8c01a27c
+diverse 6
+for 8c01a2d8
+diverse 6
+for 8c01dbd2
+diverse 6
+for 8c01e1a8
+farg 0 0 1 -2.5
+farg 1 0 3
+farg 2 0 -1
+diverse 6
+for 8c01e266
+diverse 6
+for 8c01e364
+pre 8c09f4d6 1c0 0 0 0
+arg 0 $0
+arg 1 0 1 2 3 4 5 6 7
+arg 2 0 1
+arg 3 0
+diverse 6
+for 8c01e50c
+pre 8c09f4d6 90 0 0 0
+arg 0 $0
+diverse 6
+for 8c01e8da
+diverse 6
+for 8c01eac2
+diverse 6
+for 8c01efde
+diverse 6
+for 8c01f1f0
+diverse 6
+for 8c01f3ea
+diverse 6
+for 8c01f6ac
+diverse 6
+for 8c01f74c
+slow
+pre 8c09f4d6 558 0 0 0
+pre 8c021614 $0 0 0 0
+arg 0 $1
+arg 1 0 1 2
+diverse 6
+for 8c01f752
+frames
+pre 8c09f4d6 98 0 0 0
+pre 8c02004c $0 0 0 0
+arg 0 [$1+94]
+arg 1 $1+80
+arg 2 0 1
+farg 0 7.5
+farg 1 0 4096 -4096
+diverse 6
+for 8c01f780
+slow
+pre 8c09f4d6 558 0 0 0
+pre 8c021614 $0 0 0 0
+arg 0 $1
+arg 1 0 3 4 8 e 23 33 34 40
+diverse 6
+for 8c01fe58
+frames
+pre 8c09f4d6 98 0 0 0
+arg 0 $0
+diverse 6
+for 8c02004c
+frames
+pre 8c09f4d6 98 0 0 0
+arg 0 $0
+diverse 6
+for 8c0200e8
+frames
+pre 8c09f4d6 98 0 0 0
+pre 8c02004c $0 0 0 0
+arg 0 $1
+diverse 6
+for 8c0213c8
+frames
+pre 8c09f4d6 98 0 0 0
+pre 8c02004c $0 0 0 0
+arg 0 $1
+diverse 6
+for 8c02168e
+slow
+pre 8c09f4d6 558 0 0 0
+pre 8c021614 $0 0 0 0
+pre 8c021718 $1 0 0 0
+arg 0 $1
+diverse 6
+for 8c021718
+slow
+pre 8c09f4d6 558 0 0 0
+pre 8c021614 $0 0 0 0
+arg 0 $1
+diverse 6
+for 8c02176e
+slow
+pre 8c09f4d6 558 0 0 0
+pre 8c021614 $0 0 0 0
+pre 8c021718 $1 0 0 0
+arg 0 $1
+diverse 6
+for 8c0217ec
+arg 3 0 1 2 3
+diverse 6
+for 8c02189a
+slow
+pre 8c09f4d6 558 0 0 0
+pre 8c021614 $0 0 0 0
+pre 8c021718 $1 0 0 0
+arg 0 $1
+diverse 6
+for 8c02219e
+arg 1 0 1
+arg 2 1 2 3 4 5 6 7
+diverse 6
+for 8c02232c
+arg 1 0 1
+arg 2 8 1 7
+diverse 6
+for 8c02af9c
+arg 0 [8c096230]
+diverse 6
+for 8c02c1aa
+arg 0 [8c096230]
+diverse 6
+for 8c02e4e8
+diverse 6
+for 8c02fc12
+diverse 6
+for 8c032abc
+arg 0 [[8c096230]+4c]
+diverse 6
+for 8c034a44
+diverse 6
+for 8c039b14
+arg 2 0 1
+farg 0 0 1 3.5
+farg 1 0 1000 16384 -8192
+diverse 6
+for 8c03a252
+arg 2 0 10 64
+farg 0 1 2.5 5
+farg 1 0 0.5 1 3
+farg 2 0 16384 49152
+diverse 6
+for 8c03a4c8
+pre 8c09f4d6 24 0 0 0
+arg 0 $0
+diverse 6
+for 8c03a634
+pre 8c09f4d6 24 0 0 0
+pre 8c03a4c8 $0 0 0 0
+arg 0 $1
+diverse 6
+for 8c03a6b4
+pre 8c09f4d6 24 0 0 0
+pre 8c03a4c8 $0 0 0 0
+arg 0 $1
+diverse 6
+for 8c03a75c
+pre 8c09f4d6 24 0 0 0
+pre 8c03a4c8 $0 0 0 0
+arg 0 $1
+diverse 6
+for 8c03a7e4
+pre 8c09f4d6 24 0 0 0
+pre 8c03a4c8 $0 0 0 0
+arg 0 $1
+diverse 6
+for 8c03adce
+farg 0 0 1 2.5
+diverse 6
+for 8c03c99c
+diverse 6
+for 8c03d2c4
+diverse 6
+for 8c03f470
+diverse 6
+for 8c03fb62
+diverse 6
+for 8c03fbfe
+arg 2 0 1 2 3 4 5
+diverse 6
+for 8c0419b2
+diverse 6
+for 8c0419da
+arg 2 0 1 2 10 40
+diverse 6
+for 8c041f70
+arg 1 0 1 2 3 7
+diverse 6
+for 8c042d04
+farg 0 -1 0 0.5 1
+diverse 6
+for 8c0455b0
+arg 1 0 1
+diverse 6
+for 8c045e20
+diverse 6
+for 8c046ba4
+arg 1 ffffffff 0 1 2 3
+diverse 6
+for 8c0482a0
+diverse 6
+for 8c048de6
+diverse 6
+for 8c0493dc
+diverse 6
+for 8c04a8fc
+diverse 6
+for 8c04aa28
+arg 1 0 1
+diverse 6
+for 8c04ac6a
+farg 0 1 0.5
+farg 3 1 0.25
+diverse 6
+for 8c04b0c8
+diverse 6
+for 8c04b0e2
+diverse 6
+for 8c04b106
+diverse 6
+for 8c04b45c
+diverse 6
+for 8c04b53c
+diverse 6
+for 8c04b6bc
+diverse 6
+for 8c04b78c
+farg 0 0 16384
+diverse 6
+for 8c04be38
+diverse 6
+for 8c04c02a
+diverse 6
+for 8c04d468
+arg 1 0 1
+diverse 6
+for 8c04dd94
+arg 1 0 1
+arg 3 0
+diverse 6
+for 8c04e5b0
+diverse 6
+for 8c04e8cc
+diverse 6
+for 8c04f3a2
+diverse 6
+for 8c04f498
+arg 2 0 1
+farg 0 0 16384 -16384 40000
+diverse 6
+for 8c04f5b4
+farg 0 0 16384 -16384 40000
+diverse 6
+for 8c050bae
+diverse 6
+for 8c05106c
+diverse 6
+for 8c051548
+diverse 6
+for 8c052d20
+arg 1 0 1
+arg 3 0
+diverse 6
+for 8c053a1c
+arg 1 0 1
+diverse 6
+for 8c053ec8
+diverse 6
+for 8c054034
+diverse 6
+for 8c054976
+diverse 6
+for 8c054b0a
+diverse 6
+for 8c054ea0
+diverse 6
+for 8c055d78
+arg 1 0 1
+diverse 6
+for 8c056488
+diverse 6
+for 8c057160
+diverse 6
+for 8c0587b8
+diverse 6
+for 8c058f18
+diverse 6
+for 8c058f84
+diverse 6
+for 8c0590f4
+diverse 6
+for 8c059192
+diverse 6
+for 8c05929c
+diverse 6
+for 8c059780
+diverse 6
+for 8c05a148
+diverse 6
+for 8c05a27c
+diverse 6
+for 8c05a428
+diverse 6
+for 8c05a498
+diverse 6
+for 8c05a4cc
+diverse 6
+for 8c05c26a
+diverse 6
+for 8c05caa8
+arg 1 0 1
+diverse 6
+for 8c05d268
+diverse 6
+for 8c05d520
+diverse 6
+for 8c05dd40
+diverse 6
+for 8c05e098
+diverse 6
+for 8c05e1fe
+arg 1 0 1 2 3 4
+diverse 6
+for 8c05e440
+diverse 6
+for 8c05e5ec
+diverse 6
+for 8c05f0c8
+diverse 6
+for 8c05f550
+diverse 6
+for 8c05f91c
+diverse 6
+for 8c05fa30
+arg 1 0 5 7 8 9 10 15 23
+diverse 6
+for 8c060706
+diverse 6
+for 8c030f00
+diverse 8
+for 8c0537e4
+diverse 8
+for 8c056304
+diverse 8
+for 8c047006
+diverse 8
+for 8c045b36
+diverse 8
+for 8c02478c
+diverse 8
+for 8c029efa
+diverse 8
+for 8c05bb14
+pre 8c043d4c 0 15 0 0
+arg 0 $0
+diverse 8
+for 8c05a834
+diverse 8
+for 8c03a144
+diverse 8
+for 8c01bef8
+diverse 8
+for 8c04b302
+diverse 8
+for 8c04530a
+diverse 8
+for 8c05235a
+diverse 8
+for 8c039f6e
+diverse 8
+for 8c033104
+diverse 8
+for 8c04891e
+diverse 8
+for 8c0615f8
+pre 8c09f4d6 1d0
+pre 8c0603b6 $0
+arg 0 $1+138
+arg 1 0 1
+arg 2 $1+f4
+diverse 8
+for 8c048222
+diverse 8
+for 8c039602
+diverse 8
+for 8c03b488
+diverse 8
+for 8c01def8
+diverse 8
+for 8c03ed24
+diverse 8
+for 8c02bc3e
+diverse 8
+for 8c0293f0
+diverse 8
+for 8c030bf4
+diverse 8
+for 8c03c804
+diverse 8
+for 8c01927e
+diverse 8
+for 8c0473c2
+diverse 8
+for 8c053126
+diverse 8
+for 8c04ca86
+pre 8c043d4c 0 8 0 0
+arg 0 $0+3c
+diverse 8
+for 8c04f0e0
+pre 8c043d4c 0 28 0 0
+arg 0 $0
+diverse 8
+for 8c061344
+pre 8c09f4d6 1d0
+pre 8c0603b6 $0
+pre 8c060e7a $1
+pre 8c06155c $1 3
+arg 0 $1
+diverse 8
+for 8c045514
+diverse 8
+for 8c042e28
+diverse 8
+for 8c03b194
+diverse 8
+for 8c023d16
+diverse 8
+for 8c02ce48
+diverse 8
+for 8c011a44
+arg 1 0
+farg 0 0 -1
+diverse 8
+for 8c0553b8
+diverse 8
+for 8c046374
+diverse 8
+for 8c052a50
+pre 8c043d4c 0 b 0 0
+arg 0 $0
+diverse 8
+for 8c05293c
+pre 8c09f4d6 13c 0 0 0
+arg 0 $0
+diverse 8
+for 8c060284
+pre 8c043d4c 0 32 0 0
+arg 0 $0
+diverse 8
+for 8c05f4ec
+pre 8c043d4c 0 31 0 0
+arg 0 $0
+diverse 8
+for 8c05fc78
+pre 8c043d4c 0 31 0 0
+arg 0 $0
+diverse 8
+for 8c043ab8
+diverse 8
+for 8c022d80
+diverse 8
+for 8c037d24
+diverse 8
+for 8c035fa2
+diverse 8
+for 8c04764e
+pre 8c043d4c 0 e 0 0
+arg 0 $0
+diverse 8
+for 8c052668
+pre 8c043d4c 0 24 0 0
+arg 0 $0
+diverse 8
+for 8c060f48
+pre 8c09f4d6 1d0
+pre 8c0603b6 $0
+pre 8c060e7a $1
+pre 8c06155c $1 2
+pre 8c061344 $1
+pre 8c061344 $1
+pre 8c06155c $1 ffffffff
+arg 0 $1
+diverse 8
+for 8c041b34
+diverse 8
+for 8c027234
+diverse 8
+for 8c02b9e8
+diverse 8
+for 8c02cb28
+arg 1 0
+diverse 8
+for 8c033a88
+diverse 8
+for 8c0351c8
+diverse 8
+for 8c013696
+arg 2 0 1 2
+diverse 8
+for 8c061fa4
+diverse 8
+for 8c05049c
+diverse 8
+for 8c05205c
+diverse 8
+for 8c04af40
+diverse 8
+for 8c06155c
+pre 8c09f4d6 1d0
+pre 8c0603b6 $0
+pre 8c060e7a $1
+arg 0 $1
+arg 1 0 1 5 14 ffffffff
+diverse 8
+for 8c055864
+pre 8c043d4c 0 a 0 0
+arg 0 $0
+diverse 8
+for 8c05e842
+pre 8c043d4c 0 30 0 0
+arg 0 $0
+diverse 8
+for 8c03fa44
+diverse 8
+for 8c0433d6
+diverse 8
+for 8c019e8c
+diverse 8
+for 8c0373b8
+diverse 8
+for 8c02df96
+diverse 8
+for 8c03207c
+diverse 8
+for 8c01b858
+diverse 8
+for 8c0485d0
+diverse 8
+for 8c04fe68
+diverse 8
+for 8c04dd36
+pre 8c043d4c 0 1e 0 0
+arg 0 $0
+diverse 8
+for 8c04b118
+diverse 8
+for 8c0468c4
+diverse 8
+for 8c049b86
+diverse 8
+for 8c04381a
+diverse 8
+for 8c0409b8
+diverse 8
+for 8c042a60
+diverse 8
+for 8c03c198
+diverse 8
+for 8c0233ea
+diverse 8
+for 8c028882
+diverse 8
+for 8c0381c4
+diverse 8
+for 8c030138
+diverse 8
+for 8c02fc28
+diverse 8
+for 8c02c922
+arg 2 0
+arg 3 0
+diverse 8
+for 8c0317d4
+diverse 8
+for 8c0554ae
+pre 8c043d4c 0 29 0 0
+arg 0 $0
+diverse 8
+for 8c01e970
+diverse 8
+for 8c01509a
+arg 1 0 1
+arg 2 0 4000
+arg 3 0 1
+diverse 8
+for 8c011afc
+diverse 8
+for 8c05ab00
+diverse 8
+for 8c04c46e
+pre 8c043d4c 0 7 0 0
+arg 0 $0
+diverse 8
+for 8c048ce8
+pre 8c043d4c 0 2f 0 0
+arg 0 $0
+diverse 8
+for 8c0413cc
+diverse 8
+for 8c01dd7a
+diverse 8
+for 8c02368e
+diverse 8
+for 8c03f9ce
+diverse 8
+for 8c0270d2
+diverse 8
+for 8c0175ac
+diverse 8
+for 8c017848
+diverse 8
+for 8c02baee
+diverse 8
+for 8c02f076
+arg 1 0 1 2 3
+arg 2 0 1 2 3
+diverse 8
+for 8c035014
+arg 0 [[8c096230]+4c] [[8c096230]+50] [[8c096230]+54] [[8c096230]+58]
+diverse 8
+for 8c037878
+diverse 8
+for 8c019544
+diverse 8
+for 8c01937e
+diverse 8
+for 8c01c668
+diverse 8
+for 8c013e1c
+diverse 8
+for 8c01370e
+arg 2 0 1 2
+diverse 8
+for 8c013856
+arg 2 0 1 2
+arg 3 1 2 4
+diverse 8
+for 8c0137d0
+arg 2 0 1 2
+diverse 8
+for 8c061df0
+diverse 8
+for 8c062106
+diverse 8
+for 8c050a74
+diverse 8
+for 8c051ea4
+diverse 8
+for 8c059cac
+diverse 8
+for 8c04cf08
+pre 8c043d4c 0 9 0 0
+arg 0 $0
+diverse 8
+for 8c04f198
+pre 8c043d4c 0 28 0 0
+arg 0 $0
+diverse 8
+for 8c04913a
+pre 8c043d4c 0 2f 0 0
+arg 0 $0
+diverse 8
+for 8c05e7bc
+pre 8c043d4c 0 30 0 0
+arg 0 $0
+diverse 8
+for 8c020062
+diverse 8
+for 8c0427dc
+diverse 8
+for 8c03945c
+diverse 8
+for 8c03b6f2
+diverse 8
+for 8c03de18
+diverse 8
+for 8c0167f8
+diverse 8
+for 8c037cd6
+diverse 8
+for 8c02b80a
+diverse 8
+for 8c02bbca
+diverse 8
+for 8c02d4f0
+diverse 8
+for 8c02f2c4
+diverse 8
+for 8c02c888
+arg 1 0 1 2 3
+diverse 8
+for 8c02edaa
+arg 1 0 1 2 3 4
+arg 2 0 1 2 3
+arg 3 0 1 5
+diverse 8
+for 8c02ee6a
+arg 1 0 1 2 3 4
+arg 2 0 1 2 3
+diverse 8
+for 8c02efec
+arg 1 0 1 2 3
+arg 2 0 1 2 3
+arg 3 0 1 5
+diverse 8
+for 8c034f1e
+arg 0 [[8c096230]+4c] [[8c096230]+50] [[8c096230]+54] [[8c096230]+58]
+diverse 8
+for 8c0314b4
+diverse 8
+for 8c03cd4c
+diverse 8
+for 8c03c69e
+diverse 8
+for 8c01950a
+diverse 8
+for 8c019850
+arg 0 0 1 2 3 4 5 6 7
+diverse 8
+for 8c03d65a
+diverse 8
+for 8c0146bc
+diverse 8
+for 8c011a94
+diverse 8
+for 8c013188
+diverse 8
+for 8c0139d6
+arg 3 0 1 2
+diverse 8
+for 8c013790
+arg 2 0 1 2
+arg 3 1 2 4
+diverse 8
+for 8c01398c
+arg 2 1 2 4
+diverse 8
+for 8c02278c
+diverse 8
+for 8c061e80
+pre 8c061fa4 5e7b6a00 8cfff010 0 0
+pre 8c061fa4 3b9aca00 8cfff020 0 0
+arg 0 8cfff010 8cfff020
+nopoke
+diverse 8
+for 8c0159ea
+arg 0 0 40 100
+arg 1 0 40 100
+diverse 8

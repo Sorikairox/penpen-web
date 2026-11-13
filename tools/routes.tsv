@@ -39,8 +39,9 @@ cup4	3300	600:START,700:A,1100:START,1200:A,1500:A,1620:RIGHT,1640:RIGHT,1660:RI
 goodnight	2600	600:START,700:A,1100:START,1130:DOWN,1150:DOWN,1170:DOWN,1200:A,1400:A,1600:A,1800:A,2000:A	--rtc 1592179200 --poke 8C1B7E64=00070003@1100,8C1B7E68=0012000B@1100,8C1B7E6C=00050021@1100,8C1B7E70=00090002@1100,8C1B7E74=00040011@1100,8C1B7E78=0003000E@1100,8C1B7E7C=00160001@1100,8C1B7E80=00080006@1100,8C1B7E84=000A0013@1100,8C1B7E88=00020007@1100,8C1B7E8C=001C0004@1100,8C1B7E90=00010009@1100,8C1B7E94=05020703@1100,8C1B7E98=01060408@1100
 # options (S18): Game mode 12, the language set-up, which the title menu cannot reach (its choice 3 is never set):
 # next_mode (Game at 0x8CE16B00, +0x10) poked to 12 on the title; the cursor moved every way, B leaves; then mode 12
-# again, the cursor moved, A sets the language and saves (no VMU), back to the title
-options	2000	600:START,800:RIGHT,830:LEFT,860:UP,890:DOWN,920:DOWN,950:B,1300:DOWN,1330:DOWN,1360:RIGHT,1400:A	--poke 8CE16B10=C@700,8CE16B10=C@1200
+# again, the cursor moved, A sets the language and saves (no VMU), back to the title; S18: then mode 1 (the title's
+# other variant, poked at 1900: its start routine)
+options	2300	600:START,800:RIGHT,830:LEFT,860:UP,890:DOWN,920:DOWN,950:B,1300:DOWN,1330:DOWN,1360:RIGHT,1400:A	--poke 8CE16B10=C@700,8CE16B10=C@1200,8CE16B10=1@1900
 # gallery (S18): Game mode 12's neighbour, mode 11 (the picture gallery): its files (8098gallery.pvm, the pictures')
 # are not on this disc (the US release): the scene's file name and two pictures' names poked to 4000config.pvm, two
 # pictures unlocked (save flags 0x8C1B7F50), next_mode poked to 11; every direction, A twice (the number hidden and
