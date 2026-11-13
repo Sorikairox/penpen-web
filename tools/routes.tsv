@@ -59,3 +59,9 @@ cup1b	3300	600:START,700:A,1100:START,1200:A,1500:A,1700:A,1730:DOWN,1760:A,2300
 # cup4b (S19): the fourth cup's other course (CSD); S18 left it out (pure and hand differed from frame 1764: type 0x31's
 # actors turn toward an uninitialised stack Vec3 of FUN_8C02C922, now a zeroed fresh frame on both builds, sh4_ops.h)
 cup4b	3300	600:START,700:A,1100:START,1200:A,1500:A,1620:RIGHT,1640:RIGHT,1660:RIGHT,1700:A,1730:DOWN,1760:A,2300+300:A,2700+100:A|SL,2900+200:A|SR	--poke 8C1B7E54=FFFFFFFF@1100,8C1B7E58=FFFFFFFF@1100,8C1B7E5C=FFFFFFFF@1100,8C1B7E60=FFFFFFFF@1100
+# owner (S22): the RaceSetup's state 2 (the owner scene, which no menu asks for): in the setup menu at 1740 the
+# set-up's three penguin slots (words44: 0 1 2), their characters (words68: 0 2 5; words88 stay 0) and requested = 2
+# poked; the scene loads 5110Owner.bin, builds its penguins, runs to its 600-frame time-out (2343) and the set-up
+# shows its menu again. S21's poke of `requested` alone hung: the slots were -1 (no race was run), the penguin's
+# model name read before the table, and the file loader retried a missing file for ever (the pure build too)
+owner	2450	600:START,700:A,1100:START,1200:A,1500:A,1700:A	--poke 8CE169E4=0@1740,8CE169E8=1@1740,8CE169EC=2@1740,8CE16A08=0@1740,8CE16A0C=2@1740,8CE16A10=5@1740,8CE169C8=2@1740
