@@ -2,6 +2,65 @@
 
 Newest session first. Read `docs/port/PLAN.md` (disc facts, survey, approach, phases, rules) before working.
 
+## S20 — 2026-11-13/14: the library code as C, every function outside the game accounted for, a build without generated code
+
+The user's goal: "Don't stop until all the code is ported". All guest code ran in `--network none --read-only
+--cap-drop ALL --security-opt no-new-privileges --tmpfs /tmp` containers; `git log --all -- port/gen` stays empty;
+corpora (guest RAM) only in the Docker volume `penpen-corpus` (new: `/corpus/c8`, the 19 routes; synthetic
+`/corpus/syn/s20lib*`, `s20re*`). Design and numbers: `docs/port/DECOMP.md` 21.
+
+1. **The library code as C** (`src/lib/`, 130 functions, 21.2): S19's 96 executed translated functions, the 22 the
+   C can reach that no route runs, S19's 12 maths: the SHC runtime (division with its r1 / r0 convention, C++ array
+   loops, memmove / memset / memcmp, rand, the block copy, frexpf / modff / sinf / cosf), the G2-bus copy, sy's heap
+   / start-up / library registry, bu's file image and the HLE thunks, Ninja (batches N1 / N2: the matrix stack and
+   transforms on XMTRX, vectors, trig, view / camera / screen, the chunk reader, the fog table, render state), two
+   Kamui register writes. fpu.h has `ftrv`; hw.h `hw_xmtrx()` / `REG(n)`; the game's sdk.h wrappers call the C.
+2. **Three game functions functions.tsv missed** (vtable-only, in gaps: the owner scene's draw, type 0x1B's init; a
+   copy of text_style_reset), written (delegated W3 + lead): **4 049 / 4 049 game functions**.
+3. **Every function outside the game region accounted for** (`docs/progress/outside.tsv`, `outside_classes.tsv`,
+   21.4): 130 hand-written, 172 HLE, **0 reachable left untranslated**, 1 437 reached only through stored pointers
+   nothing that runs reads, 2 296 dead. S19's 1 895 translated: 118 C, 2 game, 1 437 data-only, 338 dead. The 54
+   gap entries: all code; 52 covered by their parents' / callers' C or unreferenced, 2 real methods (written).
+4. **A build without generated code** (`tools/s11.sh genlib`, 21.5): no translated function at all (table.c only);
+   **pure = genlib on all 19 routes, native and wasm, native = wasm, the interpreter never entered**
+   (`--no-interp`); wasm **1 264 457 bytes**; rtw check OK and the browser e2e passed with it (0 recompiled
+   functions, 4 179 hand-written; 58.3 game frames/s in the race).
+5. **The stale synthetic samples** (21.6): kept, listed in `tools/replay_exclude.tsv` with reasons (15: S19's 14 and
+   one more of type 0x30's pose), honoured by every replay gate; fresh samples of the five functions recorded and pass.
+6. **Bugs found** (21.7): the G2 DMA block through a NULL pointer (lead), the fog table through hw_ptr (N2), the G2
+   read order (lead), **func_8C0304CA was njRotateZXY's thunk exported as njRotateXYZ's (S14; invisible until XF was
+   compared)**, a difftest over-reach (FR4 at the nj_Motion stubs).
+7. **Tests and tools** (21.1): difftest compares XF0-XF15; synthetic hint `reg`; recomp.py `--trim-hand` /
+   `--classify`; `--no-interp`; `PENPEN_DIGEST_MAP`; `tools/s3.sh ninjatest` (Ninja's C against the original: 580 000
+   cases, 0 differ); `tools/outside_classify.py`, `tools/gap_check.py`; compare `HG=` / `NOINTERP=` / `REUSE=`.
+
+**Progress: 4 049 of 4 049 game functions (100 %), 313 196 of 313 196 bytes** (S19's 4 046 and the 3 S20 found);
+outside the game: 130 hand-written (S19: 12), 172 HLE, 0 reachable left untranslated. Routes: 19.
+
+Tests (end of S20): difftest over the **19 routes (the c8 corpus run), 68 626 samples: 0 FAIL** (XF0-XF15 compared);
+corpora replay with the final build (c8 + syn, **17 471 samples): 0 FAIL**, 15 excluded with reasons; synthetic
+samples of the library C (s20lib*: 128 functions with passing samples after the two fixes) and of the stale samples'
+functions (s20re*); **ninjatest 580 000 / 0**; pure vs hand **identical frame lines on all 19 routes, native and wasm,
+for genhand and genlib; native = wasm; the interpreter entered nowhere** (`--no-interp`); sh4 **257 / 0**; fpu
+**9 249 782 / 0** (+ ftrv); mixer **26 / 0**; harness **5 953 functions: 5 747 pass, 0 fail, 206 untested**
+(unchanged); `GEN=genhand tools/rtw.sh build` + `check` **OK** (and with GEN=genlib); browser e2e **passed** with both
+(58.1 / 58.3 game frames/s in the race); the title, PenPen House and race screenshots look right. Mull (new code):
+**1 373 mutants, 1 035 killed, 25 equivalent, 183 unreached, 130 survived (each with a reason): 76.8 %, reach 88.8 %**;
+combined **24 181 mutants, 73.4 %, reach 91.3 %**.
+
+Not verified: why 8 of the old type 0x30 samples end with another XMTRX (the old snapshots; fresh samples and the unit
+test pass); the draw HLE reads the matrix through the RAM slot at NJG_CURMATRIX, so a difference left only in XMTRX
+is seen by the per-sample XF comparison, not by the whole-run RAM digest (a draw-list digest per frame would close
+that); the `data` class (1 437) rests on "no code that runs reads those tables" (the strict build drops them and runs
+the 19 routes with the fallback a stop); 12 library functions without samples of their own besides the whole-run
+comparison (the start-up chain: start, its body, the sections, the registry); the 13 never-executed game functions
+(as S19); the open Mull survivors of earlier sessions.
+
+Next: (1) a draw-list digest in the frame line (XMTRX-only differences in draws); (2) the genlib build as the
+default (`tools/rtw.sh build` with GEN=genlib: the module is 1.26 MB, 13x smaller); retire the translation path
+(recomp.py stays for the difftest's reference and the pure build); (3) the open Mull survivors by input class; the
+13 never-executed game functions; (4) the 8 old type 0x30 samples (a debug replay, with the user's say).
+
 ## S19 — 2026-11-13: cup4b's root cause (fresh frames read as zero), the game region's last functions and its missed ones, the code outside it measured and begun
 
 The user's goal: "Don't stop until all the code is ported". All guest code ran in `--network none --read-only
