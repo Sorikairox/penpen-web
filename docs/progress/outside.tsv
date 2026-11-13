@@ -1,29 +1,30 @@
-# S19 (tools/outside_measure.py): the hand build's translated code by library (functions.tsv region), the translated functions the 19 routes run in the hand build (tools/s3.sh fncover, FNCOVER_HAND=1), and the hand-written ones outside the game region
-# library	translated_functions	translated_bytes	executed_functions	executed_bytes	hand_written_functions	hand_written_bytes
-Ninja	527	250140	49	8800	0	0
-shc_rt	98	14614	21	1616	12	1426
-bu	84	12712	6	596	0	0
-sy	71	7274	7	394	0	0
-unknown	30	1260	4	362	0	0
-sy_start	6	182	4	170	0	0
-Kamui	69	13754	2	34	0	0
-bios_stub	20	226	1	10	0	0
-gdFs	80	6596	1	6	0	0
-pd	31	2946	1	6	0	0
-CRI_ADX	137	11400	0	0	0	0
-CRI_SFD	288	25462	0	0	0	0
-CRI_SFD_unlisted	1	4	0	0	0	0
-CRI_SJ	54	3016	0	0	0	0
-CRI_SJ_unlisted	1	14	0	0	0	0
-CRI_mw	185	16206	0	0	0	0
-CRI_mw_unlisted	2	356	0	0	0	0
-Kamui_unlisted	1	292	0	0	0	0
-Ninja_unlisted	33	17220	0	0	0	0
-bu_unlisted	2	596	0	0	0	0
-game_unlisted	54	10052	0	0	0	0
-gdFs_unlisted	1	778	0	0	0	0
-kd	14	1006	0	0	0	0
-sd	84	7610	0	0	0	0
-shc_rt_unlisted	14	130	0	0	0	0
-sy_unlisted	8	784	0	0	0	0
-total	1895	404630	96	11994	12	1426
+# S20 (tools/outside_classify.py): every function outside the game region by library and class (hand: hand-written C in src/lib / hle: the runtime replaces it / c, ctable: reached by the C (0 left) / data: only through a stored pointer nothing that runs reads / dead), and S19's translated / executed counts
+# library	hand	hle	c	ctable	data	dead	bytes_hand	s19_translated	s19_executed
+CRI_ADX	0	0	0	0	137	131	0	137	0
+CRI_SFD	0	0	0	0	288	65	0	288	0
+CRI_SFD_unlisted	0	0	0	0	0	0	0	1	0
+CRI_SJ	0	0	0	0	54	12	0	54	0
+CRI_SJ_unlisted	0	0	0	0	0	0	0	1	0
+CRI_mw	0	8	0	0	185	123	0	185	0
+CRI_mw_unlisted	0	0	0	0	0	0	0	2	0
+Kamui	2	2	0	0	59	193	34	69	2
+Kamui_unlisted	0	0	0	0	0	0	0	1	0
+Ninja	55	83	0	0	414	1021	9468	527	49
+Ninja_unlisted	0	0	0	0	0	0	0	33	0
+bios_stub	1	0	0	0	10	9	10	20	1
+bu	6	13	0	0	0	176	596	84	6
+bu_unlisted	0	0	0	0	0	0	0	2	0
+game_unlisted	0	0	0	0	0	57	0	54	0
+gdFs	1	19	0	0	79	22	6	80	1
+gdFs_unlisted	0	0	0	0	0	0	0	1	0
+kd	0	0	0	0	0	56	0	14	0
+pd	1	9	0	0	0	119	6	31	1
+sd	0	26	0	0	84	39	0	84	0
+shc_rt	44	0	0	0	42	24	4146	98	21
+shc_rt_unlisted	0	0	0	0	0	0	0	14	0
+sy	9	12	0	0	52	154	402	71	7
+sy_start	4	0	0	0	0	2	170	6	4
+sy_unlisted	0	0	0	0	0	0	0	8	0
+unknown	7	0	0	0	23	40	788	30	4
+unlisted	0	0	0	0	10	53	0	0	0
+total	130	172	0	0	1437	2296	15626	1895	96

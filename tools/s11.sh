@@ -105,11 +105,13 @@ case "${1:-}" in
   compare)
     k=${2:-native}
     routes | while IFS='	' read -r r f p x; do
-      "$REPO/tools/s3.sh" $k --frames "$f" $(padarg "$p") $(extra "$x") $RUN > "$LOGS/${k}_${r}_pure.log" 2>&1 || true
+      # S20: REUSE=1 keeps the pure run of an earlier compare (the pure translation did not change)
+      [ -n "${REUSE:-}" ] && [ -s "$LOGS/${k}_${r}_pure.log" ] || "$REPO/tools/s3.sh" $k --frames "$f" $(padarg "$p") $(extra "$x") $RUN > "$LOGS/${k}_${r}_pure.log" 2>&1 || true
       GEN=$HG "$REPO/tools/s3.sh" $k --frames "$f" $(padarg "$p") $(extra "$x") $RUN $NI > "$LOGS/${k}_${r}_hand.log" 2>&1 || true
-      # S14: the interpreter-call count is left out (the pure translation interprets code that hand-written C replaces)
-      grep '^frame ' "$LOGS/${k}_${r}_pure.log" | sed 's/ interp [0-9]* / interp - /' > "$LOGS/${k}_${r}_pure.frames" || true
-      grep '^frame ' "$LOGS/${k}_${r}_hand.log" | sed 's/ interp [0-9]* / interp - /' > "$LOGS/${k}_${r}_hand.frames" || true
+      # S14: the interpreter-call count is left out (the pure translation interprets code that hand-written C replaces);
+      # S20: so is the guest-SDK call count (the hand-written game calls the SDK's C directly, not through the table)
+      grep '^frame ' "$LOGS/${k}_${r}_pure.log" | sed 's/ interp [0-9]* / interp - /; s/ guest [0-9]* / guest - /' > "$LOGS/${k}_${r}_pure.frames" || true
+      grep '^frame ' "$LOGS/${k}_${r}_hand.log" | sed 's/ interp [0-9]* / interp - /; s/ guest [0-9]* / guest - /' > "$LOGS/${k}_${r}_hand.frames" || true
       n=$(wc -l < "$LOGS/${k}_${r}_pure.frames" | tr -d ' ')
       if [ "$n" != "$f" ]; then
         echo "compare $k $r: the pure run has $n frame lines of $f"

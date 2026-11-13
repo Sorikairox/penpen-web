@@ -59,3 +59,24 @@ print('S19 translated now: %s' % ', '.join('%s %d' % (k, v) for k, v in sorted(c
     r[4] for r in rows if r[0] in before).items())))
 print('S19 executed now: %s' % ', '.join('%s %d' % (k, v) for k, v in sorted(collections.Counter(
     r[4] for r in rows if before.get(r[0])).items())))
+# the per-library summary (docs/progress/outside.tsv, replacing S19's measurement table: S19's columns are kept as the
+# "s19_" ones from outside_functions.tsv)
+s19 = collections.defaultdict(lambda: [0, 0])
+for l in open(BEFORE):
+    if l.startswith('#'):
+        continue
+    f = l.rstrip('\n').split('\t')
+    s19[f[2]][0] += 1
+    s19[f[2]][1] += f[4] not in ('-', '0')
+KS = ['hand', 'hle', 'c', 'ctable', 'data', 'dead']
+with open(os.path.join(REPO, 'docs/progress/outside.tsv'), 'w') as o:
+    o.write('# S20 (tools/outside_classify.py): every function outside the game region by library and class (hand: '
+            'hand-written C in src/lib / hle: the runtime replaces it / c, ctable: reached by the C (0 left) / data: only '
+            'through a stored pointer nothing that runs reads / dead), and S19\'s translated / executed counts\n')
+    o.write('# library\t' + '\t'.join(KS) + '\tbytes_hand\ts19_translated\ts19_executed\n')
+    libs = sorted(set(lib) | set(s19))
+    for name in libs:
+        b = sum(r[1] for r in rows if r[2] == name and r[4] == 'hand')
+        o.write('%s\t%s\t%d\t%d\t%d\n' % (name, '\t'.join(str(lib[name][k]) for k in KS), b, s19[name][0], s19[name][1]))
+    o.write('total\t%s\t%d\t%d\t%d\n' % ('\t'.join(str(tot[k]) for k in KS), byb['hand'], sum(v[0] for v in s19.values()),
+                                         sum(v[1] for v in s19.values())))

@@ -4460,3 +4460,18 @@ for 8c049308
 # word1c (0x14 / 0x18 / 0x1C) set from the group file's entries (param bit 16); r5 = an ActorPlacement of type 0x1B:
 # param bits 8-11 index the model set, bits 0-3 the motion table (keep small). Same code as type 0x1C's 8c04956c:
 # its samples (a type-0x1C actor and placement) fit this function too.
+for 8c062b70
+# the G2-bus copy (src, dst, size, count; stack: the source / destination step modes 0 / 1 / 2, 3 = the caller's r12 / r13)
+arg 0 8c200000 8c200010
+arg 1 8c200100 8c200110
+arg 2 1 2 4 3
+arg 3 0 1 2 5 -1
+stk 0 0 1 2
+stk 1 0 1 2
+for 8c062e80
+arg 0 8c200000 8c200010
+arg 1 8c200100 8c200110
+arg 2 1 2 4 3
+arg 3 0 1 2 9 11
+stk 0 0 1 2
+stk 1 0 1 2

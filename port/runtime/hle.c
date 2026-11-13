@@ -518,6 +518,7 @@ static void frame_log_line(void) {
   char d[20] = "-";
   if (hle_digest_every > 0 && frame % (uint32_t)hle_digest_every == 0) {
     uint64_t h = ram_digest();
+#ifndef __EMSCRIPTEN__ /* the wasm hosts provide no environment (getenv would import WASI's environ_*) */
     { /* S20: PENPEN_DIGEST_MAP=FRAME:LO:HI:STEP (hex addresses, step in bytes): a digest per block of that range
          at that frame (stack area left out as above), to find where two builds' RAM differs (hashes only) */
       const char *m = getenv("PENPEN_DIGEST_MAP");
@@ -539,6 +540,7 @@ static void frame_log_line(void) {
         }
       }
     }
+#endif
     for (int i = 0; i < 16; i++) d[i] = "0123456789abcdef"[(h >> (60 - 4 * i)) & 15];
     d[16] = 0;
   }
