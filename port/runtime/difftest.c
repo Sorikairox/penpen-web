@@ -838,7 +838,7 @@ int hwt_replay(const char *list) {
  * the input. The samples are ordinary corpus samples: --hwreplay and the Mull gate use them like live ones. */
 int hwt_synth_live;
 #define SY_BASES 12
-#define SY_PRE 6
+#define SY_PRE 48 /* S21: 6 -> 48 (with `set` lines) */
 #define SY_CAND 64
 #define SY_POOL 2048
 #define SY_POKES 6
@@ -868,7 +868,7 @@ static uint32_t sy_offs[128], sy_noffs;   /* field offsets the function's instru
 static uint32_t sy_consts[64], sy_nconsts; /* small constants it compares with or loads (cmp/eq #imm, mov #imm) */
 int hwt_synth_hw;  /* the job's `hw` line: the function may write hardware registers */
 void hwt_synth_odd_note(const char *kind, uint32_t a) {
-  if (!hwt_synth_odd++ && getenv("PENPEN_SYNTH_DEBUG")) rt_log("hw synth odd %s %08x", kind, a);
+  if (!hwt_synth_odd++ && getenv("PENPEN_SYNTH_DEBUG")) rt_log("hw synth odd %s %08x pc %08x", kind, a, hw_cpu ? hw_cpu->pc : 0);
 }
 int hwt_synth_odd; /* the recording pass touched memory no real pointer does (rt.c): the input is refused */
 static uint8_t *sy_cov, *sy_cov_it;
@@ -1037,6 +1037,13 @@ static int sy_base(int b) {
   memcpy(sy_prep[b], buf_s, 16u << 20);
   SH4 c = snap;
   for (int k = 0; k < sj.npre; k++) {
+    if (sj.pre[k][0] == 0) { /* S21: `set ADDR VALUE`: a word of the base written (its result: the address) */
+      uint32_t a = sy_value(sy_pretext[k][0], b), v = sy_value(sy_pretext[k][1], b);
+      if (!sh4_is_ram(a) || (a & 3)) { rt_log("hw synth set %08x: not a RAM word", a); return -1; }
+      memcpy(sy_prep[b] + (a & 0xFFFFFC), &v, 4);
+      sy_preret[b][k] = a;
+      continue;
+    }
     SH4 p = c;
     p.pc = sj.pre[k][0]; p.pr = SY_RET;
     for (int i = 0; i < 4; i++) p.r[4 + i] = sy_value(sy_pretext[k][i], b);
@@ -1045,6 +1052,7 @@ static int sy_base(int b) {
     sy_frames_ok = 0;
     if (e != END_RET) { rt_log("hw synth prelude %d (%08x) of base %d ended %d at %08x", k, sj.pre[k][0], b, e, sbx_at); return -1; }
     sy_preret[b][k] = p.r[0];
+    c.xf = p.xf; /* S21: Ninja's current matrix (XMTRX) as the prelude left it (njUnitMatrix / njTranslateV before a posed call) */
   }
   sy_cpu[b] = c;
   sy_npool[b] = 0;
@@ -1219,6 +1227,15 @@ static void sy_job(void) {
     memset(sy_cov_it, 0, nh);
     hwt_synth_odd = 0;
     int e = sy_guarded(&c, buf_a, 1, sy_cov_it, steps);
+    { /* S21: PENPEN_SYNTH_DEBUG: why the first inputs were refused (the end code and where; an odd access) */
+      static int ndbg;
+      if (it == 0) ndbg = 0;
+      if ((e != END_RET || hwt_synth_odd) && getenv("PENPEN_SYNTH_DEBUG") && ndbg++ < 6) {
+        char d[400];
+        sy_describe(&in, d, sizeof d);
+        rt_log("hw synth refused end %d at %08x odd %d: %s", e, e == END_RET ? 0 : sbx_at, hwt_synth_odd, d);
+      }
+    }
     if (e != END_RET) continue;
     if (hwt_synth_odd) { odd++; continue; }
     rets++;
@@ -1279,7 +1296,9 @@ static void sy_job(void) {
 /* SPEC: jobs, each
  *   job FN END INSN_BYTES ITERS KEEP SEED [STEPS [STALE [SECS]]]
  *   base CORPUS_SAMPLE_PATH          (1-8)
- *   pre FN A0 A1 A2 A3               (0-6: prelude calls on each base; $k = the k-th call's result)
+ *   pre FN A0 A1 A2 A3               (0-48 with the sets: prelude calls on each base; $k = the k-th call's result;
+ *                                     S21: Ninja's current matrix XF0-XF15 as the prelude left it is kept)
+ *   set ADDR VALUE                   (S21: a word of the base written, in prelude order; [X] = the base's word at X)
  *   arg I V V ...                    (candidates for argument I: hex, $k, $k+hex)
  *   farg I F F ...                   (float candidates)
  *   reg R V V ...                    (S20: candidates for r0-r3: the C runtime's helpers take their operands there)
@@ -1326,6 +1345,12 @@ int hwt_synth(const char *spec) {
     } else if (!strcmp(tok[0], "pre") && n >= 2 && n <= 6 && sj.npre < SY_PRE) {
       sj.pre[sj.npre][0] = (uint32_t)strtoul(tok[1], 0, 16);
       for (int i = 0; i < 4; i++) snprintf(sy_pretext[sj.npre][i], 24, "%s", 2 + i < n ? tok[2 + i] : "0"); /* missing: 0 */
+      sj.npre++;
+    } else if (!strcmp(tok[0], "set") && n == 3 && sj.npre < SY_PRE) { /* S21: a word of the base, in prelude order */
+      sj.pre[sj.npre][0] = 0;
+      snprintf(sy_pretext[sj.npre][0], 24, "%s", tok[1]);
+      snprintf(sy_pretext[sj.npre][1], 24, "%s", tok[2]);
+      sy_pretext[sj.npre][2][0] = sy_pretext[sj.npre][3][0] = 0;
       sj.npre++;
     } else if (!strcmp(tok[0], "arg") && n >= 3) {
       int i = atoi(tok[1]) & 3;
