@@ -1605,3 +1605,159 @@ farg 0 0 0.5 1
 farg 1 0 0.5 1
 farg 2 0 0.5 1
 farg 3 0 0.5 1
+# ---- S17 b09 writer's hints
+for 8c0603b6
+# the type 0x32 actor's constructor (0x1D0 bytes, ActorType32): r4 = the new object
+pre 8c09f4d6 1d0
+arg 0 $0
+
+for 8c060e7a
+# this = ActorType32 (syMalloc 0x1D0, then the constructor 8c0603b6)
+pre 8c09f4d6 1d0
+pre 8c0603b6 $0
+arg 0 $1
+
+for 8c06155c
+# this = ActorType32 (constructor 8c0603b6), its ripples reset (8c060e7a); r5 = a ripple's wait (signed)
+pre 8c09f4d6 1d0
+pre 8c0603b6 $0
+pre 8c060e7a $1
+arg 0 $1
+arg 1 0 1 5 14 ffffffff
+
+for 8c061344
+# this = ActorType32 (constructor 8c0603b6), its ripples reset (8c060e7a), one ring spawned (8c06155c)
+pre 8c09f4d6 1d0
+pre 8c0603b6 $0
+pre 8c060e7a $1
+pre 8c06155c $1 3
+arg 0 $1
+
+for 8c060f48
+# this = ActorType32 (constructor 8c0603b6), ripples reset (8c060e7a), a ring (8c06155c) and two splashes (8c061344)
+pre 8c09f4d6 1d0
+pre 8c0603b6 $0
+pre 8c060e7a $1
+pre 8c06155c $1 2
+pre 8c061344 $1
+pre 8c061344 $1
+pre 8c06155c $1 ffffffff
+arg 0 $1
+
+for 8c06111e
+# this = ActorType32 (constructor 8c0603b6), ripples reset (8c060e7a), a ring (8c06155c) and a splash (8c061344)
+pre 8c09f4d6 1d0
+pre 8c0603b6 $0
+pre 8c060e7a $1
+pre 8c06155c $1 2
+pre 8c061344 $1
+arg 0 $1
+
+for 8c0615f8
+# the type 0x32 contact handler: r4 = its Contacts (ActorType32 + 0x138), r5 = the contact index (capacity 2), r6 = a Body (its own at + 0xF4)
+pre 8c09f4d6 1d0
+pre 8c0603b6 $0
+arg 0 $1+138
+arg 1 0 1
+arg 2 $1+f4
+
+for 8c060ea8
+# this = ActorType32 (constructor 8c0603b6)
+pre 8c09f4d6 1d0
+pre 8c0603b6 $0
+arg 0 $1
+
+for 8c060414
+# this = ActorType32 (constructor 8c0603b6)
+pre 8c09f4d6 1d0
+pre 8c0603b6 $0
+arg 0 $1
+
+for 8c06042e
+# this = ActorType32 (constructor 8c0603b6); r5 = free the object (0 / 1)
+pre 8c09f4d6 1d0
+pre 8c0603b6 $0
+arg 0 $1
+arg 1 0 1
+
+for 8c060452
+# this = ActorType32 (constructor 8c0603b6)
+pre 8c09f4d6 1d0
+pre 8c0603b6 $0
+arg 0 $1
+
+for 8c060470
+# the init method: r4 = an ActorType32 built by the race scene's actor group (it reads the Actor's model_set / texlist / word1c ContainerEntries, so a real one of a scene is needed), r5 = its ActorPlacement (type 0x32)
+
+for 8c060d1a
+# the draw method: r4 = an ActorType32 after its init (8c060470): its objects / motions lists must be real (a scene's actor of type 0x32)
+
+for 8c061984
+# this = the type 0x20 actor (syMalloc 0xE8, constructor 8c061964); r5 = free the object (0 / 1)
+pre 8c09f4d6 e8
+pre 8c061964 $0
+arg 0 $1
+arg 1 0 1
+
+for 8c0619a8
+# this = the type 0x20 actor (syMalloc 0xE8, constructor 8c061964)
+pre 8c09f4d6 e8
+pre 8c061964 $0
+arg 0 $1
+
+for 8c061bd6
+# the type 0x20 actor's draw: r4 = an ActorType20 after its set-up (8c0619dc; a scene's actor: its texlist at 0x28 and sprite at 0x40 must be real)
+
+for 8c061ed2
+# the clock's flags (bits 0, 1, 3)
+arg 0 0 1 2 3 8
+
+for 8c061ede
+# two RtcDates (10 bytes each): today's (8c061e1a) and one made from a count of seconds (8c061fa4)
+pre 8c09f4d6 10
+pre 8c061e1a $0
+pre 8c09f4d6 10
+pre 8c061fa4 5cb417d1 $2
+arg 0 $0 $2
+arg 1 $2 $0
+
+for 8c061e80
+# r4 = an RtcDate (10 bytes), today's (8c061e1a)
+pre 8c09f4d6 10
+pre 8c061e1a $0
+arg 0 $0
+
+for 8c06226c
+# a 16-bit half of the clock's count
+arg 0 0 1 ffff 1234
+
+for 8c062292
+# a 16-bit half of the clock's count
+arg 0 0 1 ffff 1234
+# ---- S17 lead: the RTC's writers and compare (b09) write the clock's registers / read the BIOS block: allowed
+for 8c061ede
+hw
+for 8c062244
+hw
+for 8c06226c
+hw
+for 8c062292
+hw
+for 8c061e80
+hw
+for 8c061e80
+# a valid RtcDate (made by the original seconds-to-date), as for rtc_date_to_seconds
+pre 8c061fa4 5e7b6a00 8cfff010 0 0
+pre 8c061fa4 3b9aca00 8cfff020 0 0
+arg 0 8cfff010 8cfff020
+nopoke
+# ---- S17 lead: arithmetic functions: many passing inputs (diverse), not only the ones that run new code
+for name:rtc_seconds_to_date
+# seconds spread over 1950-2018 (every month, leap years too)
+arg 0 6e55426 febddf8 11b5aecd 14f50791 1c339464 1f9db8dd 2335e9e2 23cf493f 24405d96 26a2658f 2cb85f3f 32521553 35c33744 3fb81d27 409c38f2 473d212b 4a24e39a 4dad2986 4f27b35c 51436d1f 54bec7d8 561d2417 5d998017 62590992 66cea9fa 689edcd6 68e06b0c 6a06e9ab 6b68b48e 795e846b 412d280 784ce00
+arg 1 8cfff100
+diverse 16
+nopoke
+for name:race_scene_view_bit
+# a bit of the current view's row bits (0..319)
+arg 1 0 1 1f 40 13f

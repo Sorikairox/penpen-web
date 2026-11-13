@@ -2,6 +2,69 @@
 
 Newest session first. Read `docs/port/PLAN.md` (disc facts, survey, approach, phases, rules) before working.
 
+## S17 — 2026-11-13: synthetic samples (difftests and Mull kills without a route), the draw context, 689 more functions
+
+The user's goal: "Don't stop until all the code is ported". The functions no route reaches were the obstacle (no
+difftest, no Mull kill; S16: new routes add almost nothing). All guest code ran in `--network none --read-only
+--cap-drop ALL --security-opt no-new-privileges --tmpfs /tmp` containers; `git log --all -- port/gen` stays empty;
+the corpora (guest RAM) live only in the Docker volume `penpen-corpus` (`/corpus/c5`, `/corpus/syn`). Design and
+numbers: `docs/port/DECOMP.md` 18.
+
+1. **Synthetic samples** (18.1, `--hwsynth`, `tools/synth.py`): a sample made like a live one but from a real scene
+   the game did not give the function: a corpus snapshot as the base (title, house, setup menu, 1P / 4P / cup 3
+   races, explore, GOOD NIGHT, plus the function's own / its callers' samples), optional prelude calls of the
+   original (a constructor, the factory), arguments from the base's own objects (registers, the callers' stack
+   pointers, the objects whose vtable holds the function), the function's constants, field / global pokes; the
+   original interpreted with the HLE live records the HLE results and hardware reads; then the live difftest's own
+   judgement (`sample_judge`, shared with hwt_end). A coverage-guided search keeps the inputs that run new
+   instructions of the original. Out-of-domain inputs are refused, not judged (non-RAM accesses of the guest code,
+   code outside the code ranges, a frame's end, an HLE loop or fault, side B leaving guest RAM). Passing samples
+   are ordinary corpus samples (`/corpus/syn`): `--hwreplay` and the Mull gate use them. Kept apart in
+   `docs/progress/synth_coverage.tsv` (route-backed coverage stays `fn_coverage.tsv`).
+2. **The draw context** (18.3): the difftest compared an HLE draw call by its registers only; now also the 3D draws'
+   current matrix, the render state (njControl3D, constant attribute / material, the texture list: a stack one as a
+   token), 32 bytes at each RAM pointer argument (the sprite, the model) and FR4 for the draws that read it.
+3. **Per-sample line coverage** (18.4, `tools/linecov.py`, `tools/s3.sh linecov`): src/ with gcc --coverage, every
+   corpus sample replayed: c5 runs 9 466 lines of src/, c5 + syn 15 092.
+4. **Survivors** (18.5): Mull with the synthetic corpus in the replay gate: the S17 code (runs r, m2-m4: 5 698
+   mutants; on the unreached batches the reach score is 93-99 %) and S16's open mutants again by id (`--ids`: 3 059;
+   808 killed, 783 by synthetic samples). **Combined: 16 960 mutants, 12 496 killed, 38 equivalent, 3 163
+   unreached, 1 263 survived (open): 73.8 %, reach 90.8 %** (S16: 71.9 %, 85.4 %, 1 557 open). S16's 1 557: 457
+   killed, 2 equivalent, 108 on changed lines, 990 open; S15's 212: 56 killed, 2 equivalent, 1 changed, 153 open
+   (130 on lines samples run: reached but invisible; 23 that no sample reaches). Every open mutant's per-sample
+   reach is in `docs/progress/mutation_sample_reach.tsv`. **Not done**: the per-id equivalent / gap classification
+   of the reached-invisible ones.
+5. **New functions** (18.6): the rest of S15's b2 list (the racer's effects and sounds, the computer racer's states 3
+   and 4, the race step, the title's intro and logo draw: route-backed) and nine delegated batches of unreached
+   functions (b01-b09, synthetic). Bugs found: lane_racer_steer read range2_min (0x658) where the original reads 0x654
+   (route difftest); matrix_axis_angle stored the axis before reading the matrix (a synthetic sample with the
+   axis aliasing the matrix).
+
+**Progress: 3 806 of 4 010 game functions (94.91 %), 233 516 of 301 130 bytes (77.55 %)** (S16: 3 117 / 177 706,
+59.01 %). Raw offsets: 47. Routes: 12 (unchanged), 1 640 game functions run.
+
+Tests (end of S17): difftest over the **12 routes, 39 835 samples: 0 FAIL** (with the draw context); the corpora
+replay with **0 FAIL** (c5: 8 174 route samples; syn: 4 128 synthetic samples: 6 removed whose out-of-domain inputs
+made the C fault after later merges, `tools/synth/notes.tsv`); synthetic: **2 540 functions with passing samples**
+(2 043 of them run by no route: 93.7 % of their instruction bytes run), 8 FAILs judged outside the functions' domain
+(notes); pure vs hand **identical frame lines on all 12 routes, native and wasm; native = wasm**; sh4 **257 / 0**;
+mixer **26 / 0**; harness **5 736 / 0 / 207**; `GEN=genhand tools/rtw.sh build` + `check` **OK**; screenshots from
+the hand build (title f500, PenPen House f900, race f3000 of the route) look right.
+
+Route-backed vs synthetic: 1 574 hand-written functions pass with route samples (own or inside); the routes still run
+1 640 game functions; the synthetic samples test 2 540 (`synth_coverage.tsv`, kept apart: they show the C equals the
+original on real objects of real scenes with chosen arguments and pokes, not that the game makes those calls).
+
+Not verified: the 1 263 open survivors (not classified per id); the 99 functions without a synthetic sample (frame-
+ending loaders and scene constructors, the gallery / options constructors that load files) that no route runs either:
+compiled, exported, unexecuted; the synthetic samples' FAIL classification (8, judged by reading the inputs);
+`hle.c`'s syCfgGetSoundMode change (reports its out-parameter) came after the native / wasm compares and the rtw
+check (a difftest-only effect); the browser e2e; the writers' "unsure" notes (port_work/s17 reports, 18.6).
+
+Next (DECOMP.md 18.7): (1) classify the reached-invisible mutants by id; (2) the 204 functions left (67.6 KB: the
+large ones, the dump-cut ones); (3) synthetic preludes for the 99 without samples; (4) routes for the options,
+gallery and staff roll (their scenes are C now).
+
 ## S16 — 2026-11-13: an offline sample-replay Mull gate (59 -> ~5 s per mutant), Mull on every file, 38 more functions
 
 The user's goal: "Don't stop until all the code is ported"; the user also asked why Mull is so slow. All guest code ran

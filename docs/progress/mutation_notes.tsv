@@ -323,3 +323,5 @@ cxx_lt_to_le:src/game/save.c:99:25:99:26	unreachable	S15: with the routes' poked
 cxx_init_const:src/game/save.c:99:20:99:21	equivalent	S15: starting at entry 0 only compares entry 0 with itself
 cxx_init_const:src/game/save.c:98:18:98:19	unreachable	S15: with the routes' poked scores the best is entry 4 (33), above entry 0 and score_b[0]; a table whose best is entry 0 or 8 would reach it
 cxx_lt_to_le:src/game/save.c:134:21:134:22	unreachable	S15: save_reset runs on a new record whose bytes are already 0; resetting a played record would reach it
+cxx_remove_void_call:src/core/rtc.c:64:5:64:32	equivalent	S17: debug_log_word appends only while bit 3 of its flag word (0x8C1BAC54) is set: rtc_init clears the word and only rtc_set_flags (func_8C061ED2, called by no game code) sets it, so the call returns at once in every run
+cxx_remove_void_call:src/core/rtc.c:65:5:65:32	equivalent	S17: the same (the second debug_log_word of rtc_read_seconds)

@@ -144,15 +144,52 @@ HW_SIZE(ActorType31, 0x1FC);
 #define TYPE32_BODIES 32
 typedef struct ActorType32 {
   Actor base;               /* 0x000 */
-  uint8_t pad_028[0x094 - 0x028];
-  Body1 turns[6];           /* 0x094: (0, 0, 0, 1) at construction */
+  int32_t word28;           /* 0x028: S17 b09: 0 at the init */
+  int32_t motion;           /* 0x02C: S17 b09: the motion entry whose length sets `frames` (0 at the init) */
+  int32_t kind;             /* 0x030: S17 b09: the placement's param bits 0-3 */
+  uint8_t pad_034[0x038 - 0x034];
+  int32_t state;            /* 0x038: S17 b09: 0 at the init (the update switches on 0, 1, 2) */
+  int32_t wait;             /* 0x03C: S17 b09: random 120..539 at the init */
+  int32_t word40;           /* 0x040: S17 b09: 0 at the init */
+  int32_t word44;           /* 0x044: S17 b09: 0 at the init */
+  uint8_t pad_048[0x04C - 0x048];
+  int32_t alternate;        /* 0x04C: S17 b09: not 0: drawn with the second model and motion pair */
+  uint8_t pad_050[0x054 - 0x050];
+  f32 frame;                /* 0x054: S17 b09: the motions' frame (handed by address) */
+  uint8_t pad_058[0x05C - 0x058];
+  f32 frames;               /* 0x05C: S17 b09: the motion's frame count - 1 */
+  f32 scale;                /* 0x060: S17 b09: the model's scale */
+  Vec3 v64;                 /* 0x064: S17 b09: 0 at the init */
+  uint8_t pad_070[0x074 - 0x070];
+  f32 radius;               /* 0x074: S17 b09: g_type32_radius at the init, the contacts' radius */
+  uint8_t pad_078[0x088 - 0x078];
+  Vec3 home;                /* 0x088: S17 b09: the Body's position at the init */
+  Body1 turns[6];           /* 0x094: (0, 0, 0, 1) at construction; S17 b09: [3] about x, [4] about y, [5] about z */
   Body body;                /* 0x0F4: at rest at construction; the contacts' owner */
-  uint8_t pad_124[0x138 - 0x124];
+  uint8_t pad_124[0x12C - 0x124];
+  gaddr textures;           /* 0x12C: S17 b09: the init's copy of the texlist entry's data word (an NJS_TEXLIST) */
+  gaddr motions;            /* 0x130: S17 b09: MotionEntry[] (the word1c entry's data word) */
+  gaddr objects;            /* 0x134: S17 b09: gaddr[] of NJS_OBJECTs (the model_set entry's data word) */
   Contacts contacts;        /* 0x138 */
   int32_t contacts_word;    /* 0x18C */
-  uint8_t pad_190[0x1B4 - 0x190];
-  gaddr blocks_a[3];        /* 0x1B4: 0x80 bytes each (syMalloc) */
-  gaddr blocks_b[2];        /* 0x1C0: 0x80 bytes each (syMalloc, after the Bodies) */
+  NjSprite sprite;          /* 0x190: S17 b09: the sprite every ripple is drawn with (textures, a static texanim) */
+  uint8_t pad_1b0[0x1B4 - 0x1B0];
+  /* S17 b09: 32 ripples (g_type32_ripples), one word or float each in these blocks */
+  union {
+    gaddr blocks_a[3];      /* 0x1B4: 0x80 bytes each (syMalloc) */
+    struct {
+      gaddr cells;          /* 0x1B4: int32_t: the sprite's cell (0: the spreading ring; 1-3: the splash, cycled) */
+      gaddr timers;         /* 0x1B8: int32_t: counts down in stage 1 */
+      gaddr stages;         /* 0x1BC: int32_t: 0 free, 1 waiting, 2 growing, 3 done (back to 0) */
+    };
+  };
+  union {
+    gaddr blocks_b[2];      /* 0x1C0: 0x80 bytes each (syMalloc, after the Bodies) */
+    struct {
+      gaddr sizes;          /* 0x1C0: f32: grows in stage 2 */
+      gaddr alphas;         /* 0x1C4: f32: 1 at the spawn */
+    };
+  };
   gaddr bodies;             /* 0x1C8: Body[32] or 0 */
   gaddr second_vtable;      /* 0x1CC */
 } ActorType32;
@@ -160,6 +197,22 @@ HW_OFFSET(ActorType32, turns, 0x094);
 HW_OFFSET(ActorType32, body, 0x0F4);
 HW_OFFSET(ActorType32, contacts, 0x138);
 HW_OFFSET(ActorType32, contacts_word, 0x18C);
+HW_OFFSET(ActorType32, textures, 0x12C);
+HW_OFFSET(ActorType32, alternate, 0x04C);
+HW_OFFSET(ActorType32, kind, 0x030);
+HW_OFFSET(ActorType32, state, 0x038);
+HW_OFFSET(ActorType32, word44, 0x044);
+HW_OFFSET(ActorType32, frames, 0x05C);
+HW_OFFSET(ActorType32, v64, 0x064);
+HW_OFFSET(ActorType32, radius, 0x074);
+HW_OFFSET(ActorType32, home, 0x088);
+HW_OFFSET(ActorType32, frame, 0x054);
+HW_OFFSET(ActorType32, scale, 0x060);
+HW_OFFSET(ActorType32, motions, 0x130);
+HW_OFFSET(ActorType32, objects, 0x134);
+HW_OFFSET(ActorType32, sprite, 0x190);
+HW_OFFSET(ActorType32, stages, 0x1BC);
+HW_OFFSET(ActorType32, alphas, 0x1C4);
 HW_OFFSET(ActorType32, blocks_a, 0x1B4);
 HW_OFFSET(ActorType32, blocks_b, 0x1C0);
 HW_OFFSET(ActorType32, bodies, 0x1C8);
@@ -204,5 +257,19 @@ void actor_type31_reset_items(gaddr obj);
 void actor_type31_start_near(gaddr obj);
 void actor_type31_start_release(gaddr obj);
 gaddr actor_type32_base_construct(gaddr obj);
+/* S17 b09: game/actor_type32.c */
+gaddr actor_type32_construct(gaddr obj);
+void actor_type32_free_ripples(gaddr obj);
+void actor_type32_destroy(gaddr obj);
+gaddr actor_type32_delete(gaddr obj, int32_t free_memory);
+gaddr actor_type32_destroy_self(gaddr obj);
+void actor_type32_reset_ripples(gaddr obj);
+void actor_type32_spawn_ripple(gaddr obj, int32_t wait);
+void actor_type32_contact_push(gaddr contacts, int32_t i, gaddr body);
+void actor_type32_update_ripples(gaddr obj);
+void actor_type32_draw_ripples(gaddr obj);
+void actor_type32_spawn_splash(gaddr obj);
+void actor_type32_draw(gaddr obj);
+void actor_type32_init(gaddr obj, gaddr placement);
 
 #endif
