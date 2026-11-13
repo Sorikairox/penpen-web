@@ -166,10 +166,10 @@ void actor_type31_face_player(gaddr obj, int32_t held) {
   body1_pull_angle(a->yaw, TYPE31_FACE_RATE, member_addr(obj, ActorType31, b84));
   body1_step(member_addr(obj, ActorType31, b84));
 }
-/* not exported (S18): on the cup4b route its sample differs: the original's to_player is the nearest player's unit
- * direction (normalised by njUnitVector inside race_scene_nearest_player), the C's is not normalised, so atan2
- * differs (with (0, 0) the original's atan2f sets errno 0x8C1BAC68 to EDOM 0x44D). The synthetic samples pass. */
-/* HW_EXPORT(8c05f642, actor_type31_face_player(ARG0, (int32_t)ARG1)) */
+/* S19: no racer is within 10000 of CSD's type 0x31 actors for most of the race, so race_scene_nearest_player leaves
+ * to_player as its never-written "best" (a fresh stack frame: zero, sh4_ops.h) and atan2f(0, 0) sets errno to EDOM;
+ * S18's differences here came from that stack word, which held other garbage on each build */
+HW_EXPORT(8c05f642, actor_type31_face_player(ARG0, (int32_t)ARG1))
 
 /* the original's frame of actor_type31_wander (0x4C bytes under r14, fr15 and PR): its matrix and vector go to
  * Ninja */
@@ -252,10 +252,7 @@ int32_t actor_type31_hold(gaddr obj) {
   hw_stack_free(sizeof(HoldFrame));
   return 1;
 }
-/* not exported (S18): the difftest differs: on the cup4b route (CSD) the update's items' vertices differ
- * by float rounding and the seeded random's state (0x8C1BAC68: start_release taken on one side only); a synthetic
- * sample of the hold differs in the actor's cell. Every helper read so far matches its asm; to find. */
-/* HW_EXPORT(8c05f7b0, RET(actor_type31_hold(ARG0))) */
+HW_EXPORT(8c05f7b0, RET(actor_type31_hold(ARG0)))
 
 /* was func_8C05F380: the update method: by its state (0 wander: a random wait and random angles; 1 face the nearest
  * and wander until the wait ends; 10 face, wander and wait for a player within 40; 11 hold the player while it is
@@ -312,10 +309,7 @@ void actor_type31_update(gaddr obj) {
   body1_step(member_addr(obj, ActorType31, b94));
   actor_type31_step_items(obj);
 }
-/* not exported (S18): the difftest differs: on the cup4b route (CSD) the update's items' vertices differ
- * by float rounding and the seeded random's state (0x8C1BAC68: start_release taken on one side only); a synthetic
- * sample of the hold differs in the actor's cell. Every helper read so far matches its asm; to find. */
-/* HW_EXPORT(8c05f380, actor_type31_update(ARG0)) */
+HW_EXPORT(8c05f380, actor_type31_update(ARG0))
 
 /* the original's frame of actor_type31_place_item (0x54 bytes under seven saved registers and PR): its matrix and
  * vector go to Ninja */

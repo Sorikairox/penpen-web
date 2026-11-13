@@ -31,7 +31,13 @@ void sh4_io_pref(uint32_t a);
 #define RM c->r[OPM]
 #define R0 c->r[0]
 #define OPF(name) SH4_INLINE void op_##name(SH4 *c, uint32_t op, uint32_t pc)
+#ifdef PENPEN_DBG /* S19: a debug build (port_work tools): the address of the op last run, an op address to report */
+extern uint32_t dbg_last_pc, dbg_pc_watch;
+void dbg_pc_hit(SH4 *c, uint32_t pc);
+#define UNUSED (void)op; dbg_last_pc = pc; if (__builtin_expect(pc == dbg_pc_watch, 0)) dbg_pc_hit(c, pc)
+#else
 #define UNUSED (void)op; (void)pc
+#endif
 
 SH4_INLINE uint32_t sx8(uint32_t v) { return (uint32_t)(int32_t)(int8_t)v; }
 SH4_INLINE uint32_t sx16(uint32_t v) { return (uint32_t)(int32_t)(int16_t)v; }
@@ -79,8 +85,17 @@ OPF(XTRCT) { UNUSED; RN = (RN >> 16) | (RM << 16); }
 OPF(MOVCAL) { UNUSED; wr32(RN, R0); }
 
 /* ---- arithmetic ---- */
-OPF(ADD) { UNUSED; RN += RM; }
-OPF(ADD_I) { (void)pc; RN += OPSI8; }
+/* S19: a fresh guest stack frame reads as zero. The original reads uninitialised stack words in places (FUN_8C02C922
+ * copies out its never-written "best" Vec3 when no racer is within 10000: type 0x31's actors on CSD turn toward it);
+ * what such a word holds on hardware is whatever earlier code left at that depth, which hand-written C (no guest
+ * frames) cannot reproduce. So the run time defines it, for the translation, the interpreter and hw_stack_alloc
+ * alike: lowering r15 (add #-n / add Rm / sub Rm, the SH-4 frame allocations) clears the words it uncovers. */
+SH4_INLINE void sh4_stack_lowered(uint32_t old, uint32_t now) {
+  if (now < old && old - now <= 0x10000u && sh4_is_ram(now) && sh4_is_ram(old - 1u) && (now & 0xFF000000u) == ((old - 1u) & 0xFF000000u))
+    memset(sh4_ram + (now & 0xFFFFFF), 0, old - now);
+}
+OPF(ADD) { UNUSED; if (OPN == 15) { uint32_t o = RN; RN += RM; sh4_stack_lowered(o, RN); } else RN += RM; }
+OPF(ADD_I) { (void)pc; if (OPN == 15 && (op & 0x80)) { uint32_t o = RN; RN += OPSI8; sh4_stack_lowered(o, RN); } else RN += OPSI8; }
 OPF(ADDC) {
   UNUSED;
   uint32_t n0 = RN, t1 = n0 + RM, r = t1 + c->t;
@@ -173,7 +188,7 @@ OPF(NEGC) {
   c->t = (0 < t0) | (t0 < r);
   RN = r;
 }
-OPF(SUB) { UNUSED; RN -= RM; }
+OPF(SUB) { UNUSED; if (OPN == 15) { uint32_t o = RN; RN -= RM; sh4_stack_lowered(o, RN); } else RN -= RM; }
 OPF(SUBC) {
   UNUSED;
   uint32_t n0 = RN, t1 = n0 - RM, r = t1 - c->t;

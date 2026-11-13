@@ -86,6 +86,13 @@ SH4_INLINE int sh4_is_ram(uint32_t a) { return ((a >> 26) & 7) == 3 && (a >> 29)
 #define wr16 sh4_io_w16
 #define wr8 sh4_io_w8
 #else
+#ifdef PENPEN_DBG /* S19: writes into a watched RAM range are reported (debug builds only) */
+extern uint32_t dbg_w_lo, dbg_w_hi;
+void dbg_write(uint32_t a, uint32_t v, int size);
+#define DBG_W(a, v, n) if (__builtin_expect(((a) & 0xFFFFFF) >= dbg_w_lo && ((a) & 0xFFFFFF) < dbg_w_hi, 0)) dbg_write(a, v, n)
+#else
+#define DBG_W(a, v, n)
+#endif
 SH4_INLINE uint32_t rd32(uint32_t a) {
   if (sh4_is_ram(a)) { uint32_t v; memcpy(&v, sh4_ram + (a & 0xFFFFFC), 4); return v; }
   return sh4_io_r32(a);
@@ -99,15 +106,15 @@ SH4_INLINE uint8_t rd8(uint32_t a) {
   return sh4_io_r8(a);
 }
 SH4_INLINE void wr32(uint32_t a, uint32_t v) {
-  if (sh4_is_ram(a)) { memcpy(sh4_ram + (a & 0xFFFFFC), &v, 4); return; }
+  if (sh4_is_ram(a)) { DBG_W(a, v, 4); memcpy(sh4_ram + (a & 0xFFFFFC), &v, 4); return; }
   sh4_io_w32(a, v);
 }
 SH4_INLINE void wr16(uint32_t a, uint16_t v) {
-  if (sh4_is_ram(a)) { memcpy(sh4_ram + (a & 0xFFFFFE), &v, 2); return; }
+  if (sh4_is_ram(a)) { DBG_W(a, v, 2); memcpy(sh4_ram + (a & 0xFFFFFE), &v, 2); return; }
   sh4_io_w16(a, v);
 }
 SH4_INLINE void wr8(uint32_t a, uint8_t v) {
-  if (sh4_is_ram(a)) { sh4_ram[a & 0xFFFFFF] = v; return; }
+  if (sh4_is_ram(a)) { DBG_W(a, v, 1); sh4_ram[a & 0xFFFFFF] = v; return; }
   sh4_io_w8(a, v);
 }
 #endif

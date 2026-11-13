@@ -27,7 +27,7 @@ REPO=$(cd "$(dirname "$0")/.." && pwd)
 J=${JOBS:-8}
 box() { # sandboxed container: repo read-only at /src, volumes as given by the caller
   $D run --rm --network none --read-only --cap-drop ALL --security-opt no-new-privileges --user 1000:1000 \
-    --tmpfs /tmp:exec,size=4g,mode=1777 -e HOME=/tmp -e EM_CACHE=/tmp/emcache ${PENPEN_REPLAY_DIFFS:+-e PENPEN_REPLAY_DIFFS=$PENPEN_REPLAY_DIFFS} \
+    --tmpfs /tmp:exec,size=4g,mode=1777 -e HOME=/tmp -e EM_CACHE=/tmp/emcache ${PENPEN_REPLAY_DIFFS:+-e PENPEN_REPLAY_DIFFS=$PENPEN_REPLAY_DIFFS} ${PENPEN_HWT_FRAMES:+-e PENPEN_HWT_FRAMES=$PENPEN_HWT_FRAMES} ${PENPEN_HWT_SKIP:+-e PENPEN_HWT_SKIP=$PENPEN_HWT_SKIP} \
     -v "$REPO/port":/src/port:ro -v "$REPO/tools":/src/tools:ro -v "$REPO/src":/src/src:ro "$@"
 }
 # What may be printed from a container that read disc-derived data: our own log vocabulary only (-a: a log line
@@ -49,7 +49,7 @@ case "${1:-}" in
   fncover)
     # S13: the game functions each route runs (tools/fncover.py: the pure translation with gcc --coverage)
     shift
-    box -v penpen-disc:/disc:ro -v penpen-build:/build:ro -e CF="$CF" $IMG python3 -I /src/tools/fncover.py /src/tools/routes.tsv "${1:-}" 2>&1 | filt ;;
+    box -v penpen-disc:/disc:ro -v penpen-build:/build:ro -e CF="$CF" -e FNCOVER_HAND=${FNCOVER_HAND:-0} $IMG python3 -I /src/tools/fncover.py /src/tools/routes.tsv "${1:-}" 2>&1 | filt ;;
   dupes)
     # S13: identical copies among the game's functions (tools/dupes.py; addresses only)
     box -v penpen-work:/work:ro -v "$REPO/port/symbols":/symbols:ro $IMG python3 -I /src/tools/dupes.py /work/fs/1ST_READ.BIN /symbols/functions.tsv 2>&1 | filt ;;

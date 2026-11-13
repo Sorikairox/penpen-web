@@ -57,7 +57,9 @@ uint32_t hw_call_stack(gaddr fn, int n, const uint32_t *args) {
 }
 
 gaddr hw_stack_alloc(uint32_t bytes) {
+  uint32_t o = hw_cpu->r[15];
   hw_cpu->r[15] -= (bytes + 3) & ~3u;
+  sh4_stack_lowered(o, hw_cpu->r[15]); /* S19: a fresh frame reads as zero, as the translation's (sh4_ops.h) */
   return hw_cpu->r[15];
 }
 void hw_stack_free(uint32_t bytes) { hw_cpu->r[15] += (bytes + 3) & ~3u; }

@@ -55,6 +55,9 @@ int hwt_enabled, hwt_recording;
 int hwt_alloc(void);
 static int hwt_budget = 160;   /* samples per function */
 static int hwt_spread = 50;    /* after the first calls: at most one sample per function every this many frames */
+static uint32_t hwt_skip[64];
+static int hwt_skip_n;
+static uint32_t hwt_from = 0, hwt_to = 0xFFFFFFFFu; /* S19: PENPEN_HWT_FRAMES=F0-F1 (with spread 0: every outermost call) */
 /* S14: test only these functions (--hwtest B:S:A1,A2,...; the Mull gate's first pass samples only the exports of the
    mutated file) */
 #define ONLY_MAX 4096
@@ -388,6 +391,8 @@ int hwt_begin(SH4 *c, uint32_t addr) {
   uint32_t fr = hle_frame();
   if (hwt_recording && fr - cur_frame > PENDING_FRAMES_MAX) { cur->abandoned++; hwt_recording = 0; cur_sample = 0; }
   if (hwt_recording || (hwt_only_n && !only_has(addr)) || (int)s->samples >= hwt_budget) return 0;
+  if (fr < hwt_from || fr > hwt_to) return 0; /* S19: PENPEN_HWT_FRAMES=F0-F1: sample only in those frames */
+  for (int i = 0; i < hwt_skip_n; i++) if (hwt_skip[i] == addr) return 0; /* S19: PENPEN_HWT_SKIP: drill into the callees */
   uint32_t n = s->calls;
   int want = n <= 8 || (n & (n - 1)) == 0 || fr >= s->next_frame;
   if (!want) return 0;
@@ -1365,6 +1370,9 @@ void hwt_summary(void) {
 int hwt_set(const char *opt) {
   char *e;
   { const char *d = getenv("PENPEN_REPLAY_DIFFS"); replay_diffs = d ? atoi(d) : 0; } /* S18: the live difftest too */
+  { const char *f = getenv("PENPEN_HWT_FRAMES"); if (f) { char *x; hwt_from = (uint32_t)strtoul(f, &x, 10); hwt_to = *x == '-' ? (uint32_t)strtoul(x + 1, 0, 10) : hwt_from; } }
+  { const char *k = getenv("PENPEN_HWT_SKIP"); char *x;
+    while (k && *k && hwt_skip_n < 64) { hwt_skip[hwt_skip_n++] = (uint32_t)strtoul(k, &x, 16); k = *x == ',' ? x + 1 : x; } }
   hwt_budget = (int)strtol(opt, &e, 10);
   if (*e == ':') hwt_spread = (int)strtol(e + 1, &e, 10);
   if (*e == ':')

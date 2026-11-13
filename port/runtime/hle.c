@@ -635,3 +635,28 @@ void hle_summary(void) {
     if (tab[i].calls)
       rt_log("hle   %s %s %u first frame %u", tab[i].fn ? "hle" : "guest", tab[i].name, tab[i].calls, tab[i].first);
 }
+
+#ifdef PENPEN_DBG
+/* S19: debug builds (-DPENPEN_DBG; never the shipped ones): PENPEN_DBG_PC=addr reports each run of the op at addr (its
+ * registers and the words just below r15), PENPEN_DBG_W=lo-hi (RAM offsets) every write there with the last op's
+ * address; PENPEN_DBG_FRAMES=F0-F1 limits both */
+uint32_t dbg_last_pc, dbg_pc_watch = 1, dbg_w_lo = 0xFFFFFFFFu, dbg_w_hi;
+static uint32_t dbg_f0, dbg_f1 = 0xFFFFFFFFu;
+__attribute__((constructor)) static void dbg_init(void) {
+  const char *e;
+  char *x;
+  if ((e = getenv("PENPEN_DBG_PC"))) dbg_pc_watch = (uint32_t)strtoul(e, 0, 16);
+  if ((e = getenv("PENPEN_DBG_W"))) { dbg_w_lo = (uint32_t)strtoul(e, &x, 16) & 0xFFFFFF; dbg_w_hi = (uint32_t)strtoul(x + 1, 0, 16) & 0xFFFFFF; }
+  if ((e = getenv("PENPEN_DBG_FRAMES"))) { dbg_f0 = (uint32_t)strtoul(e, &x, 10); dbg_f1 = *x == '-' ? (uint32_t)strtoul(x + 1, 0, 10) : dbg_f0; }
+}
+void dbg_pc_hit(SH4 *c, uint32_t pc) {
+  if (frame < dbg_f0 || frame > dbg_f1) return;
+  rt_log("hle dbg pc %08x frame %u r0 %08x r1 %08x r2 %08x r3 %08x", pc, frame, c->r[0], c->r[1], c->r[2], c->r[3]);
+  rt_log("hle dbg pc %08x frame %u r4 %08x r5 %08x r6 %08x r7 %08x r15 %08x pr %08x fr4 %08x fr5 %08x", pc, frame, c->r[4], c->r[5], c->r[6], c->r[7], c->r[15], c->pr, c->fr.u[4], c->fr.u[5]);
+  for (int k = 0; k < 16; k++) rt_log("hle dbg  @r15-%02x %08x", 4 * (k + 1), rd32(c->r[15] - 4u * (uint32_t)(k + 1)));
+}
+void dbg_write(uint32_t a, uint32_t v, int size) {
+  if (frame < dbg_f0 || frame > dbg_f1) return;
+  rt_log("hle dbg w %08x %08x size %d pc %08x frame %u", a, v, size, dbg_last_pc, frame);
+}
+#endif
