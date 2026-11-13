@@ -12,6 +12,7 @@
  *     the header. */
 #include <stdlib.h>
 #include <math.h>
+#include "det_math.h" /* S22: sinf / cosf as our own code (native = wasm) */
 #include "nj.h"
 #include "pvr.h"
 
@@ -263,8 +264,7 @@ static void h_njDrawSprite2D(SH4 *c) {
   float qx[4] = {x0, x1, x0, x1}, qy[4] = {y0, y0, y1, y1}, qu[4] = {u1, u2, u1, u2}, qv[4] = {v1, v1, v2, v2};
   float cs = 1, sn = 0;
   if (attr & SPR_ANGLE) {
-    float a = (float)(int32_t)rd32(sp + 0x14) * (6.28318530718f / 65536.0f);
-    cs = __builtin_cosf(a); sn = __builtin_sinf(a);
+    det_sincos_angle((int32_t)rd32(sp + 0x14), &sn, &cs);
   }
   uint32_t col = (attr & SPR_COLOR) ? nj_argb_f(NJG_CMAT) : 0xFFFFFFFFu;
   rd_vtx v[4];

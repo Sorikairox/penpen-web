@@ -14,6 +14,7 @@
  * Projection: the screen of njSetScreen (dist, cx, cy at 0x8C1EF2A4...) with near clipping in view space. */
 #include <math.h>
 #include "nj.h"
+#include "det_math.h" /* S22: powf / sinf / cosf as our own code (native = wasm) */
 #define R(i) HLE_R(i) /* S11: marks the argument registers read (rt.h) */
 
 /* SDK guest functions used for the node transforms */
@@ -202,7 +203,7 @@ static float spec_term(const float *n, const float *ldir, const float *pos, floa
   float h[3] = {l[0] + vv[0] / lv, l[1] + vv[1] / lv, l[2] + vv[2] / lv}, lh = sqrtf(h[0] * h[0] + h[1] * h[1] + h[2] * h[2]);
   if (lh < 1e-6f) return 0;
   float nh = (n[0] * h[0] + n[1] * h[1] + n[2] * h[2]) / lh;
-  return nh > 0 ? powf(nh, e < 1 ? 1 : e) : 0;
+  return nh > 0 ? det_powf(nh, e < 1 ? 1 : e) : 0;
 }
 static void shade_spec(const vb_t *v, const uint32_t *scol, uint32_t sflags, float *o, float *sp) {
   float d[4];
@@ -555,7 +556,7 @@ static void h_njDrawSprite3D(SH4 *c) {
   float x0 = (float)-cx * sx, y0 = (float)-cy * sy, x1 = (float)(tsx - cx) * sx, y1 = (float)(tsy - cy) * sy;
   float qx[4] = {x0, x1, x0, x1}, qy[4] = {y0, y0, y1, y1}, qu[4] = {u1, u2, u1, u2}, qv[4] = {v1, v1, v2, v2};
   float cs = 1, sn = 0;
-  if (attr & 1) { float a = (float)(int32_t)rd32(sp + 0x14) * (6.28318530718f / 65536.0f); cs = cosf(a); sn = sinf(a); }
+  if (attr & 1) det_sincos_angle((int32_t)rd32(sp + 0x14), &sn, &cs);
   float col[4] = {1, 1, 1, 1};
   if (attr & 2) argb4(nj_argb_f(NJG_CMAT), col);
   load_matrix();
