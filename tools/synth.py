@@ -31,7 +31,7 @@ LINE = re.compile(r'^(hw |rt crash|boot stop)[ -~]*$')
 # the bases: (route, frame): the first corpus sample of c5 at or after the frame
 BASES = [('boot', 600), ('route', 1300), ('route', 1750), ('route', 3000), ('vs4', 3000), ('cup3', 2700),
          ('explore', 3700), ('goodnight', 1500)]
-CORPUS = '/corpus/c5'
+CORPUS = os.environ.get('SYNTH_CORPUS', '/corpus/c5')  # S19: SYNTH_CORPUS=/corpus/c6 (the 19 routes)
 # S17: a job's end: inputs in a row without new code (after the first kept), seconds (--deep: 4000 / 90)
 STALE, SECS = 600, 20
 

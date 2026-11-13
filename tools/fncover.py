@@ -14,8 +14,11 @@ import concurrent.futures, glob, gzip, json, os, subprocess, sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import mut_worker as mw  # noqa: E402
 
-GEN = '/build/gen'
-NATIVE = '/build/native/obj'
+# S19: FNCOVER_HAND=1 measures the hand build instead (/build/genhand + the hand-written objects of
+# /build/native-genhand): the translated functions it still runs, game and SDK
+HAND = os.environ.get('FNCOVER_HAND') == '1'
+GEN = '/build/genhand' if HAND else '/build/gen'
+NATIVE = '/build/native-genhand/obj' if HAND else '/build/native/obj'
 T = '/tmp/fncover'
 
 
@@ -39,7 +42,7 @@ def main():
         if any(ex.map(comp, srcs)):
             print('rt cover error: compile', flush=True)
             return 1
-    rt = sorted(glob.glob(NATIVE + '/rt_*.o'))
+    rt = sorted(glob.glob(NATIVE + '/rt_*.o')) + (sorted(glob.glob(NATIVE + '/hw_*.o')) if HAND else [])
     if sh(['gcc', '--coverage', '-o', T + '/penpen'] + sorted(glob.glob(T + '/obj/*.o')) + rt + ['-lm']).returncode:
         print('rt cover error: link', flush=True)
         return 1
@@ -51,6 +54,10 @@ def main():
         p = subprocess.run([T + '/penpen'] + mw.route_args(r, 0, None), stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
                            text=True, errors='replace', env=env)
         ok = ('boot stopped at frame %d: frame limit' % r['frames']) in p.stdout
+        # S19: the functions the interpreter was entered for (the fallback: code the translation does not hold)
+        for l in p.stdout.split('\n'):
+            if l.startswith('rt interp 8c') or l.startswith('rt calls '):
+                print('rt cover %s %s' % (r['name'], l[3:]), flush=True)
         return r['name'], ok
     with concurrent.futures.ThreadPoolExecutor(4) as ex:
         res = list(ex.map(run, routes))

@@ -39,6 +39,9 @@ void course_finish_position(gaddr course, int32_t i, gaddr out) {
   course_segment_position(course, i, course_at(course)->finish_segment, out);
 }
 HW_EXPORT(8c041f8c, course_finish_position(ARG0, (int32_t)ARG1, ARG2))
+/* S19: func_8C042000 is the second half of func_8C041F8C (Ghidra cut it after the njSin call): no call or pointer
+ * reaches it, only the return from njSin inside func_8C041F8C / its shared body (func_8C041F70 jumps to 8C041F9C) */
+HW_EXPORT_FRAGMENT(8c042000, 8c041f8c)
 
 /* was func_8C041F70: racer position i at the course's start segment into *out (S18 b04; it jumps into the shared
  * body, func_8C041F9C, with the start segment) */

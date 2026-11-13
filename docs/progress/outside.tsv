@@ -1,0 +1,29 @@
+# S19 (tools/outside_measure.py): the hand build's translated code by library (functions.tsv region), the translated functions the 19 routes run in the hand build (tools/s3.sh fncover, FNCOVER_HAND=1), and the hand-written ones outside the game region
+# library	translated_functions	translated_bytes	executed_functions	executed_bytes	hand_written_functions	hand_written_bytes
+game_unlisted	80	19642	26	9590	0	0
+Ninja	527	250140	49	8800	0	0
+shc_rt	104	15094	29	2120	6	946
+bu	84	12712	6	596	0	0
+sy	71	7274	7	394	0	0
+unknown	30	1260	4	362	0	0
+sy_start	6	182	4	170	0	0
+Kamui	69	13754	2	34	0	0
+shc_rt_unlisted	14	130	3	12	0	0
+bios_stub	20	226	1	10	0	0
+gdFs	80	6596	1	6	0	0
+pd	31	2946	1	6	0	0
+CRI_ADX	137	11400	0	0	0	0
+CRI_SFD	288	25462	0	0	0	0
+CRI_SFD_unlisted	1	4	0	0	0	0
+CRI_SJ	54	3016	0	0	0	0
+CRI_SJ_unlisted	1	14	0	0	0	0
+CRI_mw	185	16206	0	0	0	0
+CRI_mw_unlisted	2	356	0	0	0	0
+Kamui_unlisted	1	292	0	0	0	0
+Ninja_unlisted	33	17220	0	0	0	0
+bu_unlisted	2	596	0	0	0	0
+gdFs_unlisted	1	778	0	0	0	0
+kd	14	1006	0	0	0	0
+sd	84	7610	0	0	0	0
+sy_unlisted	8	784	0	0	0	0
+total	1927	414700	133	22100	6	946

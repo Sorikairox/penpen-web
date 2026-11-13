@@ -68,10 +68,7 @@ HW_EXPORT_RESUMABLE(8c01a120, game_start_mode_scene(0x8C01A120u, ARG0, 1, 0x1C4,
 /* S18 b01: was func_8C01A27C: mode 9, the staff roll (game/staff_roll_draw.c: staff_roll_construct) */
 HW_EXPORT_RESUMABLE(8c01a27c, game_start_mode_scene(0x8C01A27Cu, ARG0, 0, 0x90, 0x8C01E8DAu, 1, 0))
 /* S18 b01: was func_8C01A2AE: mode 11 (its scene's constructor func_8C021A10; the soft-reset flag left as it is) */
-/* not exported (S18): with it, the gallery route's whole run equals the pure one frame for frame, but the difftest
- * sample of gallery_update in the mode's first frame differs in a gdFsRead's sector count (a stack out-parameter of
- * the file load replayed at another depth): kept translated until that is understood */
-/* HW_EXPORT_RESUMABLE(8c01a2ae, game_start_mode_scene(0x8C01A2AEu, ARG0, -1, 0x60, 0x8C021A10u, 1, 0)) */
+HW_EXPORT_RESUMABLE(8c01a2ae, game_start_mode_scene(0x8C01A2AEu, ARG0, -1, 0x60, 0x8C021A10u, 1, 0))
 /* S18 b01: was func_8C01A2D8: mode 12 (its scene's constructor func_8C021E0A; the soft-reset flag left as it is) */
 HW_EXPORT_RESUMABLE(8c01a2d8, game_start_mode_scene(0x8C01A2D8u, ARG0, -1, 0x8C, 0x8C021E0Au, 1, 0))
 
