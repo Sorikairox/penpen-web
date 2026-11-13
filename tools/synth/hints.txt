@@ -2002,46 +2002,55 @@ for 8c01eac2
 # ---- S18 (the lead): the new exports, the never-executed ones (stack arguments `stk`, loaders `slow`, constructors
 # that pass frames `frames`) ----
 for 8c02af9c
+replace
 arg 0 [8c096230]
 # this = the RaceScene of a race (constructor func_8C0297AC); RaceScene.substate (0x34) 0-3 picks the step
 
 for 8c03a4c8
+replace
 # this = a fresh 0x24-byte block (EffectDrops); the constructor fills it and returns it
 pre 8c09f4d6 24 0 0 0
 arg 0 $0
 
 for 8c03a634
+replace
 # this = an EffectDrops built by its constructor func_8C03A4C8 on a fresh 0x24 block
 pre 8c09f4d6 24 0 0 0
 pre 8c03a4c8 $0 0 0 0
 arg 0 $1
 
 for 8c03a6b4
+replace
 # this = an EffectDrops (constructor func_8C03A4C8)
 pre 8c09f4d6 24 0 0 0
 pre 8c03a4c8 $0 0 0 0
 arg 0 $1
 
 for 8c03a75c
+replace
 # this = an EffectDrops (constructor func_8C03A4C8)
 pre 8c09f4d6 24 0 0 0
 pre 8c03a4c8 $0 0 0 0
 arg 0 $1
 
 for 8c03a7e4
+replace
 # this = an EffectDrops (constructor func_8C03A4C8); r5 = a RibbonFrame (0x98 bytes: f78 at 0x78 is the speed)
 pre 8c09f4d6 24 0 0 0
 pre 8c03a4c8 $0 0 0 0
 arg 0 $1
 
 for 8c03fbfe
+replace
 # r4 unused, r5 = a Vec3, r6 = the number (texanim cell number + 5)
 arg 2 0 1 2 3 4 5
 
 for 8c03fb62
+replace
 # this = a LaneRacer (computer player, syMalloc(0x6C0) + func_8C03DB9A): lane (0x62C) 0-3, branch (0x620) 0-1
 
 for 8c039b14
+replace
 # this = a RibbonSet (RacerEffects.ribbons, 0x58 bytes, ribbon_set_construct); r5 = a Vec3;
 # r6 = the side flag; fr4 = a height, fr5 = the heading (angle units and the runtime's float functions)
 arg 2 0 1
@@ -2049,73 +2058,87 @@ farg 0 0 1 3.5
 farg 1 0 1000 16384 -8192
 
 for 8c03adce
+replace
 # this = the trail pair (two NjModel pointers at 0x00, two Body chains of 16 at 0x08); r5 = a Matrix; fr4 a height
 farg 0 0 1 2.5
 
 for 8c02c1aa
+replace
 # this = the RaceScene of a mode-2 race (three players)
 
 for 8c02c1aa
+replace
 # this = the RaceScene (g_panel)
 arg 0 [8c096230]
 
 for 8c0215c4
+replace
 # a fresh 0x558-byte block: the TrapSet's body (loads OBJTRAP_A's container and textures)
 slow
 pre 8c09f4d6 558 0 0 0
 arg 0 $0
 for 8c021614
+replace
 slow
 pre 8c09f4d6 558 0 0 0
 arg 0 $0
 for 8c02162a
+replace
 # a TrapSet built by its constructor
 slow
 pre 8c09f4d6 558 0 0 0
 pre 8c021614 $0 0 0 0
 arg 0 $1
 for 8c021658
+replace
 slow
 pre 8c09f4d6 558 0 0 0
 pre 8c021614 $0 0 0 0
 arg 0 $1
 arg 1 0 1
 for 8c02167c
+replace
 slow
 pre 8c09f4d6 558 0 0 0
 pre 8c021614 $0 0 0 0
 arg 0 $1
 for 8c021718
+replace
 # a TrapSet built by its constructor: populate places its layout's objects
 slow
 pre 8c09f4d6 558 0 0 0
 pre 8c021614 $0 0 0 0
 arg 0 $1
 for 8c02176e
+replace
 slow
 pre 8c09f4d6 558 0 0 0
 pre 8c021614 $0 0 0 0
 pre 8c021718 $1 0 0 0
 arg 0 $1
 for 8c02168e
+replace
 slow
 pre 8c09f4d6 558 0 0 0
 pre 8c021614 $0 0 0 0
 pre 8c021718 $1 0 0 0
 arg 0 $1
 for 8c02189a
+replace
 slow
 pre 8c09f4d6 558 0 0 0
 pre 8c021614 $0 0 0 0
 pre 8c021718 $1 0 0 0
 arg 0 $1
 for 8c01f74c
+replace
 slow
 pre 8c09f4d6 558 0 0 0
 pre 8c021614 $0 0 0 0
 arg 0 $1
 arg 1 0 1 2
 for 8c01f780
+replace
 # the factory: a TrapSet as the group, r5 = a placement type
 slow
 pre 8c09f4d6 558 0 0 0
@@ -2124,17 +2147,20 @@ arg 0 $1
 arg 1 0 3 4 8 e 23 33 34 40
 
 for 8c0200e8
+replace
 # a CastScene built by its constructor (its body shows a loading screen: the prelude passes frames)
 frames
 pre 8c09f4d6 98 0 0 0
 pre 8c02004c $0 0 0 0
 arg 0 $1
 for 8c0213c8
+replace
 frames
 pre 8c09f4d6 98 0 0 0
 pre 8c02004c $0 0 0 0
 arg 0 $1
 for 8c01f752
+replace
 # the CastScene's RacerEffects (its word at 0x94); r5 a Vec3 (the scene's camera at 0x80), r6 0/1
 frames
 pre 8c09f4d6 98 0 0 0
@@ -2145,69 +2171,87 @@ arg 2 0 1
 farg 0 7.5
 farg 1 0 4096 -4096
 for 8c01fe58
+replace
 frames
 pre 8c09f4d6 98 0 0 0
 arg 0 $0
 for 8c02004c
+replace
 frames
 pre 8c09f4d6 98 0 0 0
 arg 0 $0
 
 for 8c0329ac
+replace
 # this = the race scene's player 0 (a Racer)
 arg 0 [[8c096230]+4c]
 for 8c032a3a
+replace
 # this = the race scene's player 0 (a Racer)
 arg 0 [[8c096230]+4c]
 for 8c033efe
+replace
 # this = the race scene's player 0 (a Racer)
 arg 0 [[8c096230]+4c]
 for 8c03481a
+replace
 # this = the race scene's player 0 (a Racer)
 arg 0 [[8c096230]+4c]
 for 8c0349e8
+replace
 # this = the race scene's player 0 (a Racer)
 arg 0 [[8c096230]+4c]
 for 8c034d96
+replace
 # this = the race scene's player 0 (a Racer)
 arg 0 [[8c096230]+4c]
 for 8c034eb4
+replace
 # this = the race scene's player 0 (a Racer)
 arg 0 [[8c096230]+4c]
 for 8c034ed6
+replace
 # this = the race scene's player 0 (a Racer)
 arg 0 [[8c096230]+4c]
 for 8c034ef8
+replace
 # this = the race scene's player 0 (a Racer)
 arg 0 [[8c096230]+4c]
 
 for 8c01f714
+replace
 # this = a MotionPlayer (the race scene's player 0: a Racer is one); r5 = a motion set
 arg 0 [[8c096230]+4c]
 arg 1 0 1 2 3 5 a 14
 for 8c029ed2
+replace
 # this = the race scene (g_panel); state 1 builds the race (files: slow)
 slow
 arg 0 [8c096230]
 for 8c041dd0
+replace
 # the race scene's Course; r5 = a cell index; r6 / r7 = two Vec3s (the scene's camera-free scratch: its bodies)
 arg 0 [[8c096230]+38]
 arg 1 0 1 2 5 a 20 40
 arg 2 [8c096230]+100
 arg 3 [8c096230]+120
 for 8c04469e
+replace
 # the race scene's ActorGroup
 arg 0 [[8c096230]+48]
 for 8c044766
+replace
 # the race scene's ActorGroup
 arg 0 [[8c096230]+48]
 
 for 8c044766
+replace
 # the race scene's ActorGroup (its actors re-attached: slow)
 slow
 arg 0 [[8c096230]+48]
 
 for 8c02fd06
+replace
 # an OwnerScene built by its constructor (0x10C bytes; r5 = the RaceSetup: the game root's child in a mode-7 base);
 # the construction loads files and passes frames
 frames
@@ -2215,12 +2259,14 @@ pre 8c09f4d6 10c 0 0 0
 pre 8c02fc12 $0 [8ce16b34] 0 0
 arg 0 $1
 for 8c030244
+replace
 frames
 pre 8c09f4d6 10c 0 0 0
 pre 8c02fc12 $0 [8ce16b34] 0 0
 arg 0 $1
 
 for 8c030ede
+replace
 # a plain racer on a fresh 0x5A8 block: (racer, index, b, character r7, fr4, costume @r15); its model loads (slow)
 slow
 pre 8c09f4d6 5a8 0 0 0
@@ -2230,6 +2276,7 @@ arg 3 0 1 2 3 4 5 6 7
 farg 0 0
 stk 0 0 1 2
 for 8c0377e8
+replace
 # the replay racer's construction on a fresh block: (racer, scene, index, b, character @r15, costume @(4,r15), fr4)
 slow
 pre 8c09f4d6 5a8 0 0 0
@@ -2240,6 +2287,7 @@ stk 0 0 1 2 3 4 5 6 7
 stk 1 0 1 2
 farg 0 0
 for 8c037816
+replace
 slow
 pre 8c09f4d6 5a8 0 0 0
 arg 0 $0
@@ -2252,153 +2300,218 @@ farg 0 0
 
 # S18 (end): diverse runs for functions with many open mutants
 for 8c025cec
+replace
 diverse 8
 for 8c0265ec
+replace
 diverse 8
 for 8c01b23c
+replace
 diverse 8
 for 8c056cac
+replace
 diverse 8
 for 8c057ed2
+replace
 diverse 8
 for 8c04b5ac
+replace
 diverse 8
 for 8c04a1b2
+replace
 diverse 8
 for 8c048018
+replace
 diverse 8
 for 8c03fc68
+replace
 diverse 8
 for 8c059d46
+replace
 diverse 8
 for 8c0512a4
+replace
 diverse 8
 for 8c05c81e
+replace
 diverse 8
 for 8c01630e
+replace
 diverse 8
 for 8c0250e4
+replace
 diverse 8
 for 8c05ad58
+replace
 diverse 8
 for 8c05d074
+replace
 pre 8c043d4c 0 30 0 0
 arg 0 $0
 diverse 8
 for 8c02d150
+replace
 diverse 8
 for 8c057af2
+replace
 diverse 8
 for 8c02dc26
+replace
 diverse 8
 for 8c01aa58
+replace
 diverse 8
 for 8c032abc
+replace
 # the race scene's player 0 (a Racer) past the finish line
 arg 0 [[8c096230]+4c]
 for 8c010184
+replace
 diverse 6
 for 8c01022c
+replace
 diverse 6
 for 8c011b1a
+replace
 diverse 6
 for 8c012362
+replace
 diverse 6
 for 8c0123b2
+replace
 diverse 6
 for 8c012568
+replace
 diverse 6
 for 8c012678
+replace
 diverse 6
 for 8c012960
+replace
 diverse 6
 for 8c012acc
+replace
 diverse 6
 for 8c01431e
+replace
 diverse 6
 for 8c0144f2
+replace
 diverse 6
 for 8c0146f8
+replace
 diverse 6
 for 8c0148c4
+replace
 diverse 6
 for 8c014980
+replace
 diverse 6
 for 8c014a94
+replace
 diverse 6
 for 8c014e20
+replace
 diverse 6
 for 8c0158ca
+replace
 arg 0 0 40 200
 arg 1 0 60 100
 arg 2 0 7 10 42 99 ffffffff
 arg 3 10 20 32 33 48 64
 diverse 6
 for 8c015b52
+replace
 diverse 6
 for 8c016792
+replace
 diverse 6
 for 8c016bec
+replace
 diverse 6
 for 8c016d60
+replace
 diverse 6
 for 8c016e98
+replace
 diverse 6
 for 8c016f20
+replace
 diverse 6
 for 8c016fd4
+replace
 diverse 6
 for 8c017054
+replace
 diverse 6
 for 8c0170f8
+replace
 diverse 6
 for 8c01711c
+replace
 diverse 6
 for 8c01723e
+replace
 arg 0 0 1
 diverse 6
 for 8c0173e8
+replace
 arg 0 0 1 2 3 4
 diverse 6
 for 8c017ac8
+replace
 arg 0 0 1 2 3 4
 diverse 6
 for 8c017d40
+replace
 arg 0 0 1 2 3 4
 diverse 6
 for 8c018010
+replace
 arg 0 0 1 2 3 4
 diverse 6
 for 8c0182d4
+replace
 arg 0 0 1 2 3 4
 diverse 6
 for 8c01859c
+replace
 arg 0 0 1 2 3
 diverse 6
 for 8c018774
+replace
 arg 0 0 1 2 3
 diverse 6
 for 8c018f7c
+replace
 diverse 6
 for 8c019bb4
+replace
 arg 0 0 1 2 3 4 5 6 7
 diverse 6
 for 8c01a120
+replace
 diverse 6
 for 8c01a27c
+replace
 diverse 6
 for 8c01a2d8
+replace
 diverse 6
 for 8c01dbd2
+replace
 diverse 6
 for 8c01e1a8
+replace
 farg 0 0 1 -2.5
 farg 1 0 3
 farg 2 0 -1
 diverse 6
 for 8c01e266
+replace
 diverse 6
 for 8c01e364
+replace
 pre 8c09f4d6 1c0 0 0 0
 arg 0 $0
 arg 1 0 1 2 3 4 5 6 7
@@ -2406,22 +2519,30 @@ arg 2 0 1
 arg 3 0
 diverse 6
 for 8c01e50c
+replace
 pre 8c09f4d6 90 0 0 0
 arg 0 $0
 diverse 6
 for 8c01e8da
+replace
 diverse 6
 for 8c01eac2
+replace
 diverse 6
 for 8c01efde
+replace
 diverse 6
 for 8c01f1f0
+replace
 diverse 6
 for 8c01f3ea
+replace
 diverse 6
 for 8c01f6ac
+replace
 diverse 6
 for 8c01f74c
+replace
 slow
 pre 8c09f4d6 558 0 0 0
 pre 8c021614 $0 0 0 0
@@ -2429,6 +2550,7 @@ arg 0 $1
 arg 1 0 1 2
 diverse 6
 for 8c01f752
+replace
 frames
 pre 8c09f4d6 98 0 0 0
 pre 8c02004c $0 0 0 0
@@ -2439,6 +2561,7 @@ farg 0 7.5
 farg 1 0 4096 -4096
 diverse 6
 for 8c01f780
+replace
 slow
 pre 8c09f4d6 558 0 0 0
 pre 8c021614 $0 0 0 0
@@ -2446,28 +2569,33 @@ arg 0 $1
 arg 1 0 3 4 8 e 23 33 34 40
 diverse 6
 for 8c01fe58
+replace
 frames
 pre 8c09f4d6 98 0 0 0
 arg 0 $0
 diverse 6
 for 8c02004c
+replace
 frames
 pre 8c09f4d6 98 0 0 0
 arg 0 $0
 diverse 6
 for 8c0200e8
+replace
 frames
 pre 8c09f4d6 98 0 0 0
 pre 8c02004c $0 0 0 0
 arg 0 $1
 diverse 6
 for 8c0213c8
+replace
 frames
 pre 8c09f4d6 98 0 0 0
 pre 8c02004c $0 0 0 0
 arg 0 $1
 diverse 6
 for 8c02168e
+replace
 slow
 pre 8c09f4d6 558 0 0 0
 pre 8c021614 $0 0 0 0
@@ -2475,12 +2603,14 @@ pre 8c021718 $1 0 0 0
 arg 0 $1
 diverse 6
 for 8c021718
+replace
 slow
 pre 8c09f4d6 558 0 0 0
 pre 8c021614 $0 0 0 0
 arg 0 $1
 diverse 6
 for 8c02176e
+replace
 slow
 pre 8c09f4d6 558 0 0 0
 pre 8c021614 $0 0 0 0
@@ -2488,9 +2618,11 @@ pre 8c021718 $1 0 0 0
 arg 0 $1
 diverse 6
 for 8c0217ec
+replace
 arg 3 0 1 2 3
 diverse 6
 for 8c02189a
+replace
 slow
 pre 8c09f4d6 558 0 0 0
 pre 8c021614 $0 0 0 0
@@ -2498,272 +2630,379 @@ pre 8c021718 $1 0 0 0
 arg 0 $1
 diverse 6
 for 8c02219e
+replace
 arg 1 0 1
 arg 2 1 2 3 4 5 6 7
 diverse 6
 for 8c02232c
+replace
 arg 1 0 1
 arg 2 8 1 7
 diverse 6
 for 8c02af9c
+replace
 arg 0 [8c096230]
 diverse 6
 for 8c02c1aa
+replace
 arg 0 [8c096230]
 diverse 6
 for 8c02e4e8
+replace
 diverse 6
 for 8c02fc12
+replace
 diverse 6
 for 8c032abc
+replace
 arg 0 [[8c096230]+4c]
 diverse 6
 for 8c034a44
+replace
 diverse 6
 for 8c039b14
+replace
 arg 2 0 1
 farg 0 0 1 3.5
 farg 1 0 1000 16384 -8192
 diverse 6
 for 8c03a252
+replace
 arg 2 0 10 64
 farg 0 1 2.5 5
 farg 1 0 0.5 1 3
 farg 2 0 16384 49152
 diverse 6
 for 8c03a4c8
+replace
 pre 8c09f4d6 24 0 0 0
 arg 0 $0
 diverse 6
 for 8c03a634
+replace
 pre 8c09f4d6 24 0 0 0
 pre 8c03a4c8 $0 0 0 0
 arg 0 $1
 diverse 6
 for 8c03a6b4
+replace
 pre 8c09f4d6 24 0 0 0
 pre 8c03a4c8 $0 0 0 0
 arg 0 $1
 diverse 6
 for 8c03a75c
+replace
 pre 8c09f4d6 24 0 0 0
 pre 8c03a4c8 $0 0 0 0
 arg 0 $1
 diverse 6
 for 8c03a7e4
+replace
 pre 8c09f4d6 24 0 0 0
 pre 8c03a4c8 $0 0 0 0
 arg 0 $1
 diverse 6
 for 8c03adce
+replace
 farg 0 0 1 2.5
 diverse 6
 for 8c03c99c
+replace
 diverse 6
 for 8c03d2c4
+replace
 diverse 6
 for 8c03f470
+replace
 diverse 6
 for 8c03fb62
+replace
 diverse 6
 for 8c03fbfe
+replace
 arg 2 0 1 2 3 4 5
 diverse 6
 for 8c0419b2
+replace
 diverse 6
 for 8c0419da
+replace
 arg 2 0 1 2 10 40
 diverse 6
 for 8c041f70
+replace
 arg 1 0 1 2 3 7
 diverse 6
 for 8c042d04
+replace
 farg 0 -1 0 0.5 1
 diverse 6
 for 8c0455b0
+replace
 arg 1 0 1
 diverse 6
 for 8c045e20
+replace
 diverse 6
 for 8c046ba4
+replace
 arg 1 ffffffff 0 1 2 3
 diverse 6
 for 8c0482a0
+replace
 diverse 6
 for 8c048de6
+replace
 diverse 6
 for 8c0493dc
+replace
 diverse 6
 for 8c04a8fc
+replace
 diverse 6
 for 8c04aa28
+replace
 arg 1 0 1
 diverse 6
 for 8c04ac6a
+replace
 farg 0 1 0.5
 farg 3 1 0.25
 diverse 6
 for 8c04b0c8
+replace
 diverse 6
 for 8c04b0e2
+replace
 diverse 6
 for 8c04b106
+replace
 diverse 6
 for 8c04b45c
+replace
 diverse 6
 for 8c04b53c
+replace
 diverse 6
 for 8c04b6bc
+replace
 diverse 6
 for 8c04b78c
+replace
 farg 0 0 16384
 diverse 6
 for 8c04be38
+replace
 diverse 6
 for 8c04c02a
+replace
 diverse 6
 for 8c04d468
+replace
 arg 1 0 1
 diverse 6
 for 8c04dd94
+replace
 arg 1 0 1
 arg 3 0
 diverse 6
 for 8c04e5b0
+replace
 diverse 6
 for 8c04e8cc
+replace
 diverse 6
 for 8c04f3a2
+replace
 diverse 6
 for 8c04f498
+replace
 arg 2 0 1
 farg 0 0 16384 -16384 40000
 diverse 6
 for 8c04f5b4
+replace
 farg 0 0 16384 -16384 40000
 diverse 6
 for 8c050bae
+replace
 diverse 6
 for 8c05106c
+replace
 diverse 6
 for 8c051548
+replace
 diverse 6
 for 8c052d20
+replace
 arg 1 0 1
 arg 3 0
 diverse 6
 for 8c053a1c
+replace
 arg 1 0 1
 diverse 6
 for 8c053ec8
+replace
 diverse 6
 for 8c054034
+replace
 diverse 6
 for 8c054976
+replace
 diverse 6
 for 8c054b0a
+replace
 diverse 6
 for 8c054ea0
+replace
 diverse 6
 for 8c055d78
+replace
 arg 1 0 1
 diverse 6
 for 8c056488
+replace
 diverse 6
 for 8c057160
+replace
 diverse 6
 for 8c0587b8
+replace
 diverse 6
 for 8c058f18
+replace
 diverse 6
 for 8c058f84
+replace
 diverse 6
 for 8c0590f4
+replace
 diverse 6
 for 8c059192
+replace
 diverse 6
 for 8c05929c
+replace
 diverse 6
 for 8c059780
+replace
 diverse 6
 for 8c05a148
+replace
 diverse 6
 for 8c05a27c
+replace
 diverse 6
 for 8c05a428
+replace
 diverse 6
 for 8c05a498
+replace
 diverse 6
 for 8c05a4cc
+replace
 diverse 6
 for 8c05c26a
+replace
 diverse 6
 for 8c05caa8
+replace
 arg 1 0 1
 diverse 6
 for 8c05d268
+replace
 diverse 6
 for 8c05d520
+replace
 diverse 6
 for 8c05dd40
+replace
 diverse 6
 for 8c05e098
+replace
 diverse 6
 for 8c05e1fe
+replace
 arg 1 0 1 2 3 4
 diverse 6
 for 8c05e440
+replace
 diverse 6
 for 8c05e5ec
+replace
 diverse 6
 for 8c05f0c8
+replace
 diverse 6
 for 8c05f550
+replace
 diverse 6
 for 8c05f91c
+replace
 diverse 6
 for 8c05fa30
+replace
 arg 1 0 5 7 8 9 10 15 23
 diverse 6
 for 8c060706
+replace
 diverse 6
 for 8c030f00
+replace
 diverse 8
 for 8c0537e4
+replace
 diverse 8
 for 8c056304
+replace
 diverse 8
 for 8c047006
+replace
 diverse 8
 for 8c045b36
+replace
 diverse 8
 for 8c02478c
+replace
 diverse 8
 for 8c029efa
+replace
 diverse 8
 for 8c05bb14
+replace
 pre 8c043d4c 0 15 0 0
 arg 0 $0
 diverse 8
 for 8c05a834
+replace
 diverse 8
 for 8c03a144
+replace
 diverse 8
 for 8c01bef8
+replace
 diverse 8
 for 8c04b302
+replace
 diverse 8
 for 8c04530a
+replace
 diverse 8
 for 8c05235a
+replace
 diverse 8
 for 8c039f6e
+replace
 diverse 8
 for 8c033104
+replace
 diverse 8
 for 8c04891e
+replace
 diverse 8
 for 8c0615f8
+replace
 pre 8c09f4d6 1d0
 pre 8c0603b6 $0
 arg 0 $1+138
@@ -2771,38 +3010,53 @@ arg 1 0 1
 arg 2 $1+f4
 diverse 8
 for 8c048222
+replace
 diverse 8
 for 8c039602
+replace
 diverse 8
 for 8c03b488
+replace
 diverse 8
 for 8c01def8
+replace
 diverse 8
 for 8c03ed24
+replace
 diverse 8
 for 8c02bc3e
+replace
 diverse 8
 for 8c0293f0
+replace
 diverse 8
 for 8c030bf4
+replace
 diverse 8
 for 8c03c804
+replace
 diverse 8
 for 8c01927e
+replace
 diverse 8
 for 8c0473c2
+replace
 diverse 8
 for 8c053126
+replace
 diverse 8
 for 8c04ca86
+replace
 pre 8c043d4c 0 8 0 0
 arg 0 $0+3c
 diverse 8
 for 8c04f0e0
+replace
 pre 8c043d4c 0 28 0 0
 arg 0 $0
 diverse 8
 for 8c061344
+replace
 pre 8c09f4d6 1d0
 pre 8c0603b6 $0
 pre 8c060e7a $1
@@ -2810,60 +3064,80 @@ pre 8c06155c $1 3
 arg 0 $1
 diverse 8
 for 8c045514
+replace
 diverse 8
 for 8c042e28
+replace
 diverse 8
 for 8c03b194
+replace
 diverse 8
 for 8c023d16
+replace
 diverse 8
 for 8c02ce48
+replace
 diverse 8
 for 8c011a44
+replace
 arg 1 0
 farg 0 0 -1
 diverse 8
 for 8c0553b8
+replace
 diverse 8
 for 8c046374
+replace
 diverse 8
 for 8c052a50
+replace
 pre 8c043d4c 0 b 0 0
 arg 0 $0
 diverse 8
 for 8c05293c
+replace
 pre 8c09f4d6 13c 0 0 0
 arg 0 $0
 diverse 8
 for 8c060284
+replace
 pre 8c043d4c 0 32 0 0
 arg 0 $0
 diverse 8
 for 8c05f4ec
+replace
 pre 8c043d4c 0 31 0 0
 arg 0 $0
 diverse 8
 for 8c05fc78
+replace
 pre 8c043d4c 0 31 0 0
 arg 0 $0
 diverse 8
 for 8c043ab8
+replace
 diverse 8
 for 8c022d80
+replace
 diverse 8
 for 8c037d24
+replace
 diverse 8
 for 8c035fa2
+replace
 diverse 8
 for 8c04764e
+replace
 pre 8c043d4c 0 e 0 0
 arg 0 $0
 diverse 8
 for 8c052668
+replace
 pre 8c043d4c 0 24 0 0
 arg 0 $0
 diverse 8
 for 8c060f48
+replace
 pre 8c09f4d6 1d0
 pre 8c0603b6 $0
 pre 8c060e7a $1
@@ -2874,30 +3148,42 @@ pre 8c06155c $1 ffffffff
 arg 0 $1
 diverse 8
 for 8c041b34
+replace
 diverse 8
 for 8c027234
+replace
 diverse 8
 for 8c02b9e8
+replace
 diverse 8
 for 8c02cb28
+replace
 arg 1 0
 diverse 8
 for 8c033a88
+replace
 diverse 8
 for 8c0351c8
+replace
 diverse 8
 for 8c013696
+replace
 arg 2 0 1 2
 diverse 8
 for 8c061fa4
+replace
 diverse 8
 for 8c05049c
+replace
 diverse 8
 for 8c05205c
+replace
 diverse 8
 for 8c04af40
+replace
 diverse 8
 for 8c06155c
+replace
 pre 8c09f4d6 1d0
 pre 8c0603b6 $0
 pre 8c060e7a $1
@@ -2905,237 +3191,897 @@ arg 0 $1
 arg 1 0 1 5 14 ffffffff
 diverse 8
 for 8c055864
+replace
 pre 8c043d4c 0 a 0 0
 arg 0 $0
 diverse 8
 for 8c05e842
+replace
 pre 8c043d4c 0 30 0 0
 arg 0 $0
 diverse 8
 for 8c03fa44
+replace
 diverse 8
 for 8c0433d6
+replace
 diverse 8
 for 8c019e8c
+replace
 diverse 8
 for 8c0373b8
+replace
 diverse 8
 for 8c02df96
+replace
 diverse 8
 for 8c03207c
+replace
 diverse 8
 for 8c01b858
+replace
 diverse 8
 for 8c0485d0
+replace
 diverse 8
 for 8c04fe68
+replace
 diverse 8
 for 8c04dd36
+replace
 pre 8c043d4c 0 1e 0 0
 arg 0 $0
 diverse 8
 for 8c04b118
+replace
 diverse 8
 for 8c0468c4
+replace
 diverse 8
 for 8c049b86
+replace
 diverse 8
 for 8c04381a
+replace
 diverse 8
 for 8c0409b8
+replace
 diverse 8
 for 8c042a60
+replace
 diverse 8
 for 8c03c198
+replace
 diverse 8
 for 8c0233ea
+replace
 diverse 8
 for 8c028882
+replace
 diverse 8
 for 8c0381c4
+replace
 diverse 8
 for 8c030138
+replace
 diverse 8
 for 8c02fc28
+replace
 diverse 8
 for 8c02c922
+replace
 arg 2 0
 arg 3 0
 diverse 8
 for 8c0317d4
+replace
 diverse 8
 for 8c0554ae
+replace
 pre 8c043d4c 0 29 0 0
 arg 0 $0
 diverse 8
 for 8c01e970
+replace
 diverse 8
 for 8c01509a
+replace
 arg 1 0 1
 arg 2 0 4000
 arg 3 0 1
 diverse 8
 for 8c011afc
+replace
 diverse 8
 for 8c05ab00
+replace
 diverse 8
 for 8c04c46e
+replace
 pre 8c043d4c 0 7 0 0
 arg 0 $0
 diverse 8
 for 8c048ce8
+replace
 pre 8c043d4c 0 2f 0 0
 arg 0 $0
 diverse 8
 for 8c0413cc
+replace
 diverse 8
 for 8c01dd7a
+replace
 diverse 8
 for 8c02368e
+replace
 diverse 8
 for 8c03f9ce
+replace
 diverse 8
 for 8c0270d2
+replace
 diverse 8
 for 8c0175ac
+replace
 diverse 8
 for 8c017848
+replace
 diverse 8
 for 8c02baee
+replace
 diverse 8
 for 8c02f076
+replace
 arg 1 0 1 2 3
 arg 2 0 1 2 3
 diverse 8
 for 8c035014
+replace
 arg 0 [[8c096230]+4c] [[8c096230]+50] [[8c096230]+54] [[8c096230]+58]
 diverse 8
 for 8c037878
+replace
 diverse 8
 for 8c019544
+replace
 diverse 8
 for 8c01937e
+replace
 diverse 8
 for 8c01c668
+replace
 diverse 8
 for 8c013e1c
+replace
 diverse 8
 for 8c01370e
+replace
 arg 2 0 1 2
 diverse 8
 for 8c013856
+replace
 arg 2 0 1 2
 arg 3 1 2 4
 diverse 8
 for 8c0137d0
+replace
 arg 2 0 1 2
 diverse 8
 for 8c061df0
+replace
 diverse 8
 for 8c062106
+replace
 diverse 8
 for 8c050a74
+replace
 diverse 8
 for 8c051ea4
+replace
 diverse 8
 for 8c059cac
+replace
 diverse 8
 for 8c04cf08
+replace
 pre 8c043d4c 0 9 0 0
 arg 0 $0
 diverse 8
 for 8c04f198
+replace
 pre 8c043d4c 0 28 0 0
 arg 0 $0
 diverse 8
 for 8c04913a
+replace
 pre 8c043d4c 0 2f 0 0
 arg 0 $0
 diverse 8
 for 8c05e7bc
+replace
 pre 8c043d4c 0 30 0 0
 arg 0 $0
 diverse 8
 for 8c020062
+replace
 diverse 8
 for 8c0427dc
+replace
 diverse 8
 for 8c03945c
+replace
 diverse 8
 for 8c03b6f2
+replace
 diverse 8
 for 8c03de18
+replace
 diverse 8
 for 8c0167f8
+replace
 diverse 8
 for 8c037cd6
+replace
 diverse 8
 for 8c02b80a
+replace
 diverse 8
 for 8c02bbca
+replace
 diverse 8
 for 8c02d4f0
+replace
 diverse 8
 for 8c02f2c4
+replace
 diverse 8
 for 8c02c888
+replace
 arg 1 0 1 2 3
 diverse 8
 for 8c02edaa
+replace
 arg 1 0 1 2 3 4
 arg 2 0 1 2 3
 arg 3 0 1 5
 diverse 8
 for 8c02ee6a
+replace
 arg 1 0 1 2 3 4
 arg 2 0 1 2 3
 diverse 8
 for 8c02efec
+replace
 arg 1 0 1 2 3
 arg 2 0 1 2 3
 arg 3 0 1 5
 diverse 8
 for 8c034f1e
+replace
 arg 0 [[8c096230]+4c] [[8c096230]+50] [[8c096230]+54] [[8c096230]+58]
 diverse 8
 for 8c0314b4
+replace
 diverse 8
 for 8c03cd4c
+replace
 diverse 8
 for 8c03c69e
+replace
 diverse 8
 for 8c01950a
+replace
 diverse 8
 for 8c019850
+replace
 arg 0 0 1 2 3 4 5 6 7
 diverse 8
 for 8c03d65a
+replace
 diverse 8
 for 8c0146bc
+replace
 diverse 8
 for 8c011a94
+replace
 diverse 8
 for 8c013188
+replace
 diverse 8
 for 8c0139d6
+replace
 arg 3 0 1 2
 diverse 8
 for 8c013790
+replace
 arg 2 0 1 2
 arg 3 1 2 4
 diverse 8
 for 8c01398c
+replace
 arg 2 1 2 4
 diverse 8
 for 8c02278c
+replace
 diverse 8
 for 8c061e80
+replace
 pre 8c061fa4 5e7b6a00 8cfff010 0 0
 pre 8c061fa4 3b9aca00 8cfff020 0 0
 arg 0 8cfff010 8cfff020
 nopoke
 diverse 8
 for 8c0159ea
+replace
 arg 0 0 40 100
 arg 1 0 40 100
+diverse 8
+for 8c0623b4
+replace
+diverse 8
+for 8c0171d0
+replace
+diverse 8
+for 8c010e18
+replace
+diverse 8
+for 8c043a90
+replace
+diverse 8
+for 8c0479ec
+replace
+diverse 8
+for 8c046564
+replace
+diverse 8
+for 8c052fce
+replace
+diverse 8
+for 8c0584d4
+replace
+diverse 8
+for 8c055c20
+replace
+diverse 8
+for 8c056086
+replace
+diverse 8
+for 8c048500
+replace
+diverse 8
+for 8c049640
+replace
+diverse 8
+for 8c04c2cc
+replace
+diverse 8
+for 8c04cc5e
+replace
+pre 8c043d4c 0 8 0 0
+arg 0 $0
+diverse 8
+for 8c05b230
+replace
+diverse 8
+for 8c0460a6
+replace
+diverse 8
+for 8c05bf54
+replace
+diverse 8
+for 8c044c60
+replace
+pre 8c043d4c 0 0 0 0
+arg 0 $0
+diverse 8
+for 8c04cfdc
+replace
+pre 8c043d4c 0 9 0 0
+arg 0 $0
+diverse 8
+for 8c04cd5a
+replace
+diverse 8
+for 8c045fee
+replace
+diverse 8
+for 8c05c670
+replace
+diverse 8
+for 8c05900e
+replace
+pre 8c043d4c 0 26 0 0
+arg 0 $0
+diverse 8
+for 8c05485c
+replace
+pre 8c09f4d6 13c 0 0 0
+arg 0 $0
+diverse 8
+for 8c058b84
+replace
+pre 8c09f4d6 11c 0 0 0
+arg 0 $0
+diverse 8
+for 8c042fbe
+replace
+diverse 8
+for 8c019b30
+replace
+arg 0 0 1 2 3 4 5 6 7
+diverse 8
+for 8c041bd2
+replace
+diverse 8
+for 8c04391e
+replace
+diverse 8
+for 8c041356
+replace
+diverse 8
+for 8c042952
+replace
+diverse 8
+for 8c042d7e
+replace
+diverse 8
+for 8c0397a8
+replace
+diverse 8
+for 8c01de32
+replace
+diverse 8
+for 8c027c58
+replace
+diverse 8
+for 8c038788
+replace
+diverse 8
+for 8c01d23c
+replace
+diverse 8
+for 8c02ba96
+replace
+diverse 8
+for 8c02cc3e
+replace
+diverse 8
+for 8c02e6f2
+replace
+diverse 8
+for 8c02ec54
+replace
+diverse 8
+for 8c01a950
+replace
+diverse 8
+for 8c02ea0c
+replace
+diverse 8
+for 8c02daf0
+replace
+diverse 8
+for 8c02f2a2
+replace
+arg 1 0 1 2 3 4
+arg 2 0 1
+diverse 8
+for 8c02f1e8
+replace
+arg 1 0 1 2 3 4
+arg 2 0 1
+diverse 8
+for 8c033992
+replace
+diverse 8
+for 8c033810
+replace
+arg 0 [[8c096230]+4c] [[8c096230]+50] [[8c096230]+54] [[8c096230]+58]
+diverse 8
+for 8c0304f2
+replace
+diverse 8
+for 8c033f0c
+replace
+diverse 8
+for 8c019358
+replace
+diverse 8
+for 8c041848
+replace
+arg 1 0 1 2 8 20 40 64
+diverse 8
+for 8c01e48c
+replace
+diverse 8
+for 8c016b7a
+replace
+arg 0 0 20
+arg 1 0 20
+diverse 8
+for 8c012d1c
+replace
+diverse 8
+for 8c012d72
+replace
+diverse 8
+for 8c012d88
+replace
+arg 0 f
+diverse 8
+for 8c012e40
+replace
+diverse 8
+for 8c012ebe
+replace
+diverse 8
+for 8c013746
+replace
+arg 2 1 2 4
+diverse 8
+for 8c013b82
+replace
+diverse 8
+for 8c013ba2
+replace
+diverse 8
+for 8c061db8
+replace
+diverse 8
+for 8c0622f4
+replace
+diverse 8
+for 8c061ede
+replace
+pre 8c09f4d6 10
+pre 8c061e1a $0
+pre 8c09f4d6 10
+pre 8c061fa4 5cb417d1 $2
+arg 0 $0 $2
+arg 1 $2 $0
+hw
+diverse 8
+for 8c0128c0
+replace
+diverse 8
+for 8c010306
+replace
+diverse 8
+for 8c010442
+replace
+diverse 8
+for 8c0623ee
+replace
+diverse 8
+for 8c010e10
+replace
+diverse 8
+for 8c044600
+replace
+diverse 8
+for 8c0446b0
+replace
+diverse 8
+for 8c04b4de
+replace
+diverse 8
+for 8c04c780
+replace
+diverse 8
+for 8c04fa18
+replace
+diverse 8
+for 8c04d81a
+replace
+diverse 8
+for 8c04d23c
+replace
+pre 8c043d4c 0 2e 0 0
+arg 0 $0
+diverse 8
+for 8c04d250
+replace
+pre 8c043d4c 0 2e 0 0
+arg 0 $0
+arg 1 0 1
+diverse 8
+for 8c04d274
+replace
+pre 8c043d4c 0 2e 0 0
+arg 0 $0
+diverse 8
+for 8c04d940
+replace
+pre 8c043d4c 0 1e 0 0
+arg 0 $0
+diverse 8
+for 8c0585c0
+replace
+diverse 8
+for 8c0586de
+replace
+diverse 8
+for 8c044b40
+replace
+diverse 8
+for 8c049d06
+replace
+diverse 8
+for 8c045074
+replace
+diverse 8
+for 8c0459a8
+replace
+diverse 8
+for 8c0479b0
+replace
+diverse 8
+for 8c047b88
+replace
+diverse 8
+for 8c048456
+replace
+diverse 8
+for 8c048882
+replace
+diverse 8
+for 8c05b9c0
+replace
+diverse 8
+for 8c04bad8
+replace
+diverse 8
+for 8c04cdf0
+replace
+pre 8c043d4c 0 9 0 0
+arg 0 $0
+diverse 8
+for 8c0529ce
+replace
+pre 8c043d4c 0 b 0 0
+arg 0 $0
+diverse 8
+for 8c04f29c
+replace
+pre 8c043d4c 0 28 0 0
+arg 0 $0
+diverse 8
+for 8c04e3b4
+replace
+diverse 8
+for 8c0459ba
+replace
+diverse 8
+for 8c0619dc
+replace
+diverse 8
+for 8c05570e
+replace
+pre 8c043d4c 0 a 0 0
+arg 0 $0
+diverse 8
+for 8c047f02
+replace
+diverse 8
+for 8c04094e
+replace
+diverse 8
+for 8c0200a6
+replace
+arg 1 0 1
+diverse 8
+for 8c041d42
+replace
+diverse 8
+for 8c04207e
+replace
+diverse 8
+for 8c04309e
+replace
+diverse 8
+for 8c041880
+replace
+diverse 8
+for 8c041a7c
+replace
+diverse 8
+for 8c038d94
+replace
+diverse 8
+for 8c03c0bc
+replace
+diverse 8
+for 8c038cea
+replace
+diverse 8
+for 8c03be38
+replace
+diverse 8
+for 8c01d58c
+replace
+diverse 8
+for 8c01dbb8
+replace
+diverse 8
+for 8c0244de
+replace
+diverse 8
+for 8c023bee
+replace
+diverse 8
+for 8c02386c
+replace
+diverse 8
+for 8c01a448
+replace
+diverse 8
+for 8c01a386
+replace
+diverse 8
+for 8c0164ec
+replace
+diverse 8
+for 8c0166d8
+replace
+diverse 8
+for 8c016510
+replace
+diverse 8
+for 8c022c2c
+replace
+diverse 8
+for 8c0285ca
+replace
+diverse 8
+for 8c027ef0
+replace
+diverse 8
+for 8c037f74
+replace
+diverse 8
+for 8c037f86
+replace
+diverse 8
+for 8c02db94
+replace
+diverse 8
+for 8c02de52
+replace
+arg 1 0 1 2 3
+diverse 8
+for 8c02ef04
+replace
+diverse 8
+for 8c02d904
+replace
+diverse 8
+for 8c02da24
+replace
+diverse 8
+for 8c02eaf2
+replace
+diverse 8
+for 8c02eb94
+replace
+diverse 8
+for 8c02ed1a
+replace
+diverse 8
+for 8c02ed6c
+replace
+diverse 8
+for 8c02e7c6
+replace
+diverse 8
+for 8c037b1e
+replace
+diverse 8
+for 8c036fac
+replace
+diverse 8
+for 8c031690
+replace
+diverse 8
+for 8c0336bc
+replace
+diverse 8
+for 8c033004
+replace
+diverse 8
+for 8c033e6c
+replace
+diverse 8
+for 8c0345a8
+replace
+arg 0 [[8c096230]+4c] [[8c096230]+50] [[8c096230]+54] [[8c096230]+58]
+diverse 8
+for 8c03138e
+replace
+farg 0 0 16384 32768
+arg 0 [[8c096230]+4c] [[8c096230]+50] [[8c096230]+54] [[8c096230]+58]
+diverse 8
+for 8c0375c2
+replace
+diverse 8
+for 8c037866
+replace
+diverse 8
+for 8c0375b0
+replace
+diverse 8
+for 8c037842
+replace
+diverse 8
+for 8c0193be
+replace
+diverse 8
+for 8c018dd0
+replace
+diverse 8
+for 8c0196c8
+replace
+diverse 8
+for 8c0197c4
+replace
+arg 0 0 1 7 8 13 20 31 40 47
+diverse 8
+for 8c01944a
+replace
+arg 0 ffffffff 0 1 2
+arg 1 0 1 2 3
+arg 2 0 1 2 3 4
+diverse 8
+for 8c055198
+replace
+pre 8c043d4c 0 29 0 0
+arg 0 $0
+arg 1 0 1
+diverse 8
+for 8c055afe
+replace
+pre 8c043d4c 0 17 0 0
+arg 0 $0
+diverse 8
+for 8c055b36
+replace
+pre 8c043d4c 0 17 0 0
+arg 0 $0
+diverse 8
+for 8c0568d0
+replace
+pre 8c043d4c 0 21 0 0
+arg 0 $0
+diverse 8
+for 8c05692e
+replace
+pre 8c043d4c 0 21 0 0
+arg 0 $0
+diverse 8
+for 8c05e920
+replace
+pre 8c043d4c 0 30 0 0
+arg 0 $0+2b0
+arg 1 0 1
+arg 2 $0+ec
+diverse 8
+for 8c05c6c6
+replace
+pre 8c043d4c 0 2d 0 0
+arg 0 $0
+diverse 8
+for 8c05c6da
+replace
+pre 8c043d4c 0 2d 0 0
+arg 0 $0
+arg 1 0 1
+diverse 8
+for 8c01e900
+replace
+diverse 8
+for 8c016bae
+replace
+diverse 8
+for 8c01986a
+replace
+arg 0 0 1 2 3 4 5 6 7
 diverse 8
