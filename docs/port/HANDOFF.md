@@ -2,6 +2,61 @@
 
 Newest session first. Read `docs/port/PLAN.md` (disc facts, survey, approach, phases, rules) before working.
 
+## S16 — 2026-11-13: an offline sample-replay Mull gate (59 -> ~5 s per mutant), Mull on every file, 38 more functions
+
+The user's goal: "Don't stop until all the code is ported"; the user also asked why Mull is so slow. All guest code ran
+in `--network none --read-only --cap-drop ALL --security-opt no-new-privileges --tmpfs /tmp` containers; `git log
+--all -- port/gen` stays empty; the sample corpus (guest RAM) lives only in the Docker volume `penpen-corpus`.
+Design and numbers: `docs/port/DECOMP.md` 17.
+
+1. **Why Mull was slow, and the fix** (17.1): a mutant was judged by whole routes from boot; a survivor ran every
+   covering route to its end (~82 % of the time). The difftest already records everything a sample needs to be
+   judged again without the run, so the routes now keep a **corpus** of up to 8 passing samples per function
+   (`--hwcorpus`, `tools/s11.sh corpus TAG K`: snapshot pages in a content-addressed store, HLE / stack / RAM-fill /
+   hardware-read records, side A's outcome, the functions side A entered; ~1.3 GB for 12 routes, 4 min), and
+   `--hwreplay` runs side B of chosen samples on any build against the recorded side A. The Mull gate replays the
+   samples that ran the mutated function's original code first; only what the replay does not kill runs the
+   file-export difftest on the 1-3 routes that run the line most per second. **Measured: actor_types.c 59.2 ->
+   4.6 s per mutant, race_draw.c 52.8 -> 4.1 s; the kill sets match or exceed the old gate's** (actor_types.c 99 ->
+   126: the 27 more are S15's skipped duplicates, 3 checked by hand; race_draw.c the same 158). The whole corpus
+   replays in ~20 s: a regression check of every hand-written function after any edit.
+2. **Two S13 / S15 differences found with the replay** (17.2): racer_camera_start had the far point's test reversed
+   (the time trial's intro); system_language read the BIOS block's byte through `hw_ptr` where the original reads
+   address 0x0C through the I/O model (new `hw_read8`). Both exported.
+3. **Mull debt** (17.4): every src/ file now has a Mull result (121 files; S15: 59, 30 without): **12 714 mutants,
+   9 110 killed, 40 equivalent, 2 007 unreached, 1 557 survived (open): 71.9 %, reach 85.4 %** (S15: 4 703 mutants,
+   81.5 %, 255 open). n1 (the 30 files + the changed and new ones: 5 404 mutants) took 99 min, n2 (the files with
+   S15 survivors + the later merges: 6 249) 78 min; with the old gate they would have taken ~15 h and ~17 h. Of S15's
+   255 open survivors, 5 are killed now, 212 survive again, 38 are on changed lines. **Not done: classifying the
+   1 557 survivors** (17.4 says where they are and what the first look shows).
+4. **New functions** (17.3): lead: the SetupMenu's construction func_8C022D80 (resumable); four delegated writers
+   (brief `port_work/s16/WRITER_BRIEF.md`): the save load, the pause menu's draws, the RaceSetup's construction, the
+   RaceScene's build and update, the racer's contact sort / run / ground and walls / reset / update after its
+   controls, the course's draw and weather, the computer racer's look-ahead, actor types 1, 2, 0x19, 0x24, 0x2B, the
+   sign's draw, the SetupMenu's states 1-3 and screens, the text drawer, the view's camera upload, the Contacts'
+   sphere-triangle test, mode 4's record panel. Found on merging: racer_ground read the wrong literal-pool half.
+5. **Routes**: none added. Six candidates (the house's fifth choice with the unlock flags, other title-menu
+   entries) were measured with `fncover`: at most 1 new function: not kept (17.5).
+
+**Progress: 3 117 of 4 010 game functions (77.73 %), 177 706 of 301 130 bytes (59.01 %)** (S15: 3 079 / 135 372,
+44.95 %). Raw offsets: 47. Routes: 12, 1 640 game functions run.
+
+Tests (end of S16): difftest (the corpus run c5: the full difftest on 12 routes + its nested pass) **63 570 samples,
+0 FAIL**, the 38 new exports pass (own samples or inside); the corpora c1-c5 replay with 0 FAIL; pure vs hand
+**identical frame lines on all 12 routes, native and wasm; native = wasm**; sh4 **257 / 0**; mixer **26 / 0**; harness
+**5 736 / 0 / 207**; `GEN=genhand tools/rtw.sh build` + `check` **OK**; screenshots from the hand build (title f500,
+PenPen House f900, race f3000 of the route) look right.
+
+Not verified: the 1 557 open survivors (not classified); five exports tested in c4 but not in c5 (the racer's
+set-action / state-4 start and two accessors: their samples went inside the new C caller; their C is unchanged); the
+browser e2e; the writers' "unsure" notes (17.3).
+
+Next (DECOMP.md 17.6): (1) classify the open survivors with the replay's help (per-sample line coverage would say
+which survivors the samples never reach), starting with the S15 ones (212); (2) the functions left in
+`port_work/s15/b2/` (8c01bef8, 8c0351c8, 8c035fa2, 8c03e150, 8c03ed24, 8c029efa, 8c01c668, state 4's update
+8c0270d2) and a re-cut with `tools/batches.py`; (3) routes for the 2 370 unreached functions (the ending, options,
+VMU menus: find the inputs by reading the menus' C).
+
 ## S15 — 2026-11-12/13: the Mull debt (m2, m3, m4), the lead's resumable scenes, nine delegated batches, a cheaper Mull gate
 
 The user's goal: "Don't stop until all the code is ported". All guest code ran in `--network none --read-only
