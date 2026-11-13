@@ -2,6 +2,41 @@
 
 Newest session first. Read `docs/port/PLAN.md` (disc facts, survey, approach, phases, rules) before working.
 
+## S21 — 2026-11-14: a draw-list digest, the stale samples proven, genlib as the module, samples for what had none
+
+All guest code ran in `--network none --read-only --cap-drop ALL --security-opt no-new-privileges --tmpfs /tmp`
+containers; `git log --all -- port/gen` stays empty; corpora only in the volume `penpen-corpus` (new: `/corpus/syn/s21*`,
+119 samples). Design and numbers: `docs/port/DECOMP.md` 22.
+
+1. **A draw-list digest on the frame line** (`ram R draw D`, port/render/rd.c, 22.1): an XMTRX-only difference that
+   reaches a draw now shows in the whole-run comparison (a perturbed racer shadow: RAM equal on all 3 300 frames of
+   cup2, draw different on 1 535). Pure vs hand with it: **genlib 19 / 19 native and wasm, genhand 19 / 19 native,
+   19 / 19 wasm**; native = wasm for RAM everywhere, for the draw digest on 18 routes (boot: 2 frames, the draw HLE's
+   host powf / sinf / cosf). racer_draw now calls the ZXY thunk the original calls (no behaviour change).
+2. **The 15 stale samples are a recording artefact, proven** (22.2): with the fresh-frame clearing turned off in a
+   debug build all 15 pass; type 0x30's 8 read PoseFrame words that nj_MotionStepA-C (HLE stubs here) never write.
+   Reasons written in `tools/replay_exclude.tsv`; nothing deleted. Found: **nj_MotionStepA / B / C are HLE stubs**.
+3. **genlib is the retrowser module** (`tools/rtw.sh build`, 22.3): 1 266 041 bytes, rtw check OK, browser e2e passed
+   (0 recompiled functions, 4 179 hand-written); title / house / race screenshots right.
+4. **Synthetic samples for what had none** (`tools/synth/s21/`, difftest `set ADDR VALUE`, 22.4): the four contact
+   responses, both posed contact builders, the trails, type 0x1B's init, type 0x31's hold / update, the G2 DMA block (9
+   functions), the start-up's sections and the registry. **Bug found: actor_type31_hold** wrote the held player's
+   position into the Body instead of v164 (fixed; s21h3/s000000 catches it). Left without samples, with reasons: the
+   start / body (never return), the cast viewer (dead), the owner scene (a poke route hung), types 0x30 / 0x32's draws.
+5. **Mutants** (22.5): the files S21 sampled: **1 345 mutants, 962 killed, 25 equivalent, 257 unreached, 101
+   survived (10 accepted, 91 open by input class, each with a reason): 72.9 %, reach 90.5 %**; combined **24 181 mutants,
+   17 882 killed: 74.5 %, reach 91.3 %** (S20 73.4 %).
+
+Tests (end of S21): corpora replay (c8 + syn) **17 590 samples, 0 FAIL, 15 excluded**; sh4 257 / 0; compares as in 1;
+rtw check OK; e2e passed. Not rerun: the 19-route difftest, fputest, ninjatest, mixer (no change to their code).
+
+Not verified: the e2e's frames/s (the log line was cut); why the owner-scene poke hangs; whether the draw digest
+differs between pure and hand anywhere outside the 19 routes (it cannot be computed per sample).
+
+Next: (1) nj_MotionStepA / B / C as HLE (type 0x30's poses); (2) the owner scene route (debug the hang at 1740); (3)
+types 0x30 / 0x32's draws (a course that places them, or a constructed object tree); (4) the draw HLE's host maths as
+our own code so the draw digest is native = wasm; (5) the open Mull survivors (22.5).
+
 ## S20 — 2026-11-13/14: the library code as C, every function outside the game accounted for, a build without generated code
 
 The user's goal: "Don't stop until all the code is ported". All guest code ran in `--network none --read-only

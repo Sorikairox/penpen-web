@@ -8,15 +8,15 @@ only, PLAN 9), with types, structs, loops and comments.
 
 ## 1. Status
 
-| | S11 | S12 | S13 | S14 | S15 | S16 | S17 | S18 | S19 | S20 |
-|---|---|---|---|---|---|---|---|---|---|---|
-| Game functions replaced (`docs/progress/decomp_functions.tsv`) | 47 (section 9) | 70 (+23) (section 11) | 2 468 (+2 398: ~2 000 identical copies, section 13) | 2 938 (+470: copy-group leaders and their copies, scene constructors, the RaceSetup update, the loading screen, 7 delegated batches; section 15) | 3 079 (+141: lead resumable scenes and destructors, 9 delegated batches; section 16) | 3 117 (+38: the SetupMenu construction, 4 delegated writers: menus, racer, course, actors, text, contacts; section 17) | 3 806 (+689: the rest of S15's b2 list, nine delegated batches of mostly unreached functions; section 18) | 4 005 (+199: the last batches b01-b06, single ones, 50 fragments; section 19) | 4 046 of 4 046 (+41: type 0x31 x3, mode 11's start, func_8C042000 as a fragment, and the 36 game functions functions.tsv missed, now listed: batches u / u2; section 20) | 4 049 of 4 049 (+3: the owner scene's draw, type 0x1B's init (vtable-only, in gaps), a copy of text_style_reset); outside the game 130 library functions (src/lib) |
-| Region | the game's core: main loop, start-up, callbacks, drive watch, task tree, Game modes, pads, views; the sound front end | + the GD-ROM file loader, the data-container fix-ups (Ninja models, motions, texture lists), CDDA pause and play, the title scene's constructor and destructor | + float helpers; the vector / Body / Ninja / accessor inline methods, the title scene, 231 delegated leaves (engine, save, VMU, race scene, racers, course, camera, actors) | + typed classes for S13's code (407 raw offsets -> 47); the race scene's HUD / pause / results, the racer's body, controls and effects, the motion player, the computer racer, the course construction, PenPen House / GOOD NIGHT / menus, the other cups' scenery actors | + the GOOD NIGHT and movie scenes' construction and playback (resumable), the RaceScene's construction / destructor, the actor group and the factory, actor types 1 2 3 0x20 0x2D, the course's ground search and environment (fog, lights, weather, sky, sounds), the racer's actions (dash, hits, states 2-4) and base construction, the race views' drawing and start per mode, the menus' screens, logos, save progress, the RTC, the motion player's draw, effect pushes | + the SetupMenu (construction, states 1-3, screens), the racer's run / ground / reset / update, the course's draw and weather, actor types 1 2 0x19 0x24 0x2B, the text drawer, the camera upload, the sphere-triangle test | + the racer's effects / sounds, the computer racer's states 3 and 4, the race step, the title's intro; task trees, motion drawers, container fix-ups, CD, save records, VMU drive, card messages, the staff roll, gallery and options scenes, racer swimming, race sound ports, the owner scene, the replay racer, actor types 0x00 0x06 0x09 0x0A 0x0B 0x0F 0x10 0x1B 0x26-0x28 0x2F-0x32 | + the cast viewer (func_8C0200E8), the race ending (func_8C02AF9C), type 0x32's update (func_8C060706), the last actor types, contacts' model builders, sbInitSystem, text drawers decoded from raw bytes, the owner scene and cast viewer construction (resumable); 50 fragments | + the gap functions (vtable-only init / update / draw methods of a dozen actor types, the title menu's and logo scene's draws, out-of-line setters); outside the game: the C runtime's atan2f / asinf / acosf / floorf (12 functions, src/lib) | the libraries outside the game: the SHC runtime, G2 copy, sy heap / start / registry, bu image and thunks, Ninja (matrix stack, transforms, trig, view, chunk reader, fog, render state), Kamui register writes; a build without generated code (genlib) |
-| Routes (`tools/routes.tsv`) | boot 8 000, route 6 000 | + explore 7 000, vs2 4 000, vs4 4 000, demo 3 400, reset 3 600 (section 5.1), inputs 1 000 (section 10) | the same 8 | + cup2, cup3, cup4 (unlock flags poked: the other cups), goodnight (mode 4): 12 routes | the same 12 (explore and goodnight also poke the score tables; goodnight runs on 2000-06-15) | the same 12 | the same 12 | + options (mode 12), gallery (mode 11), staffroll (mode 9), cup1b, cup2b, cup3b: 18 routes | + cup4b (CSD): 19 routes | the same 19 |
-| Differential test (`tools/s11.sh test`) | every export but main passes, 0 fail | 8 routes, 5 792 samples: **69 of 70 pass, 0 FAIL** (main: never returns, whole-run comparison only) | 8 routes: 0 FAIL; every export passes or is a copy of a passing one | 12 routes, 135 382 samples: **0 FAIL**; every export passes or is a copy of a passing one, but main, cd_play (inside, S12) and task_destroy_tree (inside, a targeted run: 15.5) | 12 routes, 114 757 samples: **0 FAIL** (rare paths checked by targeted runs: 16.3) | 12 routes (the corpus run), 63 570 samples: **0 FAIL**; the corpora replay with 0 FAIL | 12 routes, 39 835 samples: **0 FAIL**; the corpora replay with 0 FAIL (c5: 8 174, syn: 4 128); **synthetic samples** (section 18): 2 540 functions with passing ones (2 043 that no route runs) | 18 routes, 52 622 samples: **0 FAIL**; corpora replay 0 FAIL (c5 + syn: 19 157); synthetic: 2 702 functions with passing samples  | 19 routes (the c7 corpus run), 57 489 samples: **0 FAIL**; corpora replay (c7 + syn, 15 819 samples): c7 0 FAIL; syn: 14 S17 / S18 samples FAIL under the defined stack (fresh ones of the same functions pass, 20.6); synthetic: + the maths, type 0x31, batches u / u2 | 19 routes (the c8 corpus run), 68 626 samples: 0 FAIL; XF0-XF15 compared; corpora replay (c8 + syn, 17 471 samples): 0 FAIL, 15 stale samples excluded with reasons; synthetic: the library C and the 3 new functions |
-| Whole-run comparison (`tools/s11.sh compare`) | route + boot: every frame line identical, native and wasm | all 8 routes: every frame line identical (RAM digest every frame), native and wasm; native = wasm | all 8 routes identical, native and wasm; native = wasm | all 12 routes identical (the interpreter-call count left out), native and wasm; native = wasm | all 12 routes identical, native and wasm; native = wasm | all 12 routes identical, native and wasm; native = wasm | all 12 routes identical, native and wasm; native = wasm | all 18 routes identical, native and wasm; native = wasm | all 19 routes identical, native and wasm; native = wasm | all 19 routes identical, native and wasm; native = wasm; also the build without generated code (genlib: no translated function, the interpreter never entered) |
-| Mutation score (section 10) | 63.6 % (upper bound: see section 10) | Mull: **90.4 %** (776 mutants: 672 killed, 33 equivalent, 71 unreached, 0 survived; reach score 100 %) | fpu.h 118/118; lead code 355 mutants: 90.9 % (reach 100 %); delegated code not yet | S13 files the refactor left unchanged: 583 mutants, **91.6 %** (reach 100 %, 0 survived); refactored / new files: partial or not yet (15.3) | Mull m2 / m3 / m4 / m6 (59 files with S14's row): 4 703 mutants, 3 813 killed, 26 equivalent, 609 unreached, **255 survived (open)**: 81.5 % (reach 93.7 %): 16.1 | **every file**: 121 files, 12 714 mutants, 9 110 killed, 40 equivalent, 2 007 unreached, **1 557 survived (open)**: 71.9 % (reach 85.4 %); the replay gate: ~5 s per mutant (17) | 193 files, 16 960 mutants, 12 496 killed, 38 equivalent, 3 163 unreached, **1 263 survived (open)**: 73.8 % (reach 90.8 %); synthetic samples in the replay gate (18.5) | S18 code (n1, partial: 6 340 mutants of 73 files): 3 743 killed, 363 survived, 2 234 uncovered, 49 equivalent: 59.5 % (reach 91.2 %); the S17 combined figures stand for the files S18 did not change | combined (S17 + S18 n1 + S19 n2 / n3b / n4): 22 991 mutants, 16 753 killed, 144 equivalent, 4 510 unreached, 1 584 survived (each with a reason): 73.3 %, reach 91.4 %; S19's new files 81.5 % | S20's new code (run S20): 1 373 mutants, 1 035 killed, 25 equivalent, 183 unreached, 130 survived (each with a reason): 76.8 %, reach 88.8 %; combined: 24 181 mutants, 17 631 killed, 169 equivalent, 4 692 unreached, 1 689 survived: 73.4 %, reach 91.3 % |
-| Functions / bytes | 47 of 4 010 (1.17 %), 4 728 of 301 130 bytes (1.57 %) | **70 of 4 010 (1.75 %), 7 474 of 301 130 bytes (2.48 %)** | **2 468 of 4 010 (61.55 %), 57 508 of 301 130 bytes (19.10 %)** | **2 938 of 4 010 (73.27 %), 104 420 of 301 130 bytes (34.68 %)** | **3 079 of 4 010 (76.78 %), 135 372 of 301 130 bytes (44.95 %)** | **3 117 of 4 010 (77.73 %), 177 706 of 301 130 bytes (59.01 %)** | **3 806 of 4 010 (94.91 %), 233 516 of 301 130 bytes (77.55 %)** | **4 005 of 4 010 (99.88 %), 300 222 of 301 130 bytes (99.70 %)** | **4 046 of 4 046 (100 %), 312 174 of 312 174 bytes (100 %)** (functions.tsv + 36 gap functions) | 4 049 of 4 049 (100 %), 313 196 of 313 196 bytes (100 %); outside: 130 hand-written, 172 HLE, 0 reachable left, 1 437 data-only, 2 296 dead |
+| | S11 | S12 | S13 | S14 | S15 | S16 | S17 | S18 | S19 | S20 | S21 |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| Game functions replaced (`docs/progress/decomp_functions.tsv`) | 47 (section 9) | 70 (+23) (section 11) | 2 468 (+2 398: ~2 000 identical copies, section 13) | 2 938 (+470: copy-group leaders and their copies, scene constructors, the RaceSetup update, the loading screen, 7 delegated batches; section 15) | 3 079 (+141: lead resumable scenes and destructors, 9 delegated batches; section 16) | 3 117 (+38: the SetupMenu construction, 4 delegated writers: menus, racer, course, actors, text, contacts; section 17) | 3 806 (+689: the rest of S15's b2 list, nine delegated batches of mostly unreached functions; section 18) | 4 005 (+199: the last batches b01-b06, single ones, 50 fragments; section 19) | 4 046 of 4 046 (+41: type 0x31 x3, mode 11's start, func_8C042000 as a fragment, and the 36 game functions functions.tsv missed, now listed: batches u / u2; section 20) | 4 049 of 4 049 (+3: the owner scene's draw, type 0x1B's init (vtable-only, in gaps), a copy of text_style_reset); outside the game 130 library functions (src/lib) | 4 049 of 4 049 (unchanged; fixes: actor_type31_hold, racer_draw's thunk) |
+| Region | the game's core: main loop, start-up, callbacks, drive watch, task tree, Game modes, pads, views; the sound front end | + the GD-ROM file loader, the data-container fix-ups (Ninja models, motions, texture lists), CDDA pause and play, the title scene's constructor and destructor | + float helpers; the vector / Body / Ninja / accessor inline methods, the title scene, 231 delegated leaves (engine, save, VMU, race scene, racers, course, camera, actors) | + typed classes for S13's code (407 raw offsets -> 47); the race scene's HUD / pause / results, the racer's body, controls and effects, the motion player, the computer racer, the course construction, PenPen House / GOOD NIGHT / menus, the other cups' scenery actors | + the GOOD NIGHT and movie scenes' construction and playback (resumable), the RaceScene's construction / destructor, the actor group and the factory, actor types 1 2 3 0x20 0x2D, the course's ground search and environment (fog, lights, weather, sky, sounds), the racer's actions (dash, hits, states 2-4) and base construction, the race views' drawing and start per mode, the menus' screens, logos, save progress, the RTC, the motion player's draw, effect pushes | + the SetupMenu (construction, states 1-3, screens), the racer's run / ground / reset / update, the course's draw and weather, actor types 1 2 0x19 0x24 0x2B, the text drawer, the camera upload, the sphere-triangle test | + the racer's effects / sounds, the computer racer's states 3 and 4, the race step, the title's intro; task trees, motion drawers, container fix-ups, CD, save records, VMU drive, card messages, the staff roll, gallery and options scenes, racer swimming, race sound ports, the owner scene, the replay racer, actor types 0x00 0x06 0x09 0x0A 0x0B 0x0F 0x10 0x1B 0x26-0x28 0x2F-0x32 | + the cast viewer (func_8C0200E8), the race ending (func_8C02AF9C), type 0x32's update (func_8C060706), the last actor types, contacts' model builders, sbInitSystem, text drawers decoded from raw bytes, the owner scene and cast viewer construction (resumable); 50 fragments | + the gap functions (vtable-only init / update / draw methods of a dozen actor types, the title menu's and logo scene's draws, out-of-line setters); outside the game: the C runtime's atan2f / asinf / acosf / floorf (12 functions, src/lib) | the libraries outside the game: the SHC runtime, G2 copy, sy heap / start / registry, bu image and thunks, Ninja (matrix stack, transforms, trig, view, chunk reader, fog, render state), Kamui register writes; a build without generated code (genlib) | tests: the draw-list digest, synthetic samples for the contact responses, posed builders, trails, type 0x1B init, type 0x31 hold, G2 DMA block, start-up / registry; genlib as the retrowser module |
+| Routes (`tools/routes.tsv`) | boot 8 000, route 6 000 | + explore 7 000, vs2 4 000, vs4 4 000, demo 3 400, reset 3 600 (section 5.1), inputs 1 000 (section 10) | the same 8 | + cup2, cup3, cup4 (unlock flags poked: the other cups), goodnight (mode 4): 12 routes | the same 12 (explore and goodnight also poke the score tables; goodnight runs on 2000-06-15) | the same 12 | the same 12 | + options (mode 12), gallery (mode 11), staffroll (mode 9), cup1b, cup2b, cup3b: 18 routes | + cup4b (CSD): 19 routes | the same 19 | the same 19 |
+| Differential test (`tools/s11.sh test`) | every export but main passes, 0 fail | 8 routes, 5 792 samples: **69 of 70 pass, 0 FAIL** (main: never returns, whole-run comparison only) | 8 routes: 0 FAIL; every export passes or is a copy of a passing one | 12 routes, 135 382 samples: **0 FAIL**; every export passes or is a copy of a passing one, but main, cd_play (inside, S12) and task_destroy_tree (inside, a targeted run: 15.5) | 12 routes, 114 757 samples: **0 FAIL** (rare paths checked by targeted runs: 16.3) | 12 routes (the corpus run), 63 570 samples: **0 FAIL**; the corpora replay with 0 FAIL | 12 routes, 39 835 samples: **0 FAIL**; the corpora replay with 0 FAIL (c5: 8 174, syn: 4 128); **synthetic samples** (section 18): 2 540 functions with passing ones (2 043 that no route runs) | 18 routes, 52 622 samples: **0 FAIL**; corpora replay 0 FAIL (c5 + syn: 19 157); synthetic: 2 702 functions with passing samples  | 19 routes (the c7 corpus run), 57 489 samples: **0 FAIL**; corpora replay (c7 + syn, 15 819 samples): c7 0 FAIL; syn: 14 S17 / S18 samples FAIL under the defined stack (fresh ones of the same functions pass, 20.6); synthetic: + the maths, type 0x31, batches u / u2 | 19 routes (the c8 corpus run), 68 626 samples: 0 FAIL; XF0-XF15 compared; corpora replay (c8 + syn, 17 471 samples): 0 FAIL, 15 stale samples excluded with reasons; synthetic: the library C and the 3 new functions | corpora replay (c8 + syn, 17 590 samples): 0 FAIL, 15 excluded (proven artefacts); synthetic: s21* (119 samples); the route difftest not rerun |
+| Whole-run comparison (`tools/s11.sh compare`) | route + boot: every frame line identical, native and wasm | all 8 routes: every frame line identical (RAM digest every frame), native and wasm; native = wasm | all 8 routes identical, native and wasm; native = wasm | all 12 routes identical (the interpreter-call count left out), native and wasm; native = wasm | all 12 routes identical, native and wasm; native = wasm | all 12 routes identical, native and wasm; native = wasm | all 12 routes identical, native and wasm; native = wasm | all 18 routes identical, native and wasm; native = wasm | all 19 routes identical, native and wasm; native = wasm | all 19 routes identical, native and wasm; native = wasm; also the build without generated code (genlib: no translated function, the interpreter never entered) | all 19 routes identical with the draw-list digest, genhand and genlib, native and wasm; native = wasm for RAM (draw: boot 2 frames, host libm) |
+| Mutation score (section 10) | 63.6 % (upper bound: see section 10) | Mull: **90.4 %** (776 mutants: 672 killed, 33 equivalent, 71 unreached, 0 survived; reach score 100 %) | fpu.h 118/118; lead code 355 mutants: 90.9 % (reach 100 %); delegated code not yet | S13 files the refactor left unchanged: 583 mutants, **91.6 %** (reach 100 %, 0 survived); refactored / new files: partial or not yet (15.3) | Mull m2 / m3 / m4 / m6 (59 files with S14's row): 4 703 mutants, 3 813 killed, 26 equivalent, 609 unreached, **255 survived (open)**: 81.5 % (reach 93.7 %): 16.1 | **every file**: 121 files, 12 714 mutants, 9 110 killed, 40 equivalent, 2 007 unreached, **1 557 survived (open)**: 71.9 % (reach 85.4 %); the replay gate: ~5 s per mutant (17) | 193 files, 16 960 mutants, 12 496 killed, 38 equivalent, 3 163 unreached, **1 263 survived (open)**: 73.8 % (reach 90.8 %); synthetic samples in the replay gate (18.5) | S18 code (n1, partial: 6 340 mutants of 73 files): 3 743 killed, 363 survived, 2 234 uncovered, 49 equivalent: 59.5 % (reach 91.2 %); the S17 combined figures stand for the files S18 did not change | combined (S17 + S18 n1 + S19 n2 / n3b / n4): 22 991 mutants, 16 753 killed, 144 equivalent, 4 510 unreached, 1 584 survived (each with a reason): 73.3 %, reach 91.4 %; S19's new files 81.5 % | S20's new code (run S20): 1 373 mutants, 1 035 killed, 25 equivalent, 183 unreached, 130 survived (each with a reason): 76.8 %, reach 88.8 %; combined: 24 181 mutants, 17 631 killed, 169 equivalent, 4 692 unreached, 1 689 survived: 73.4 %, reach 91.3 % | S21 files (run S21): 1 345 mutants, 962 killed, 25 equivalent, 257 unreached, 101 survived (each with a reason): 72.9 %, reach 90.5 %; combined: 24 181 mutants, 17 882 killed, 170 equivalent, 4 435 unreached, 1 694 survived: 74.5 %, reach 91.3 % |
+| Functions / bytes | 47 of 4 010 (1.17 %), 4 728 of 301 130 bytes (1.57 %) | **70 of 4 010 (1.75 %), 7 474 of 301 130 bytes (2.48 %)** | **2 468 of 4 010 (61.55 %), 57 508 of 301 130 bytes (19.10 %)** | **2 938 of 4 010 (73.27 %), 104 420 of 301 130 bytes (34.68 %)** | **3 079 of 4 010 (76.78 %), 135 372 of 301 130 bytes (44.95 %)** | **3 117 of 4 010 (77.73 %), 177 706 of 301 130 bytes (59.01 %)** | **3 806 of 4 010 (94.91 %), 233 516 of 301 130 bytes (77.55 %)** | **4 005 of 4 010 (99.88 %), 300 222 of 301 130 bytes (99.70 %)** | **4 046 of 4 046 (100 %), 312 174 of 312 174 bytes (100 %)** (functions.tsv + 36 gap functions) | 4 049 of 4 049 (100 %), 313 196 of 313 196 bytes (100 %); outside: 130 hand-written, 172 HLE, 0 reachable left, 1 437 data-only, 2 296 dead | 4 049 of 4 049 (100 %), 313 196 of 313 196 bytes (100 %) |
 
 ## 2. How a hand-written function replaces the translated one (link-time selection)
 
@@ -1626,3 +1626,134 @@ Next:
 3. The open survivors by input class (synthetic pokes of the G2 DMA block, a constructed OwnerScene / type 0x1B
    placement, the bu image's boundary descriptions, POF0's longer forms); S19's open ones; the 13 never-executed game
    functions; the 8 old type 0x30 samples (a debug replay, with the user's say).
+
+## 22. S21: a draw-list digest, the stale samples' proof, genlib as the module, synthetic samples for what had none
+
+The user's goals (S20's next steps): close the XMTRX gap of the whole-run comparison, trace the 8 stale type 0x30
+samples, make the build without generated code the retrowser module, and give samples to what had none.
+
+### 22.1 The draw-list digest (`draw` on the frame line)
+
+Ninja's current matrix lives in XMTRX (XF0-XF15), not in RAM; the draw HLE reads the RAM slot at NJG_CURMATRIX, which
+an object draw fills from XMTRX by its push (nj_model.c draw_object: G_PUSH copies XMTRX into the new slot; a bare
+model draw finds the slot equal to XMTRX: checked at every bare draw of route 0-2500, no difference). So a difference
+left only in XMTRX reaches the picture but no RAM word the frame line's digest covers. `rd_end` (port/render/rd.c) now
+hashes the packed frame (header, commands, vertices, fog table, the texture ids freed, each upload's RGBA pixels in
+place of its host pointer) when the frame's RAM digest is written; the frame line ends `ram R draw D`. The tools that
+compare frame lines (compare, Mull's gate) compare it with the rest.
+
+Proof that it closes the gap: racer_draw's shadow rotation perturbed by one Ninja unit (an XMTRX-only change, popped
+before the frame ends) on cup2: the RAM digest is equal on all 3 300 frames, the draw digest differs on 1 535 (from the
+race's first frame, 1765).
+
+Results (pure vs hand, every frame line with both digests): **genlib (`--no-interp`) 19 / 19 native, 19 / 19 wasm;
+genhand 19 / 19 native, 19 / 19 wasm**. Native = wasm holds for RAM on every route and for the draw digest on 18
+routes; boot differs in the draw digest on 2 frames (3998, 4102: the attract demo) on both pure and hand alike: the
+draw HLE's host maths (powf for the specular, sinf / cosf for a sprite's turn: glibc and the wasm libc may differ in
+the last place). The game state is equal (RAM); the comparison of builds is native-to-native and wasm-to-wasm.
+
+A related audit: racer_draw (0x8C0373B8) called matrix_rotate_xyz where the original calls func_8C0304CA (the
+njRotateZXY thunk S20 found mislabelled; a scan of the game code for calls to the three rotate thunks: 0x8C02278C from
+0x8C027F50, 0x8C02F5B4 from 0x8C02FF48, 0x8C0304CA from 0x8C037470 only). Fixed; no behaviour change (X and Z are literal
+zeros there and both orders skip a zero angle).
+
+### 22.2 The 15 stale samples: a recording artefact, proven
+
+All 15 samples of `tools/replay_exclude.tsv` were recorded in S17 / S18, before S19 made a fresh guest frame read as
+zero (`sh4_stack_lowered`, `hw_stack_alloc`). A debug build of the hand side with that clearing turned off (one line of
+sh4_ops.h, nothing else; built from a copy of the tree into a scratch build directory) replays **all 15: 15 pass**
+(the normal build fails each). So their side A read stack words no code had written, which held the snapshot's
+leftovers then. For type 0x30's 8 (actor_type30_pose_node, 0x8C05E098) the words are the PoseFrame's pos / ang / scl:
+the original fills them through nj_MotionStepA / B / C, which this port's HLE answers with `h_default` (r0 = 0, nothing
+written; the replay shows those four HLE calls and nothing written); a zero scale gives XF0-XF3 = 0 on side B, the
+recorded leftover a matrix on side A (s18n5's: XF4 -0 / +0 from a zero against a leftover angle). Not a bug in the C;
+the samples stay (the user's rule), the reasons in the list are now the proven ones.
+
+Found on the way (not fixed: an HLE gap, not C): **nj_MotionStepA / B / C are stubs**, so type 0x30's posed parts get
+zero position / angle / scale wherever the motion has keys (the original interpolates them); no route draws a type 0x30
+actor, so no route shows it.
+
+### 22.3 The build without generated code as the retrowser module
+
+`tools/rtw.sh build` builds from `/build/genlib` by default (GEN=gen / genhand as before): **penpen.wasm 1 266 041
+bytes**; `rtw check` OK; the browser e2e passed (two boots, the save found after the reload, "0 recompiled functions,
+4179 of them hand-written"); the title, PenPen House and race screenshots look right. (The e2e's frames-per-second line
+was not kept by this run's log filter.)
+
+### 22.4 Synthetic samples for what had none (`tools/synth/s21/`)
+
+S17-S20's generated jobs never returned for these functions (the objects they need are not where the bases have them).
+S21 writes the jobs by hand (`tools/synth/s21/*.spec`, run by `tools/synth/s21/run.sh SPEC NEW_NAME`): bases chosen
+where the objects live (found by scanning corpus snapshots for the response / vtable words), and difftest.c's new
+`set ADDR VALUE` (a word of the base, in prelude order; up to 48 preludes and sets; XMTRX as the prelude left it is
+kept, for posed calls; `PENPEN_SYNTH_DEBUG=1` says why inputs were refused).
+
+| function | how | samples (corpus `/corpus/syn/`) | original's bytes run |
+|---|---|---|---|
+| post_respond 0x8C04D468 | cup2's post (0x8CB6E920), a Contacts whose other[0] is it, bodies set at its position | s21p1 2, s21r1 3 | 346 / 346 |
+| actor_type0b_respond 0x8C052D20 | cup3b's two type 0x0B actors, bodies at their positions, the turn pointer 0 or a float | s21r1 6 | 184 / 218 |
+| gate_respond 0x8C055D78 | cup3's / cup3b's turning gates | s21r1 5 | 270 / 270 |
+| type2d_respond 0x8C05CAA8 | cup4's / cup4b's type 0x2D actors | s21r1 4 | 268 / 268 |
+| contacts_add_object_posed 0x8C0148C4, contacts_add_cnk_model_posed 0x8C0146F8 | a Contacts built by contacts_construct, XMTRX at the gate / type 0x2D actor (njUnitMatrix, njTranslateV preludes), their models | s21o1 4 (and inside every response sample) | 76 / 186, 346 / 410 |
+| effect_trails_push 0x8C03ADCE | a trail pair built in free RAM (two NjModels, two Body chains, some bodies above the ground) | s21t1 1 | 430 / 430 |
+| actor_type1b_init 0x8C049308 | constructed by its constructor, the group entries of a live actor (param bit 16), four placements | s21b3 2 | 186 / 200 |
+| actor_type31_hold 0x8C05F7B0, actor_type31_update 0x8C05F380 | cup4b's type 0x31 actors with a held player, state 11 on a hold cell | s21h1 / s21h3 17 | 122 / 126, 176 / 400 |
+| the G2 DMA block (g2_copy, g2_write, the channel / FIFO helpers: 9) | the library's DMA state pointer (0x8C0998A8) set to a block in RAM with channels, enable bits, the interrupt flag on and off | s21g1 51 | 36-376 of each, most whole |
+| sy_init_sections 0x8C0100D8, sy_list_libraries, the registry (8) | boot / race bases, `slow` (the sections are copied byte by byte), `hw` (SR) | s21s1 / s21s3 / s21s4 23 | 78 / 90; registry 34-114 of each |
+
+**A real bug found: actor_type31_hold** copied the held player's position into the actor's Body (0xA4); the original's
+block copy (func_8C0625EC) targets v164 (0x164, the point its wander circles), and the cell is then found from the
+unchanged Body. The sample s21h3/s000000 fails on the old C (`ram 8cb218e4 00000101/00000002`) and passes on the fixed
+one; S21's first samples (s21h1's fail.tsv) were recorded before the fix. No route holds a player (fn_coverage), so the
+whole-run comparisons are unaffected.
+
+Still without a sample of their own:
+
+- **the start-up's start and body** (0x8C010000, 0x8C0100A0): they call main and never return; every route runs them
+  (the whole-run comparison covers them).
+- **the cast viewer** (cast_scene_construct 0x8C02004C, cast_scene_init 0x8C01FE58): nothing in the shipped game builds
+  it (no call, no pointer) and its body ends frames (a loading screen): a synthetic call cannot pass a frame (refused),
+  and no route can reach it. Dead code, written for completeness.
+- **the owner scene** (owner_scene_construct 0x8C02FC12, owner_scene_init 0x8C02F850, its draw 0x8C02FE38): the
+  RaceSetup's state 2, which no menu asks for; a route poking RaceSetup.requested = 2 in the setup menu (frame 1740)
+  hung inside the construction (no frame line after the poke; not traced). Its construction ends frames (loads
+  5110Owner.bin); the draw needs that file's objects.
+- **types 0x30 / 0x32's draws** (0x8C05DD40, 0x8C060D1A): no base has such an actor (a scan of the 19 routes' snapshots
+  at frames 2400 / 3000 for their vtables found none); a constructed one needs its group file's object tree and motions
+  (the draw walks five nodes and the motion's keys).
+
+### 22.5 Mutants
+
+Mull on the files S21's samples reach (`--only` actor_type31, actor_bodies_b04, actor_type0b_b04, actor_mesh_respond,
+contact_models, effects_trails, actor_type1b_init, lib/g2, lib/sy/start, lib/sy/lib_registry; corpora c8 + syn; frame
+lines with the draw digest; 73 min, 6 workers; `port_work/s21/mull/r1.run.out`): **1 345 mutants, 962 killed (861 by
+the replay), 25 equivalent, 257 unreached, 101 survived: 72.9 %, reach 90.5 %**. Every survivor has a reason
+(`mutation_notes.tsv`): 10 *accepted* (SR's IMASK in the G2 copy's and the registry's critical sections: no interrupt
+is modelled, nothing compared reads the mask; the G2 samples run the flag both ways), 91 *open* by input class: 49 in
+type 0x31 (no racer near on CSD: the items' turns and the held / released states rest at zero, so a removed zero-angle
+rotation or step changes nothing seen; the notes of S19 moved with the hold fix's two lines), 42 in the contact model
+builders and the ground search under a point (the courses' models hold only some chunk / strip kinds and strides).
+New equivalents: G2's `channel + offsetof(index)` (0), g2_copy's level initialiser (read only after
+sr_imask_raise set it), two njUnitMatrix calls after matrix_identity. Survivors not killed by new samples this session
+(the open ones above need a racer near a type 0x31 actor, or course models with the other chunk kinds).
+Combined with S20's (`tools/mull_combine.py`, S21's run replacing its files): **24 181 mutants, 17 882 killed, 170
+equivalent, 4 435 unreached, 1 694 survived (each with a reason): 74.5 %, reach 91.3 %** (S20: 17 631 killed, 73.4 %).
+
+### 22.6 Results and next
+
+**4 049 of 4 049 game functions (100 %), 313 196 of 313 196 bytes** (unchanged); outside the game 130 hand-written,
+172 HLE. Whole-run comparison with the draw digest: **genlib 19 / 19 native and wasm; genhand 19 / 19 native,
+19 / 19 wasm**. Corpora replay (c8 + syn) on the final hand build: **17 590 samples, 0 FAIL, 15 excluded** (S20 17 471: + S21's
+119 synthetic samples). sh4 unit tests 257 / 0. The route difftest (`tools/s11.sh test`), fputest, ninjatest and the
+mixer test were not rerun (no change to the interpreter, fpu.h or the Ninja C; the C changes are the hold and racer_draw's
+thunk, both judged by samples). rtw check OK, the browser e2e passed with the genlib module.
+
+Next:
+
+1. nj_MotionStepA / B / C as HLE (they are stubs: type 0x30's posed parts get zero keys); then fresh samples of type
+   0x30's pose with keys.
+2. The owner scene: why the RaceSetup poke hangs (a debug run from frame 1740); a route for it would cover its
+   construction, init and draw.
+3. Types 0x30 / 0x32's draws: an actor built from a group file that has them (which course places them?), or a
+   constructed object tree.
+4. A draw digest equal native = wasm (the draw HLE's powf / sinf / cosf in our own code), so boot's two frames agree.

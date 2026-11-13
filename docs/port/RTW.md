@@ -106,7 +106,7 @@ then advances it by frames, and that the e2e/test harness may pin it.
 ```
 tools/s3.sh gen                 # the translation (once per recompiler change)
 tools/rtw.sh image              # once: penpen-rtw:1 (network only during this build)
-tools/rtw.sh build              # wasm + glue + manifest with hashes in penpen-build:/build/rtw
+tools/rtw.sh build              # wasm + glue + manifest with hashes in penpen-build:/build/rtw (S21: from /build/genlib, no generated code; GEN=gen / genhand)
 tools/rtw.sh check              # rtw.mjs check /build/rtw --disc /raw/archive.7z, --network none
 ```
 
