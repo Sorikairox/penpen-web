@@ -2,8 +2,10 @@
 # Pen Pen S6: the retrowser module (docs/port/RTW.md). Everything runs in Docker; the module directory holds the
 # wasm (translated game code: local only, never committed) and lives in the volume penpen-build:/build/rtw.
 #   tools/rtw.sh image          build the image penpen-rtw:1 (retrowser main + Playwright Chromium; network only here)
-#   tools/rtw.sh build          build the wasm (emsdk image, from /build/gen) and assemble /build/rtw:
-#                               penpen.wasm, penpen.js (render_gl.js + glue.js), retrowser.json (rtw.mjs hash)
+#   tools/rtw.sh build          build the wasm (emsdk image) and assemble /build/rtw: penpen.wasm, penpen.js
+#                               (render_gl.js + glue.js), retrowser.json (rtw.mjs hash); S21: from /build/genlib by
+#                               default (the hand build without generated code: tools/s11.sh genlib); GEN=gen the pure
+#                               translation, GEN=genhand the hand build with the old trim
 #   tools/rtw.sh check          rtw.mjs check /build/rtw --disc /raw/archive.7z (--network none)
 #   tools/rtw.sh e2e [args]     the end-to-end test: the retrowser local host + headless Chromium in one
 #                               --network none container; the player's archive picked on the disc screen
@@ -30,10 +32,13 @@ case "${1:-}" in
     rm -rf "$T" ;;
   build)
     # S11: GEN=genhand builds the module from the translation without the hand-written functions + src/
-    G=${GEN:-gen}
+    # S21: the default is genlib (no translated function: table.c only); GEN=gen the pure translation (/build/wasm)
+    GEN=${GEN:-genlib}
+    G=$GEN
+    W=/build/wasm; [ "$GEN" = gen ] || W=/build/wasm-$GEN
     OUT=$($D run $SAFE --tmpfs /tmp:exec,size=4g,mode=1777 -e HOME=/tmp -v "$REPO/port":/src/port:ro -v "$REPO/src":/src/src:ro -v penpen-build:/build $EMSDK \
-      sh -c "sh /src/port/runtime/build.sh wasm /build/$G /build/wasm${GEN:+-$GEN} '$CF' 8 && rm -rf /build/rtw && mkdir -p /build/rtw &&
-        cp /build/wasm${GEN:+-$GEN}/penpen.wasm /build/rtw/penpen.wasm &&
+      sh -c "sh /src/port/runtime/build.sh wasm /build/$G $W '$CF' 8 && rm -rf /build/rtw && mkdir -p /build/rtw &&
+        cp $W/penpen.wasm /build/rtw/penpen.wasm &&
         cat /src/port/render/gl/render_gl.js /src/port/rtw/glue.js > /build/rtw/penpen.js &&
         cp /src/port/rtw/retrowser.json /build/rtw/retrowser.json && echo rtw module assembled" 2>&1 || true)
     echo "$OUT" | filt
