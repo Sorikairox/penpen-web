@@ -91,8 +91,13 @@ OPF(MOVCAL) { UNUSED; wr32(RN, R0); }
  * frames) cannot reproduce. So the run time defines it, for the translation, the interpreter and hw_stack_alloc
  * alike: lowering r15 (add #-n / add Rm / sub Rm, the SH-4 frame allocations) clears the words it uncovers. */
 SH4_INLINE void sh4_stack_lowered(uint32_t old, uint32_t now) {
-  if (now < old && old - now <= 0x10000u && sh4_is_ram(now) && sh4_is_ram(old - 1u) && (now & 0xFF000000u) == ((old - 1u) & 0xFF000000u))
+  if (now < old && old - now <= 0x10000u && sh4_is_ram(now) && sh4_is_ram(old - 1u) && (now & 0xFF000000u) == ((old - 1u) & 0xFF000000u)) {
+#ifdef SH4_MEM_HOOK /* the differential harness: memory is its overlay, reached through the hooks */
+    for (uint32_t a = now; a < old; a++) wr8(a, 0);
+#else
     memset(sh4_ram + (now & 0xFFFFFF), 0, old - now);
+#endif
+  }
 }
 OPF(ADD) { UNUSED; if (OPN == 15) { uint32_t o = RN; RN += RM; sh4_stack_lowered(o, RN); } else RN += RM; }
 OPF(ADD_I) { (void)pc; if (OPN == 15 && (op & 0x80)) { uint32_t o = RN; RN += OPSI8; sh4_stack_lowered(o, RN); } else RN += OPSI8; }
