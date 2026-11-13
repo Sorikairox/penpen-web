@@ -265,6 +265,10 @@ def table(names):
             if l.startswith('#'):
                 continue
             t = l.rstrip('\n').split('\t')
+            # S18: a newer row replaces an older one, but a row without kept samples does not replace one with some
+            old = rows.get(t[0])
+            if old and int(old[4] or 0) > 0 and not int(t[4] or 0) > 0:
+                continue
             rows[t[0]] = t + [n]
     with open(os.path.join(REPO, 'docs/progress/synth_coverage.tsv'), 'w') as f:
         f.write('# S17 synthetic samples (tools/synth.py, DECOMP.md 18): per hand-written function, its synthetic difftest\n'

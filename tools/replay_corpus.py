@@ -80,11 +80,40 @@ def owner_keys(repo, only=None):
         addrs = {int(a, 16) for a in exps} | was.get(name, set())
         per_file.setdefault(r, set()).update(addrs)
         lines[(r, ln)] = (name, addrs)
+    # S18: a static helper (no address of its own) takes the addresses of the functions of its file that call it,
+    # transitively (S17 gave it every address of its file: with the 160-sample cap the samples that run the helper
+    # with the input a mutant needs were often cut off: grid_right's `+= 1` -> `-= 1` survived in menu_costume.c)
+    fn_lines, fn_addrs = {}, {}
+    for (r, ln), (name, addrs) in lines.items():
+        fn_lines.setdefault((r, name), []).append(ln)
+        fn_addrs.setdefault((r, name), set()).update(addrs)
+    text = {}
+    def src_line(r, ln):
+        if r not in text:
+            text[r] = open(os.path.join(repo, 'src', r), errors='replace').read().split('\n')
+        return text[r][ln - 1] if 0 < ln <= len(text[r]) else ''
+    callers = {}
+    for (r, name), lns in fn_lines.items():
+        for (r2, other), lns2 in fn_lines.items():
+            if r2 != r or other == name:
+                continue
+            if any(re.search(r'\b%s\s*\(' % re.escape(name), src_line(r, l)) for l in lns2):
+                callers.setdefault((r, name), set()).add(other)
+    def reach(r, name, seen):
+        out = set(fn_addrs.get((r, name), ()))
+        if out:
+            return out
+        for c in callers.get((r, name), ()):
+            if c not in seen:
+                out |= reach(r, c, seen | {c})
+        return out
     keys, sets = {}, {}
     for (r, ln), (name, addrs) in lines.items():
         if not addrs:
-            addrs = per_file.get(r, set())
-            name = '(file) ' + r
+            addrs = reach(r, name, {name})
+            if not addrs:
+                addrs = per_file.get(r, set())
+                name = '(file) ' + r
         k = r + ':' + name
         keys['%s:%d' % (r, ln)] = k
         sets[k] = sorted(addrs)

@@ -32,7 +32,7 @@ for d, _, files in os.walk(os.path.join(REPO, 'src')):
         path = os.path.join(d, fn)
         rel = os.path.relpath(path, REPO)
         for m in EXPORT.finditer(open(path).read()):
-            kind = {None: 'plain', '_RESUMABLE': 'resumable', '_MAIN': 'main'}.get(m.group(1), m.group(1))
+            kind = {None: 'plain', '_RESUMABLE': 'resumable', '_MAIN': 'main', '_FRAGMENT': 'fragment'}.get(m.group(1), m.group(1))
             addr = int(m.group(2), 16)
             names = [n for n in re.findall(r'([A-Za-z_][A-Za-z0-9_]*)\s*\(', m.group(3)) if n not in WRAPPERS]
             name = names[0] if names else '(empty)'

@@ -317,12 +317,34 @@ static void note_entry(uint32_t t) {
   }
 }
 
+/* S18: the starts of the functions of the game's code range, as a bitmap: side A notes a function it enters by
+   running on into it (a "function" Ghidra split off its parent at a literal pool or an epilogue: the parent's code
+   falls through into it), not only by a branch, so a corpus sample shows that such a fragment ran inside its parent */
+#define FS_LO 0x0C010000u
+#define FS_HI 0x0C066900u
+static uint8_t fs_map[(FS_HI - FS_LO) / 16];
+static int fs_built;
+static int fn_start(uint32_t pc) {
+  uint32_t k = pc & 0x1FFFFFFFu;
+  if (k < FS_LO || k >= FS_HI) return 0;
+  if (!fs_built) {
+    for (int i = 0; i < rt_fn_count; i++) {
+      uint32_t a = rt_fn_table[i].addr & 0x1FFFFFFFu;
+      if (a >= FS_LO && a < FS_HI) fs_map[(a - FS_LO) >> 4] |= (uint8_t)(1u << (((a - FS_LO) >> 1) & 7));
+    }
+    fs_built = 1;
+  }
+  return fs_map[(k - FS_LO) >> 4] >> (((k - FS_LO) >> 1) & 7) & 1;
+}
 /* interpret from c->pc until the return to ret with the stack back at sp; HLE targets are replayed */
 static int sbx_steps(SH4 *c, uint32_t ret, uint32_t sp, int64_t steps) {
   while (steps-- > 0) {
     int r = sh4_step(c);
     if (r) { sbx_at = c->fault; return r == -1 ? END_ILLEGAL : r == -3 ? END_SLOT : END_UNSUP; }
-    if (c->last == SH4_BR_NONE) continue;
+    if (c->last == SH4_BR_NONE) {
+      if (side_a && fn_start(c->pc)) note_entry(RT_NORM(c->pc)); /* S18: fell through into a function's start */
+      continue;
+    }
     if (c->last == SH4_BR_RET && c->pc == ret && c->r[15] >= sp) return END_RET;
     /* S17: as rt.c's interp_call: the rest of a function Ghidra cut short, entered with the PR of its last call, returns
        to hw_call's marker when the original's caller is hand-written (side B only: side A runs no hand-written code) */
@@ -406,6 +428,8 @@ static void fail(const char *fmt, uint32_t x, uint32_t y, uint32_t z) {
     b[o] = 0;
     memcpy(cur->why, b, (size_t)o + 1);
     rt_log("hw FAIL %08x frame %u call %u: %s", cur->addr, cur_frame, cur->calls, b);
+    if (replay_diffs) /* S18: the hand-written functions side A entered (the candidates) */
+      for (int k = 0; k < inside_n; k++) rt_log("hw FAIL inside %08x", inside[k]);
   }
 }
 
@@ -1340,6 +1364,7 @@ void hwt_summary(void) {
 /* --hwtest BUDGET[:SPREAD[:ONLY]] */
 int hwt_set(const char *opt) {
   char *e;
+  { const char *d = getenv("PENPEN_REPLAY_DIFFS"); replay_diffs = d ? atoi(d) : 0; } /* S18: the live difftest too */
   hwt_budget = (int)strtol(opt, &e, 10);
   if (*e == ':') hwt_spread = (int)strtol(e + 1, &e, 10);
   if (*e == ':')

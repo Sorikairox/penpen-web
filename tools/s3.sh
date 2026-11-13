@@ -27,7 +27,7 @@ REPO=$(cd "$(dirname "$0")/.." && pwd)
 J=${JOBS:-8}
 box() { # sandboxed container: repo read-only at /src, volumes as given by the caller
   $D run --rm --network none --read-only --cap-drop ALL --security-opt no-new-privileges --user 1000:1000 \
-    --tmpfs /tmp:exec,size=4g,mode=1777 -e HOME=/tmp -e EM_CACHE=/tmp/emcache \
+    --tmpfs /tmp:exec,size=4g,mode=1777 -e HOME=/tmp -e EM_CACHE=/tmp/emcache ${PENPEN_REPLAY_DIFFS:+-e PENPEN_REPLAY_DIFFS=$PENPEN_REPLAY_DIFFS} \
     -v "$REPO/port":/src/port:ro -v "$REPO/tools":/src/tools:ro -v "$REPO/src":/src/src:ro "$@"
 }
 # What may be printed from a container that read disc-derived data: our own log vocabulary only (-a: a log line
