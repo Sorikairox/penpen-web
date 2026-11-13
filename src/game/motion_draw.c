@@ -308,7 +308,9 @@ void racer_draw(gaddr racer) {
 
   matrix_push();
   matrix_translate_v(racer_body(racer));
-  matrix_rotate_xyz(F32(0.0f), racer_heading(racer), F32(0.0f));
+  /* S21: the original calls func_8C0304CA (njRotateZXY's thunk) here, not njRotateXYZ's: written with the thunk S14
+     mistook (DECOMP 21.7); with X and Z literal zeros both orders run only the Y rotation (a zero angle is skipped) */
+  matrix_rotate_zxy(F32(0.0f), racer_heading(racer), F32(0.0f));
   racer_scale_along(r, racer);
   njCnkModDrawModel(RACER_SHADOW_MODEL);
   matrix_pop();
