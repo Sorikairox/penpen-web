@@ -70,7 +70,8 @@ void menu_penguin_set_looks(gaddr penguin) {
       p->looks[3] = 2;
   }
 }
-/* not exported (S14 difftest: untested: since the menu code that called it is hand-written, it is entered only from C, and no passing sample of its callers covered it): HW_EXPORT(8c022c70, menu_penguin_set_looks(ARG0)) */
+/* S17: exported (re-checked against the original; tested by synthetic samples) */
+HW_EXPORT(8c022c70, menu_penguin_set_looks(ARG0))
 
 /* was func_8C022C2C: back to the menus' motion table: posing (set character + 1, motion 1) or standing (set 0,
  * motion 0), no request, frame 0, speed 1; that set started, then the style numbers (the original falls through

@@ -74,14 +74,17 @@ typedef struct CharacterParams {
   f32 walk_turn[3]; /* 0x24: S16 b04: its turn rate per stick y, the same way */
   f32 jump_push;  /* 0x30: S16 b04: state 3 on special ground: the upward push when button 0 is pressed */
   f32 lift_push;  /* 0x34: S16 b04: state 3 elsewhere: the upward push while button 0 is held */
-  uint8_t pad_38[0x44 - 0x38];
+  uint8_t pad_38[0x3C - 0x38];
+  f32 action4_push; /* 0x3C: S17 b04: state 3's action 4: the push (z) per update (times 1.2) */
+  f32 action4_turn; /* 0x40: S17 b04: its turn rate (times stick_y) */
   f32 dash_push;  /* 0x44: S15 b05: added to the moving body's push (z) when the dash starts */
   uint8_t pad_48[0x4C - 0x48];
   f32 walk_scale[6]; /* 0x4C: S16 b04: state 3 on special ground: the push scaled by Racer.ground */
   f32 damping_y;  /* 0x64: S15 b05: the moving body's vertical damping in the dash and the hit */
   f32 ground_damping[7]; /* 0x68: S15 b05: its horizontal damping while hit, by Racer.ground (0-4 seen) */
   f32 dash_damping;      /* 0x84: S15 b05: its horizontal damping in the dash */
-  uint8_t pad_88[0x90 - 0x88];
+  uint8_t pad_88[0x8C - 0x88];
+  int32_t action4_frames; /* 0x8C: S17 b04: state 3's action 4: its length (scaled by the item, 0x8C0855E8) */
   int32_t dash_frames;    /* 0x90: S15 b05: the dash's first part */
   int32_t dash_end_frames; /* 0x94: its second part */
   int32_t hit_frames[3];  /* 0x98: S15 b05: action 3's length by hit_strength: [0] for 2, [1] for 1, [2] for 0 */
@@ -101,8 +104,29 @@ typedef struct CharacterParams {
                            * than hold_levels[n] (the highest that holds) */
   int32_t release_frames_max; /* 0x374: S16 b04: level 6 while released for 1 to this many updates */
   int32_t frames378; /* 0x378: its length (scaled by the item, func_8C03438C) */
-  uint8_t pad_37c[0x434 - 0x37C];
+  int32_t state4_hit_frames[2]; /* 0x37C: S17 b04: state 4's action 3 (hit): [0] for hit_strength 2 (and any
+                                 * other than 0, 1), [1] for 0 and 1 */
+  uint8_t pad_384[0x3C0 - 0x384];
+  f32 swim4_push;         /* 0x3C0: S17 b04: state 5's action 4: the push (z) per update */
+  f32 swim4_turn;         /* 0x3C4: its turn rate (times stick_y) */
+  uint8_t pad_3c8[0x3E4 - 0x3C8];
+  f32 swim4_tilt_rate;    /* 0x3E4: the rate value33c is pulled at (to stick_x times swim4_tilt) */
+  f32 swim_damping_xy[7]; /* 0x3E8: S17 b04: state 5 under the surface: the moving body's x and y damping by
+                           * stroke_level ([0] in action 4) */
+  f32 swim_damping_z[7];  /* 0x404: its z damping */
+  f32 swim4_tilt;         /* 0x420 */
+  int32_t swim_frames[4]; /* 0x424: S17 b04: state 5: [0] action 4's length (scaled by the item, 0x8C085628);
+                           * [1] / [2] / [3] action 3's (hit) for hit_strength 2 / 1 / 0 (motion sets 0x1B / 0x1C /
+                           * 0x1A; [2] again when set 0x1B ends) */
 } CharacterParams;
+HW_OFFSET(CharacterParams, action4_push, 0x3C);
+HW_OFFSET(CharacterParams, action4_frames, 0x8C);
+HW_OFFSET(CharacterParams, state4_hit_frames, 0x37C);
+HW_OFFSET(CharacterParams, swim4_push, 0x3C0);
+HW_OFFSET(CharacterParams, swim4_tilt_rate, 0x3E4);
+HW_OFFSET(CharacterParams, swim_damping_z, 0x404);
+HW_OFFSET(CharacterParams, swim4_tilt, 0x420);
+HW_OFFSET(CharacterParams, swim_frames, 0x424);
 HW_OFFSET(CharacterParams, mass, 0x08);
 HW_OFFSET(CharacterParams, hit_mass, 0x10);
 HW_OFFSET(CharacterParams, dash_push, 0x44);
@@ -667,5 +691,21 @@ gaddr racer_base_init(gaddr racer, uint32_t index, gaddr unused_b, int32_t chara
 void racer_emit_effects(gaddr self);
 void racer_play_sounds(gaddr self);
 void lane_racer_steer(gaddr self);
+
+/* S17 b03: game/racer_fields.c */
+gaddr racer_body2fc(gaddr racer);
+f32 racer_value33c(gaddr racer);
+f32 racer_f434(gaddr racer);
+int32_t racer_word1a8(gaddr racer);
+int32_t racer_ground_kind(gaddr racer);
+f32 racer_time(gaddr racer, int32_t i);
+int32_t racer_stick_damped(gaddr racer);
+void racer_set_stick_damped(gaddr racer, int32_t value);
+f32 racer_f188(gaddr racer);
+void racer_set_f188(gaddr racer, f32 value);
+int32_t racer_had_contacts(gaddr racer);
+void racer_put_position(gaddr racer, gaddr v);
+void racer_put_velocity(gaddr racer, gaddr v);
+void racer_put_heading(gaddr racer, f32 heading);
 
 #endif

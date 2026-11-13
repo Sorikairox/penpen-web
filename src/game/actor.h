@@ -246,10 +246,16 @@ HW_SIZE(ActorType1C, 0x90);
 /* an actor that turns (func_8C04763E; by its address, probably type 0x0E: constructor func_8C047576, 0x44 bytes) */
 typedef struct Spinner {
   Actor base;               /* 0x00 */
-  uint8_t pad_28[0x38 - 0x28];
-  f32 angle;                /* 0x38: Ninja units */
+  Vec3 position;            /* 0x28: S17 b05: where it is drawn (func_8C04764E) */
+  f32 tilt;                 /* 0x34: S17 b05: about x (Ninja units, as a float) */
+  f32 angle;                /* 0x38: Ninja units (about y) */
+  gaddr model;              /* 0x3C: S17 b05: NJS_CNK_OBJECT drawn with nj_ModelL1 */
+  gaddr second_vtable;      /* 0x40: S17 b05 */
 } Spinner;
 HW_OFFSET(Spinner, angle, 0x38);
+HW_OFFSET(Spinner, tilt, 0x34);
+HW_OFFSET(Spinner, model, 0x3C);
+HW_SIZE(Spinner, 0x44);
 
 /* type 0x1D (constructor func_8C04795C): a chain, a Body with its contacts, a swing and 20 links (func_8C0479EC sets
  * it up) */
@@ -575,20 +581,28 @@ HW_SIZE(Balls, 0x3F8);
  * (func_8C04FE68) */
 typedef struct Wobbler {
   Actor base;               /* 0x000 */
-  uint8_t pad_028[0x040 - 0x028];
-  f32 clock;                /* 0x040: + 1 each step */
+  uint8_t pad_028[0x02C - 0x028];
+  int32_t motion;           /* 0x02C: S17 b06: the entry of the motion table it is drawn with */
+  uint8_t pad_030[0x040 - 0x030];
+  f32 clock;                /* 0x040: + 1 each step (S17 b06: the motion's frame, handed by address) */
   uint8_t pad_044[0x048 - 0x044];
   f32 rest;                 /* 0x048: the value its three Body1s are pulled toward */
-  uint8_t pad_04c[0x058 - 0x04C];
+  Vec3 angle;               /* 0x04C: S17 b06: drawn turned about z, y, then x by it */
   Vec3 position;            /* 0x058: the contacts' owner */
-  Body1 wobble[3];          /* 0x064 */
-  Body body;                /* 0x094 */
-  uint8_t pad_0c4[0x0D0 - 0x0C4];
+  Body1 wobble[3];          /* 0x064: S17 b06: their values scale the model in x, y, z */
+  Body body;                /* 0x094: S17 b06: drawn at its position */
+  gaddr object;             /* 0x0C4: S17 b06: NJS_OBJECT */
+  gaddr texlist;            /* 0x0C8: S17 b06 */
+  gaddr motions;            /* 0x0CC: S17 b06: MotionEntry table */
   Contacts contacts;        /* 0x0D0: owned by the position, radius 6, capacity 2 */
   int32_t contacts_word;    /* 0x124 */
   gaddr second_vtable;      /* 0x128 */
 } Wobbler;
 HW_OFFSET(Wobbler, clock, 0x040);
+HW_OFFSET(Wobbler, motion, 0x02C);
+HW_OFFSET(Wobbler, angle, 0x04C);
+HW_OFFSET(Wobbler, object, 0x0C4);
+HW_OFFSET(Wobbler, motions, 0x0CC);
 HW_OFFSET(Wobbler, rest, 0x048);
 HW_OFFSET(Wobbler, position, 0x058);
 HW_OFFSET(Wobbler, wobble, 0x064);
@@ -600,7 +614,8 @@ HW_SIZE(Wobbler, 0x12C);
 typedef struct ActorType19 {
   Actor base;               /* 0x000 */
   uint8_t pad_028[0x030 - 0x028];
-  int32_t slow;             /* 0x030: 0 = the clock runs at double speed */
+  int32_t slow;             /* 0x030: 0 = the clock runs at double speed (S17 b06: also the entry of the motion
+                             * table it is drawn with) */
   int32_t state;            /* 0x034: picks the step (func_8C050BAE, func_8C05106C, func_8C0512A4, func_8C051548) */
   uint8_t pad_038[0x03C - 0x038];
   int32_t phase;            /* 0x03C: S16 b06: state 2's phase: 0 waits for a player on trigger_cell, 1 counts
@@ -614,11 +629,23 @@ typedef struct ActorType19 {
   Vec3 points[3];           /* 0x064 */
   Quat turns[3];            /* 0x088 */
   Body body;                /* 0x0B8 */
-  uint8_t pad_0e8[0x0F4 - 0x0E8];
+  gaddr object;             /* 0x0E8: S17 b06: NJS_OBJECT */
+  gaddr texlist;            /* 0x0EC: S17 b06 */
+  gaddr motions;            /* 0x0F0: S17 b06: MotionEntry table */
   Contacts contacts;        /* 0x0F4: owned by the body, radius 2, capacity 2 */
   int32_t contacts_word;    /* 0x148 */
-  Vec3 point14c;            /* 0x14C */
-  uint8_t pad_158[0x1B8 - 0x158];
+  Vec3 point14c;            /* 0x14C: S17 b06: the first path's point (from + half - cos(t) half) */
+  Vec3 path_from;           /* 0x158: S17 b06: two paths run from `from` to `to` by a half cosine as path_t goes
+                             * 0 to 0x8000 */
+  Vec3 path_half;           /* 0x164: S17 b06: (to - from) / 2 */
+  Vec3 path_to;             /* 0x170 */
+  Vec3 point17c;            /* 0x17C: S17 b06: the second path's point */
+  Vec3 path_b_from;         /* 0x188 */
+  Vec3 path_b_half;         /* 0x194 */
+  Vec3 path_b_to;           /* 0x1A0 */
+  f32 path_t;               /* 0x1AC: S17 b06: Ninja angle units, 0 to 0x8000 */
+  f32 path_step;            /* 0x1B0: S17 b06: 0x8000 / path_length */
+  f32 path_length;          /* 0x1B4: S17 b06: steps the paths take */
   gaddr second_vtable;      /* 0x1B8 */
 } ActorType19;
 HW_OFFSET(ActorType19, state, 0x034);
@@ -630,6 +657,17 @@ HW_OFFSET(ActorType19, turns, 0x088);
 HW_OFFSET(ActorType19, body, 0x0B8);
 HW_OFFSET(ActorType19, contacts, 0x0F4);
 HW_OFFSET(ActorType19, point14c, 0x14C);
+HW_OFFSET(ActorType19, object, 0x0E8);
+HW_OFFSET(ActorType19, motions, 0x0F0);
+HW_OFFSET(ActorType19, path_from, 0x158);
+HW_OFFSET(ActorType19, path_half, 0x164);
+HW_OFFSET(ActorType19, path_to, 0x170);
+HW_OFFSET(ActorType19, point17c, 0x17C);
+HW_OFFSET(ActorType19, path_b_from, 0x188);
+HW_OFFSET(ActorType19, path_b_half, 0x194);
+HW_OFFSET(ActorType19, path_b_to, 0x1A0);
+HW_OFFSET(ActorType19, path_t, 0x1AC);
+HW_OFFSET(ActorType19, path_length, 0x1B4);
 HW_SIZE(ActorType19, 0x1BC);
 
 /* what Actor.model_set, texlist and word1c point at: a word, then the list (S14 b10: the effect reads the second
@@ -772,12 +810,13 @@ typedef struct Flock {
   f32 height;               /* 0x38: a body 500 above it stops */
   uint8_t pad_3c[0x40 - 0x3C];
   gaddr bodies;             /* 0x40: Body[count] (operator new[], each built by func_8C0551CE) */
-  uint8_t pad_44[0x64 - 0x44];
+  NjSprite sprite;          /* 0x44: S17 b07: drawn twice at each body (func_8C0554AE) */
   gaddr second_vtable;      /* 0x64 */
 } Flock;
 HW_OFFSET(Flock, trigger_cell, 0x30);
 HW_OFFSET(Flock, height, 0x38);
 HW_OFFSET(Flock, bodies, 0x40);
+HW_OFFSET(Flock, sprite, 0x44);
 HW_OFFSET(Flock, second_vtable, 0x64);
 HW_SIZE(Flock, 0x68);
 
@@ -1260,6 +1299,7 @@ HW_SIZE(ActorType20, 0xE8);
 /* ---- end of S15 b08 ---- */
 
 /* game/actor.c */
+gaddr course_actor_placements(gaddr course); /* S17 b05: exported there, declared here */
 void actor_a_destroy(gaddr obj);
 void actor_b_destroy(gaddr obj);
 gaddr actor_base_construct(gaddr actor);

@@ -82,4 +82,8 @@ void body1_pull(f32 target, f32 rate, gaddr p);
 void body1_pull_angle(f32 target, f32 rate, gaddr p);
 void body1_step(gaddr s);
 
+/* S17 b04: game/motion_attach.c */
+void motion_attach_node_callback(gaddr node);
+void matrix_set_identity(gaddr m);
+
 #endif

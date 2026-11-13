@@ -102,4 +102,14 @@ gaddr motion_player_build(gaddr player, int32_t character, int32_t variant, gadd
 void motion_player_play_set(gaddr player, int32_t set, f32 speed);
 void motion_player_advance(gaddr player);
 
+/* S17 b02: game/motion_player_access.c */
+void motion_player_looks_from_save(gaddr player);
+void motion_player_play_set_1(gaddr player, int32_t set);
+void motion_player_set_speed(gaddr player, f32 speed);
+void motion_player_set_look(gaddr player, int32_t i, int32_t look);
+int32_t motion_player_look(gaddr player, int32_t i);
+int32_t motion_player_toggle_word14(gaddr player);
+gaddr motion_player_request(gaddr player);
+f32 motion_player_frame_now(gaddr player);
+
 #endif

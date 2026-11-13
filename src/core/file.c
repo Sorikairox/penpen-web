@@ -16,7 +16,6 @@ static int32_t gdFsDaPlay(int32_t first_track, int32_t last_track, int32_t repea
 }
 
 /* still translated (the runs never call them: a directory change, the error callback) */
-static void file_change_dir(gaddr dir_name) { CALL1(0x8C012D1Cu, dir_name); } /* func_8C012D1C: gdFsChangeDir until it succeeds */
 
 /* the main loop's globals this module resets (game/game.h has them too) */
 #define g_exit_request GUEST_VAR(int32_t, 0x8C08AD48u)

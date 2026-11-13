@@ -68,5 +68,12 @@ int32_t task_is_paused(const Task *task);
 TaskTree *tasktree_attach_root(TaskTree *tree);
 void tasktree_update(gaddr tree);
 void tasktree_set_pause(TaskTree *tree, int32_t paused);
+/* S17 b01: core/task_tree.c */
+void task_add_siblings(Task *task, Task *first);
+gaddr tasktree_construct(gaddr tree);
+void tasktree_destroy_tasks(TaskTree *tree);
+gaddr tasktree_destroy(gaddr tree, int32_t free_memory);
+gaddr tasktree_destroy_member(gaddr tree);
+int32_t tasktree_toggle_pause(TaskTree *tree);
 
 #endif

@@ -126,18 +126,7 @@ void fix_cnk_object_tree(gaddr object, gaddr base) {
 }
 HW_EXPORT(8c0138e6, fix_cnk_object_tree(ARG0, ARG1))
 
-/* ---- still translated: the fix-ups of container types no route loads (they stay the translation's until a run
- * reaches them: the difftest could not test them) ---- */
-static void fix_objects(gaddr array, gaddr base, int32_t count) { CALL3(0x8C013696u, array, base, count); }
-static void fix_texlists(gaddr array, gaddr base, int32_t count) { CALL3(0x8C01370Eu, array, base, count); }
-static void fix_action(gaddr action, gaddr base, int32_t nodes) { CALL3(0x8C013746u, action, base, nodes); }
-static void fix_actions(gaddr array, gaddr base, int32_t count, int32_t nodes) { CALL4(0x8C013790u, array, base, count, nodes); }
-static void fix_action_list(gaddr array, gaddr base, int32_t count) { CALL3(0x8C0137D0u, array, base, count); }
-static void fix_motion_pair(gaddr pair, gaddr base, int32_t nodes) { CALL3(0x8C01380Au, pair, base, nodes); }
-static void fix_motion_pairs(gaddr array, gaddr base, int32_t count, int32_t nodes) { CALL4(0x8C013856u, array, base, count, nodes); }
-static void fix_cnk_action(gaddr action, gaddr base, int32_t nodes) { CALL3(0x8C01398Cu, action, base, nodes); }
-/* func_8C0139D6 takes its count from the fourth argument and passes it on as the node count; the third is unused */
-static void fix_cnk_actions(gaddr array, gaddr base, int32_t unused, int32_t count) { CALL4(0x8C0139D6u, array, base, unused, count); }
+/* the fix-ups of container types no route loads: S17 b01, core/fixup_more.c (tested by synthetic samples) */
 
 /* ---- arrays: `count` pointers (or tuples), each fixed when not 0 ---- */
 

@@ -12,6 +12,7 @@
 #include "../core/file.h"     /* NjObject */
 #include "../core/ninja.h"    /* NjSprite, matrix_* */
 #include "actor.h"
+#include "actor_b06.h"   /* motes_draw (S17 b06) */
 
 enum { SIGN_MODE_SWING_X = 0, SIGN_MODE_TWO_PARTS = 1, SIGN_MODE_SWING_Z = 2, SIGN_MODE_SWING_Y = 3,
        SIGN_MODE_STILL = 4, SIGN_MODE_MOTES = 5, SIGN_MODE_BOARD = 6 };
@@ -38,7 +39,6 @@ static void text_color_set(f32 r, f32 g, f32 b, f32 a) {
 /* func_8C019860 (game/save.c, no header): the game's language (0-6) */
 static int32_t game_language(void) { return (int32_t)CALL0(0x8C019860u); }
 /* func_8C04CA86: draw a MemberArray of motes */
-static void motes_draw(gaddr motes) { CALL1(0x8C04CA86u, motes); }
 
 /* the original's frame of the draw (0x34 bytes under r8 and PR): the board sprite */
 typedef struct SignFrame {

@@ -137,4 +137,20 @@ void fix_cnk_model(gaddr model, gaddr base);
 gaddr container_load(gaddr name, gaddr dir_name);
 
 void cd_wait_stopped(void);
+/* S17 b01: core/fixup_more.c (fixup.c's static wrappers of these go) */
+void fix_objects(gaddr array, gaddr base, int32_t count);
+void fix_texlists(gaddr array, gaddr base, int32_t count);
+void fix_action(gaddr action, gaddr base, int32_t nodes);
+void fix_actions(gaddr array, gaddr base, int32_t count, int32_t nodes);
+void fix_action_list(gaddr array, gaddr base, int32_t count);
+void fix_motion_pair(gaddr pair, gaddr base, int32_t nodes);
+void fix_motion_pairs(gaddr array, gaddr base, int32_t count, int32_t nodes);
+void fix_cnk_action(gaddr action, gaddr base, int32_t nodes);
+void fix_cnk_actions(gaddr array, gaddr base, int32_t unused, int32_t count);
+/* S17 b01: core/cd.c (file.c's / texture.c's static file_change_dir wrappers go) */
+void file_change_dir(gaddr dir_name);
+void cd_stop(void);
+int32_t cd_release(int32_t arg);
+void file_error(gaddr object, int32_t error);
+
 #endif

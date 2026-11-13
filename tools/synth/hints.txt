@@ -1359,3 +1359,249 @@ hw
 arg 0 8cfff100
 for name:system_language
 hw
+# ---- S17 b08 writer's hints
+for 8c05a74e
+# this: Fence: deleting destructor (placement type 0x12, made by the factory func_8C043D4C)
+pre 8c043d4c 0 12 0 0
+arg 0 $0
+arg 1 0 1
+
+for 8c05aa96
+# this: WaveField: deleting destructor (placement type 0x13, made by the factory func_8C043D4C)
+pre 8c043d4c 0 13 0 0
+arg 0 $0
+arg 1 0 1
+
+for 8c05b1c6
+# this: Ornament: deleting destructor (placement type 0x14, made by the factory func_8C043D4C)
+pre 8c043d4c 0 14 0 0
+arg 0 $0
+arg 1 0 1
+
+for 8c05b964
+# this: Swinger: deleting destructor (placement type 0x15, made by the factory func_8C043D4C)
+pre 8c043d4c 0 15 0 0
+arg 0 $0
+arg 1 0 1
+
+for 8c05bc80
+# this: Sparkles: deleting destructor (placement type 0x16, made by the factory func_8C043D4C)
+pre 8c043d4c 0 16 0 0
+arg 0 $0
+arg 1 0 1
+
+for 8c05bff6
+# this: Rings: deleting destructor (placement type 0x2C, made by the factory func_8C043D4C)
+pre 8c043d4c 0 2c 0 0
+arg 0 $0
+arg 1 0 1
+
+for 8c05c6da
+# this: ActorType2D: deleting destructor (placement type 0x2D, made by the factory func_8C043D4C)
+pre 8c043d4c 0 2d 0 0
+arg 0 $0
+arg 1 0 1
+
+for 8c05d220
+# this: ActorType30: deleting destructor (placement type 0x30, made by the factory func_8C043D4C)
+pre 8c043d4c 0 30 0 0
+arg 0 $0
+arg 1 0 1
+
+for 8c05f08c
+# this: ActorType31: deleting destructor (placement type 0x31, made by the factory func_8C043D4C)
+pre 8c043d4c 0 31 0 0
+arg 0 $0
+arg 1 0 1
+
+for 8c05a772
+# this: Fence (placement type 0x12, made by the factory func_8C043D4C)
+pre 8c043d4c 0 12 0 0
+arg 0 $0
+
+for 8c05aaba
+# this: WaveField (placement type 0x13, made by the factory func_8C043D4C)
+pre 8c043d4c 0 13 0 0
+arg 0 $0
+
+for 8c05b1ea
+# this: Ornament (placement type 0x14, made by the factory func_8C043D4C)
+pre 8c043d4c 0 14 0 0
+arg 0 $0
+
+for 8c05b7c2
+# this: Ornament (placement type 0x14, made by the factory func_8C043D4C)
+pre 8c043d4c 0 14 0 0
+arg 0 $0
+
+for 8c05b988
+# this: Swinger (placement type 0x15, made by the factory func_8C043D4C)
+pre 8c043d4c 0 15 0 0
+arg 0 $0
+
+for 8c05bb14
+# this: Swinger (placement type 0x15, made by the factory func_8C043D4C)
+pre 8c043d4c 0 15 0 0
+arg 0 $0
+
+for 8c05bca4
+# this: Sparkles (placement type 0x16, made by the factory func_8C043D4C)
+pre 8c043d4c 0 16 0 0
+arg 0 $0
+
+for 8c05bfe2
+# this: Rings (placement type 0x2C, made by the factory func_8C043D4C)
+pre 8c043d4c 0 2c 0 0
+arg 0 $0
+
+for 8c05c01a
+# this: Rings (placement type 0x2C, made by the factory func_8C043D4C)
+pre 8c043d4c 0 2c 0 0
+arg 0 $0
+
+for 8c05c6c6
+# this: ActorType2D (placement type 0x2D, made by the factory func_8C043D4C)
+pre 8c043d4c 0 2d 0 0
+arg 0 $0
+
+for 8c05c6fe
+# this: ActorType2D (placement type 0x2D, made by the factory func_8C043D4C)
+pre 8c043d4c 0 2d 0 0
+arg 0 $0
+
+for 8c05ca34
+# this: ActorType2D (placement type 0x2D, made by the factory func_8C043D4C)
+pre 8c043d4c 0 2d 0 0
+arg 0 $0
+
+for 8c05d074
+# this: ActorType30 (constructed again in place) (placement type 0x30, made by the factory func_8C043D4C)
+pre 8c043d4c 0 30 0 0
+arg 0 $0
+
+for 8c05d190
+# this: ActorType30 (constructed again in place) (placement type 0x30, made by the factory func_8C043D4C)
+pre 8c043d4c 0 30 0 0
+arg 0 $0
+
+for 8c05d200
+# this: ActorType30 (placement type 0x30, made by the factory func_8C043D4C)
+pre 8c043d4c 0 30 0 0
+arg 0 $0
+
+for 8c05d244
+# this: ActorType30 (placement type 0x30, made by the factory func_8C043D4C)
+pre 8c043d4c 0 30 0 0
+arg 0 $0
+
+for 8c05e36c
+# this: ActorType30 (placement type 0x30, made by the factory func_8C043D4C)
+pre 8c043d4c 0 30 0 0
+arg 0 $0
+
+for 8c05e3c0
+# this: ActorType30 (placement type 0x30, made by the factory func_8C043D4C)
+pre 8c043d4c 0 30 0 0
+arg 0 $0
+
+for 8c05e7bc
+# this: ActorType30 (placement type 0x30, made by the factory func_8C043D4C)
+pre 8c043d4c 0 30 0 0
+arg 0 $0
+
+for 8c05e842
+# this: ActorType30 (placement type 0x30, made by the factory func_8C043D4C)
+pre 8c043d4c 0 30 0 0
+arg 0 $0
+
+for 8c05edf0
+# this: ActorType31 (constructed again in place) (placement type 0x31, made by the factory func_8C043D4C)
+pre 8c043d4c 0 31 0 0
+arg 0 $0
+
+for 8c05efb4
+# this: ActorType31 (constructed again in place) (placement type 0x31, made by the factory func_8C043D4C)
+pre 8c043d4c 0 31 0 0
+arg 0 $0
+
+for 8c05efd0
+# this: ActorType31 (placement type 0x31, made by the factory func_8C043D4C)
+pre 8c043d4c 0 31 0 0
+arg 0 $0
+
+for 8c05f0b0
+# this: ActorType31 (placement type 0x31, made by the factory func_8C043D4C)
+pre 8c043d4c 0 31 0 0
+arg 0 $0
+
+for 8c05f4ec
+# this: ActorType31 (placement type 0x31, made by the factory func_8C043D4C)
+pre 8c043d4c 0 31 0 0
+arg 0 $0
+
+for 8c05fc78
+# this: ActorType31 (placement type 0x31, made by the factory func_8C043D4C)
+pre 8c043d4c 0 31 0 0
+arg 0 $0
+
+for 8c060284
+# this: ActorType32 (its base constructed again in place) (placement type 0x32, made by the factory func_8C043D4C)
+pre 8c043d4c 0 32 0 0
+arg 0 $0
+
+for 8c05f708
+# this: ActorType31; scene at 0x1F4 must be the race scene, player at 0x40 0..3, distance 0x48 < 40 for the main path (placement type 0x31, made by the factory func_8C043D4C)
+pre 8c043d4c 0 31 0 0
+arg 0 $0
+
+for 8c05f87c
+# this: ActorType31; scene at 0x1F4 must be the race scene, player at 0x40 0..3 (placement type 0x31, made by the factory func_8C043D4C)
+pre 8c043d4c 0 31 0 0
+arg 0 $0
+
+for 8c05e920
+# a Contacts handler (contacts, i, body): contacts = ActorType30's first set (0x2B0, capacity 2), i < capacity, body = its Body (0xEC)
+pre 8c043d4c 0 30 0 0
+arg 0 $0+2b0
+arg 1 0 1
+arg 2 $0+ec
+
+for 8c05e986
+# a Contacts handler (contacts, i, body): contacts = ActorType30's first set (0x2B0, capacity 2), i < capacity, body = its Body (0xEC)
+pre 8c043d4c 0 30 0 0
+arg 0 $0+2b0
+arg 1 0 1
+arg 2 $0+ec
+
+for 8c05c424
+# a Contacts handler (contacts, i, body): contacts = ActorType30's first set (0x2B0, capacity 2), i < capacity, body = its Body (0xEC)
+pre 8c043d4c 0 30 0 0
+arg 0 $0+2b0
+arg 1 0 1
+arg 2 $0+ec
+
+for 8c05c63a
+# race_scene_view_cell copy: r4 = the RaceScene, r5 = the view (-1 = current) indexing view_cell[4]
+arg 1 ffffffff 0 1 2 3
+
+for 8c05d002
+# race_scene_view_cell copy: r4 = the RaceScene, r5 = the view (-1 = current) indexing view_cell[4]
+arg 1 ffffffff 0 1 2 3
+
+for 8c0601fa
+# race_scene_view_cell copy: r4 = the RaceScene, r5 = the view (-1 = current) indexing view_cell[4]
+arg 1 ffffffff 0 1 2 3
+
+for 8c05cd7e
+# the constant material = (r, g, b, a) in fr4..fr7
+farg 0 0 0.5 1
+farg 1 0 0.5 1
+farg 2 0 0.5 1
+farg 3 0 0.5 1
+
+for 8c05ff24
+# the constant material = (r, g, b, a) in fr4..fr7
+farg 0 0 0.5 1
+farg 1 0 0.5 1
+farg 2 0 0.5 1
+farg 3 0 0.5 1

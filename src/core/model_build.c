@@ -83,8 +83,8 @@ void model_alloc_meshset(gaddr model, int32_t i, uint32_t type, uint32_t materia
   s->vertex_colors = with_colors != 0 ? syMalloc((uint32_t)indices * 4) : 0;
   s->vertex_uvs = with_uv != 0 ? syMalloc((uint32_t)indices * 4) : 0;
 }
-/* not exported: for a mesh type other than 0 / 0x4000 the original reads a register it never set (the caller's r13) */
-/* HW_EXPORT(8c01509a, model_alloc_meshset(ARG0, (int32_t)ARG1, ARG2, ARG3, (int32_t)ARG4, (int32_t)ARG5, (int32_t)ARG6)) */
+/* S17: exported (tested by synthetic samples: a translated caller's r13 is the CPU's at entry, as the original reads) */
+HW_EXPORT(8c01509a, model_alloc_meshset(ARG0, (int32_t)ARG1, ARG2, ARG3, (int32_t)ARG4, (int32_t)ARG5, (int32_t)ARG6))
 
 /* was func_8C01513C: frees every mesh set's arrays, then the mesh sets */
 void model_free_meshsets(gaddr model) {

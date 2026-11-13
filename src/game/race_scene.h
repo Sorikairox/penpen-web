@@ -96,7 +96,11 @@ typedef struct RaceScene {
   int32_t pause_port;           /* 0xB40: the port (0-3) of the player who paused */
   int32_t pause_cursor;         /* 0xB44: the pause menu's line (0 to g_pause_last_line) */
   int32_t pad_removed;          /* 0xB48: the pausing player's controller was pulled out */
-  gaddr result;                 /* 0xB4C */
+  union {
+    gaddr result;               /* 0xB4C */
+    int32_t menu_line;          /* 0xB4C: S17 b04: the after-race menu's line under the cursor
+                                 * (race_results_menu_update) */
+  };
   int32_t keep_course;          /* 0xB50: 0 = the set-up builds the course and actors */
   f32 pause_fade;               /* 0xB54: the pause screen's fade (> 0: drawn) */
   f32 pause_fade_step;          /* 0xB58: +-1/30 per frame, by whether the scene is paused */
@@ -114,7 +118,8 @@ typedef struct RaceScene {
   int32_t word_cb8;             /* 0xCB8: S15 b04: 0 when a race starts; S17 r2: frames since the last sample (0-7) */
   int32_t word_cbc;             /* 0xCBC: the same; S17 r2: the recording's sample (one every 8 frames) */
   int16_t scores[RACE_PLAYERS]; /* 0xCC0: shown with the results */
-  uint8_t pad_cc8[0xCCC - 0xCC8];
+  int16_t result_score;         /* 0xCC8: S17 b04: the results' score (func_8C02E7C6 returns it in state 3) */
+  uint8_t pad_cca[0xCCC - 0xCCA];
   gaddr vec_lists_a[RACE_RACERS]; /* 0xCCC: S15: per racer slot, g_race_mark_count / 8 + 1 Vec3s */
   gaddr vec_lists_b[RACE_RACERS]; /* 0xCEC: the same */
   gaddr word_lists[RACE_RACERS];  /* 0xD0C: the same number of words */
@@ -151,6 +156,7 @@ HW_OFFSET(RaceScene, pause_fade, 0xB54);
 HW_OFFSET(RaceScene, pause_fade_step, 0xB58);
 HW_OFFSET(RaceScene, vecA80, 0xA80);
 HW_OFFSET(RaceScene, result, 0xB4C);
+HW_OFFSET(RaceScene, menu_line, 0xB4C);
 HW_OFFSET(RaceScene, keep_course, 0xB50);
 HW_OFFSET(RaceScene, bodies, 0xB60);
 HW_OFFSET(RaceScene, values1, 0xC50);
@@ -162,6 +168,7 @@ HW_OFFSET(RaceScene, word_cac, 0xCAC);
 HW_OFFSET(RaceScene, word_cb8, 0xCB8);
 HW_OFFSET(RaceScene, word_cbc, 0xCBC);
 HW_OFFSET(RaceScene, scores, 0xCC0);
+HW_OFFSET(RaceScene, result_score, 0xCC8);
 HW_OFFSET(RaceScene, marks_a, 0xCB0);
 HW_OFFSET(RaceScene, vec_lists_a, 0xCCC);
 HW_OFFSET(RaceScene, word_lists, 0xD0C);
@@ -260,5 +267,16 @@ void race_start_four(gaddr scene);
 void race_start_trial(gaddr scene);
 void race_start_demo(gaddr scene);
 void race_scene_start(gaddr scene);
+
+/* S17 b03: game/race_setup_fields.c */
+uint32_t race_setup_word3c(gaddr setup);
+void race_setup_set_word3c(gaddr setup, uint32_t value);
+uint32_t race_setup_word40(gaddr setup);
+void race_setup_set_word40(gaddr setup, uint32_t value);
+void race_setup_set_word44(gaddr setup, int32_t i, int32_t value);
+int32_t race_scene_shown_view(gaddr scene);
+void race_scene_run_state1(gaddr scene);
+gaddr race_scene_destroy_self(gaddr scene);
+gaddr setup_menu_destroy_self(gaddr menu);
 
 #endif

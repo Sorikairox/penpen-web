@@ -10,7 +10,6 @@ static gaddr gdFsOpen(gaddr name, gaddr dir_record) { return CALL2(0x8C09EB96u, 
 static void gdFsClose(gaddr handle) { CALL1(0x8C09E2B4u, handle); }
 static void gdFsGetFileSctSize(gaddr handle, gaddr sectors_out) { CALL2(0x8C09E306u, handle, sectors_out); }
 static int32_t gdFsRead(gaddr handle, int32_t sectors, gaddr buffer) { return (int32_t)CALL3(0x8C09E3DEu, handle, sectors, buffer); }
-static void file_change_dir(gaddr dir_name) { CALL1(0x8C012D1Cu, dir_name); } /* func_8C012D1C: gdFsChangeDir until it succeeds */
 static void njLoadTexturePvmMemory(gaddr pvm, gaddr texlist) { CALL2(0x8C0A3D5Cu, pvm, texlist); }
 
 /* was func_8C0120CA: loads the PVM file `name` (from directory dir_name when it is not 0) into texlist */

@@ -11,6 +11,9 @@ void sprite_small_draw(int32_t n, uint32_t attr, f32 x, f32 y, f32 scale);
 void sprite_big_draw(int32_t n, uint32_t attr, f32 x, f32 y, f32 scale);
 /* S15 b04: was func_8C022A78 (and its copy func_8C029332): the style back to its default (white, scale 1) */
 void text_style_reset(void);
+/* S17 b02: was func_8C022A58 (core/sprite_text.c; declared for its copies): the text scale (in 32-pixel units)
+ * and the style's third value */
+void text_set_scale(f32 sx, f32 sy, f32 v);
 
 /* S16 w4: core/text_draw.c (was func_8C01529A; game files called it through static text_draw wrappers): a
  * Shift-JIS string at (x, y) through the small sprite in the text style; returns the advance before the last
