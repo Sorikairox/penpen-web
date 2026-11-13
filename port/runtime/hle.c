@@ -235,6 +235,13 @@ static void h_gdFsInit(SH4 *c) {
   wr16(GD_SYS + 0x4C, 1); wr16(GD_SYS + 0x50, ST_IDLE); wr32(GD_SYS, GD_DRIVE);
   R(0) = 0;
 }
+/* S18: the synthetic samples' process runs no frame, so the game's gdFsInit (frame 0: 8 handles, the work area at
+ * 0x8C1AF120) never ran there and every gdFsOpen failed: a constructor's file load looped until the step budget.
+ * hwt_synth attaches the drive to the work area the bases' RAM already holds (nothing is written) */
+void hle_gd_attach(uint32_t max, uint32_t work) {
+  gd_max = max > NFH ? NFH : max;
+  gd_work = (work + 31) & ~31u;
+}
 static void h_gdFsOpen(SH4 *c) {
   char name[40], extra[48];
   guest_str(R(4), name, sizeof name);
@@ -555,6 +562,15 @@ static void vblank(SH4 *c) {
   chain_fire(c, 0x900);
   if (vsync_fn) rt_guest_call(c, vsync_fn, 0, 0, 0, 0);
   R(0) = 0;
+}
+/* S18: a frame passed inside a synthetic sample's PRELUDE (difftest.c `frames`: a constructor that shows a loading
+ * screen): the end-of-render callbacks and the V-blank's work run as njWaitVSync and the rewind would run them, but
+ * the run's frame does not advance, no frame line is written and nothing yields (the prelude goes on) */
+void hle_frame_pass(SH4 *c) {
+  if (eor_fn) rt_guest_call(c, eor_fn, 0, 0, 0, 0);
+  chain_fire(c, 0x920);
+  nj_frame_end();
+  vblank(c);
 }
 static void h_syBtExit(SH4 *c) { logcall(c, ""); rt_stop("the game asked to exit to the BIOS"); }
 static void h_syCfgGetSoundMode(SH4 *c) { logcall(c, ""); if (R(4)) { wr32(R(4), 0); hwt_hle_wrote(R(4), 4); } R(0) = 0; } /* S17: the out-parameter reported (difftest) */

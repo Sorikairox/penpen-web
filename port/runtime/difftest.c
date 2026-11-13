@@ -177,6 +177,7 @@ static int cur_sample, sample_ids; /* a sample may span frames (the call yields)
 typedef struct { uint32_t t, arity, fargs, a[8]; } call_ent; /* a[4..7]: FR4-FR7 */
 #define CX_N 9
 #define CALLS_MAX 8192
+#define RUNAWAY 100000 /* S18: side B making this many more HLE calls / hardware reads than side A made is a runaway */
 /* S17: cx: what a draw call's HLE sees at the moment of the call besides its registers (the draw context, ctx_of) */
 typedef struct { call_ent call[CALLS_MAX]; uint32_t cx[CALLS_MAX][CX_N]; int n, diverged, io_reads; uint32_t io_hash, io_n; } side_log;
 static side_log log_a, log_b, *slog;
@@ -195,6 +196,7 @@ void hwt_record_io(uint32_t a, uint32_t v) {
 }
 uint32_t hwt_io_read(uint32_t a) {
   int k = slog->io_reads++;
+  if (slog == &log_b && k > iorec_n + RUNAWAY) hwt_sandbox_abort(6, a); /* S18: a polling loop's runaway */
   if (k < iorec_n && k < IOREC_MAX && iorec[k][0] == a) return iorec[k][1];
   slog->diverged = 1;
   return hsh(a ^ 0x5A5A0F0Fu);
@@ -252,6 +254,10 @@ static void ctx_of(SH4 *c, uint32_t a, uint32_t *cx) {
 /* an HLE call in the sandbox: logged, then answered from the live record */
 static void sbx_hle(SH4 *c, uint32_t a, int arity, int fargs) {
   int k = slog->n++;
+  /* S18: a loop that never ends on side B (a mutant's `while (gdFsDaStop() != 0)` answered by a constant) ran until
+     the replay's 120 s time-out, which is not a kill: side A's call count is known, so side B's runaway ends here (the
+     ends differ: a FAIL) */
+  if (slog == &log_b && k > log_a.n + RUNAWAY) hwt_sandbox_abort(6, a);
   if (k < CALLS_MAX) {
     call_ent *e = &slog->call[k];
     e->t = a; e->arity = arity < 0 ? 4 : (uint32_t)arity; e->fargs = (uint32_t)fargs;
@@ -675,11 +681,14 @@ static void corpus_keep(int ea, uint32_t at_a, uint32_t cost) {
 
 /* --hwreplay LIST: each line a sample file of a corpus (its pages.bin beside it); side B with this build against the
  * recorded side A. Prints "hw replay pass|FAIL ..." per sample and stops at the first FAIL; "hw replay done". */
-static struct { char dir[512]; const uint8_t *p; size_t n; } pmap[64];
+/* S18: 64 -> 1024 corpus directories (S18's routes and synthetic runs passed 64: the samples of the later directories
+   were "unreadable", not judged: a silent gap in the replay and the Mull gate) */
+#define PMAP_MAX 1024
+static struct { char dir[512]; const uint8_t *p; size_t n; } pmap[PMAP_MAX];
 static int pmap_n;
 static const uint8_t *pages_of(const char *dir) {
   for (int i = 0; i < pmap_n; i++) if (!strcmp(pmap[i].dir, dir)) return pmap[i].p;
-  if (pmap_n == 64) return 0;
+  if (pmap_n == PMAP_MAX) { rt_log("hw replay: more than %d corpus directories", PMAP_MAX); return 0; }
   char path[600];
   snprintf(path, sizeof path, "%s/pages.bin", dir);
   int fd = open(path, O_RDONLY);
@@ -804,6 +813,8 @@ typedef struct { int base; uint32_t a[4], f[4]; int np; uint32_t pa[SY_POKES], p
 static struct {
   uint32_t fn, end, insn, iters, keep, seed, steps, stale, secs; /* S17: stale / secs: 0 = 600 / 20 */
   int diverse;                     /* `diverse N`: keep up to N passing inputs even without new code (values for arithmetic) */
+  int frames;                      /* S18 `frames`: the preludes may pass frames (a constructor's loading screen) */
+  int slow;                        /* S18 `slow`: a loader (container / texture files interpreted): 30 s, 20x steps */
   int nopoke;                      /* `nopoke`: the arguments only (the objects they point to stay as the base has them) */
   int nbase;
   char base[SY_BASES][512];
@@ -875,6 +886,9 @@ static char sy_ctext[4][SY_CAND][24], sy_pretext[SY_PRE][4][24];
 
 /* the recording pass: the original code interpreted from c->pc until it returns to ret with the stack back at sp; HLE
  * calls run live (recorded when hwt_recording is set: rt_call's hooks); the function's instructions run are marked */
+void hle_frame_pass(SH4 *c); /* hle.c (S18) */
+void hle_gd_attach(uint32_t max, uint32_t work); /* hle.c (S18) */
+static int sy_frames_ok, sy_frames_passed; /* S18: the prelude being run may pass frames (`frames`) */
 static int sy_run(SH4 *c, uint32_t ret, uint32_t sp, int64_t steps, uint8_t *cov) {
   while (steps-- > 0) {
     uint32_t pc = RT_NORM(c->pc);
@@ -898,7 +912,14 @@ static int sy_run(SH4 *c, uint32_t ret, uint32_t sp, int64_t steps, uint8_t *cov
     uint32_t t = RT_NORM(c->pc);
     if (c->last != SH4_BR_RET && hle_known(t)) {
       const char *nm = hle_name(t);
-      if (nm && !strcmp(nm, "njWaitVSync")) return END_STOP; /* the frame would end inside the call */
+      if (nm && !strcmp(nm, "njWaitVSync")) {
+        /* S18: a prelude with `frames` passes the frame (hle_frame_pass: the V-blank's work, no yield), up to 900 of
+           them; anywhere else the frame would end inside the call: refused */
+        if (!sy_frames_ok || ++sy_frames_passed > 900) return END_STOP;
+        hle_frame_pass(c);
+        c->pc = c->pr;
+        continue;
+      }
       int last = (int)c->last;
       rt_call(c, t);
       if (rt_unw) { rt_unw = 0; return END_STOP; }
@@ -947,7 +968,7 @@ static int sy_guarded(SH4 *c, uint8_t *ram, int record, uint8_t *cov, int64_t st
       installed = 1;
     }
     signal(SIGALRM, sy_alarm);
-    alarm(2);
+    alarm(sj.slow ? 30 : 2);
     code = sy_run(c, SY_RET, c->r[15], steps, cov);
   }
   alarm(0);
@@ -981,7 +1002,9 @@ static int sy_base(int b) {
     SH4 p = c;
     p.pc = sj.pre[k][0]; p.pr = SY_RET;
     for (int i = 0; i < 4; i++) p.r[4 + i] = sy_value(sy_pretext[k][i], b);
-    int e = sy_guarded(&p, sy_prep[b], 0, 0, 50000000);
+    sy_frames_ok = sj.frames; sy_frames_passed = 0;
+    int e = sy_guarded(&p, sy_prep[b], 0, 0, sj.slow ? 1000000000 : 50000000);
+    sy_frames_ok = 0;
     if (e != END_RET) { rt_log("hw synth prelude %d (%08x) of base %d ended %d at %08x", k, sj.pre[k][0], b, e, sbx_at); return -1; }
     sy_preret[b][k] = p.r[0];
   }
@@ -1124,7 +1147,7 @@ static void sy_job(void) {
   for (int b = 0; b < sj.nbase; b++) if (!sy_base(b)) { ok[b] = 1; nok++; }
   cur = stat_of(sj.fn);
   uint32_t kept = 0, pass = 0, failn = 0, rets = 0, covered = 0, judged = 0, odd = 0, domain = 0;
-  int64_t steps = sj.steps ? sj.steps : 2000000;
+  int64_t steps = sj.steps ? sj.steps : sj.slow ? 400000000 : 2000000;
   char why0[128] = "";
   /* S17: a job ends after ITERS inputs, KEEP kept samples, 600 inputs in a row that ran no new code (after the first
      kept one), or 20 s */
@@ -1211,6 +1234,7 @@ static void sy_job(void) {
  *   end */
 int hwt_synth(const char *spec) {
   if (hwt_alloc() < 0 || !corpus_k) { rt_log("hw synth: needs --hwcorpus DIR:K"); return 2; }
+  hle_gd_attach(8, 0x8C1AF120u); /* S18: the drive as the game's gdFsInit set it up (hle.c) */
   FILE *f = fopen(spec, "r");
   if (!f) { rt_log("hw synth: no spec"); return 2; }
   char path[600];
@@ -1237,6 +1261,10 @@ int hwt_synth(const char *spec) {
       sj.diverse = atoi(tok[1]);
     } else if (!strcmp(tok[0], "nopoke")) {
       sj.nopoke = 1;
+    } else if (!strcmp(tok[0], "slow")) {
+      sj.slow = 1;
+    } else if (!strcmp(tok[0], "frames")) {
+      sj.frames = sj.slow = 1;
     } else if (!strcmp(tok[0], "hw")) {
       hwt_synth_hw = 1;
     } else if (!strcmp(tok[0], "base") && n == 2 && sj.nbase < SY_BASES) {
