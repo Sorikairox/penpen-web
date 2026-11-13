@@ -127,11 +127,16 @@ uint32_t nj_tex_of(uint32_t tl, uint32_t n) {
 static uint32_t *pix; /* decode buffer: 1024 x 1024 */
 static uint32_t n_tex_loaded, n_tex_failed;
 /* load one PVR at guest address a (avail bytes) into a memlist entry: reuse by global index */
+static int load_host(const uint8_t *buf, uint32_t avail, uint32_t gbix_hint, uint32_t entry);
 static int load_one(uint32_t a, uint32_t avail, uint32_t gbix_hint, uint32_t entry) {
   static uint8_t *buf; static uint32_t cbuf;
   if (avail > (8u << 20)) avail = 8u << 20;
   if (avail > cbuf) { free(buf); cbuf = avail; buf = malloc(cbuf); }
   for (uint32_t k = 0; k < avail; k++) buf[k] = rd8(a + k);
+  return load_host(buf, avail, gbix_hint, entry);
+}
+/* S18: the decode and the memlist entry, from a host buffer (a PVR in guest RAM, or a file njLoadTexture read) */
+static int load_host(const uint8_t *buf, uint32_t avail, uint32_t gbix_hint, uint32_t entry) {
   pvr_info in;
   if (!pix) pix = malloc(1024 * 1024 * 4);
   int r = pvr_decode(buf, avail, pix, 1024 * 1024, &in);
@@ -180,6 +185,37 @@ static void h_njLoadTexturePvmMemory(SH4 *c) {
     q += (uint32_t)used;
   }
   R(0) = 1;
+}
+/* S18: njLoadTexture(texlist): each entry's texture from its file (NJS_TEXNAME: file name, attributes, texture). The
+ * SDK's own njLoadTexture (guest code) works on a texture manager the HLE's njInitTexture does not set up, so it
+ * failed for ever and the game's texlist_load (func_8C0120A0: until it succeeds) never returned: the staff roll's
+ * scene (mode 9) hung there. An entry whose attributes say the name is a memory address (NJD_TEXATTR_TYPE_MEMORY,
+ * 0x20000000) is decoded from guest RAM. Returns the texlist's count, -1 when a texture is missing. */
+int disc_find_ex(const char *name, uint32_t *lba, uint32_t *size, int *index);
+int disc_read_lba(uint32_t lba, uint32_t n, void *dst);
+static void h_njLoadTexture(SH4 *c) {
+  hle_logcall(c, "");
+  uint32_t tl = R(4);
+  if (!sh4_is_ram(tl)) { R(0) = (uint32_t)-1; return; }
+  uint32_t n = rd32(tl + 4), ents = rd32(tl);
+  for (uint32_t i = 0; i < n; i++) {
+    uint32_t ent = ents + i * 12, name = rd32(ent), attr = rd32(ent + 4);
+    if (attr & 0x20000000u) { if (load_one(name, 4u << 20, 0xFFFFFFFFu, ent) <= 0) { R(0) = (uint32_t)-1; return; } continue; }
+    char fn[64];
+    uint32_t k = 0;
+    for (; k + 1 < sizeof fn && sh4_is_ram(name + k) && rd8(name + k); k++) fn[k] = (char)rd8(name + k);
+    fn[k] = 0;
+    uint32_t lba, size;
+    int index;
+    if (disc_find_ex(fn, &lba, &size, &index) || size > (8u << 20)) { rt_log("render njLoadTexture: no file %s", fn); R(0) = (uint32_t)-1; return; }
+    uint8_t *buf = malloc(((size + 2047) / 2048) * 2048);
+    if (!buf || disc_read_lba(lba, (size + 2047) / 2048, buf)) { free(buf); R(0) = (uint32_t)-1; return; }
+    wr32(ent + 4, attr & ~0x01000000u);
+    int used = load_host(buf, size, 0xFFFFFFFFu, ent);
+    free(buf);
+    if (used <= 0) { R(0) = (uint32_t)-1; return; }
+  }
+  R(0) = n;
 }
 static void release_mem(uint32_t ta) {
   int i = mem_index(ta);
@@ -308,6 +344,7 @@ const nj_impl_t nj_impls[] = {
   {"njClip2D", h_njClip2D}, {"njSetFogColor", h_njSetFogColor}, {"njSetFogTable", h_njSetFogTable},
   {"njFogEnable", h_njFogEnable}, {"njFogDisable", h_njFogDisable},
   {"njInitTexture", h_njInitTexture}, {"njLoadTexturePvmMemory", h_njLoadTexturePvmMemory},
+  {"njLoadTexture", h_njLoadTexture},
   {"njReleaseTexture", h_njReleaseTexture}, {"njDrawSprite2D", h_njDrawSprite2D},
   {"njDrawPolygon", h_njDrawPolygon}, {"njDrawTriangle2D", h_njDrawTriangle2D}, {"njDrawLine2D", h_njDrawLine2D},
 };

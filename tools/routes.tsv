@@ -46,3 +46,7 @@ options	2000	600:START,800:RIGHT,830:LEFT,860:UP,890:DOWN,920:DOWN,950:B,1300:DO
 # pictures unlocked (save flags 0x8C1B7F50), next_mode poked to 11; every direction, A twice (the number hidden and
 # shown), Start back to the title
 gallery	1300	600:START,800:RIGHT,840:UP,880:LEFT,920:DOWN,960:DOWN,1000:A,1040:A,1100:START	--poke 8C072D34=30303034@650,8C072D38=666E6F63@650,8C072D3C=702E6769@650,8C072D40=00006D76@650,8C092E70=8C073464@650,8C092E74=8C073464@650,8C1B7F50=00000003@650,8CE16B10=B@700
+# staffroll (S18): Game mode 9, the staff roll (on hardware: after a cup is won, RaceSetup state 4): next_mode poked to
+# 9 on the title (its texlist loads through the HLE's njLoadTexture, S18); each phase's countdown (the scene at
+# 0x8CE169C0, +0x28) poked short three times so that phase 4 comes; Start leaves for mode 4 (GOOD NIGHT)
+staffroll	2600	600:START,1500:START,2100:START,2140:A,2300:A	--poke 8CE16B10=9@700,8CE169E8=20@1000,8CE169E8=20@1300,8CE169E8=20@1600

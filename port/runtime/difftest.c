@@ -809,7 +809,8 @@ int hwt_synth_live;
 #define SY_POOL 2048
 #define SY_POKES 6
 #define SY_QUEUE 64
-typedef struct { int base; uint32_t a[4], f[4]; int np; uint32_t pa[SY_POKES], pv[SY_POKES]; } sy_input;
+#define SY_STK 4 /* S18: stack arguments (the 5th.. of a call: @(4K,r15)) */
+typedef struct { int base; uint32_t a[4], f[4], s[SY_STK]; int np; uint32_t pa[SY_POKES], pv[SY_POKES]; } sy_input;
 static struct {
   uint32_t fn, end, insn, iters, keep, seed, steps, stale, secs; /* S17: stale / secs: 0 = 600 / 20 */
   int diverse;                     /* `diverse N`: keep up to N passing inputs even without new code (values for arithmetic) */
@@ -883,6 +884,8 @@ static uint32_t sy_value(const char *t, int base) {
   return (uint32_t)strtoul(t, 0, 16);
 }
 static char sy_ctext[4][SY_CAND][24], sy_pretext[SY_PRE][4][24];
+static char sy_stext[SY_STK][SY_CAND][24]; /* S18: `stk K V...`: candidates for the stack word @(4K,r15) */
+static int sy_nstk[SY_STK];
 
 /* the recording pass: the original code interpreted from c->pc until it returns to ret with the stack back at sp; HLE
  * calls run live (recorded when hwt_recording is set: rt_call's hooks); the function's instructions run are marked */
@@ -1067,13 +1070,19 @@ static uint32_t sy_pick_farg(int b, int i) {
 static void sy_fresh(sy_input *in, const int *ok) {
   do in->base = (int)(sy_rnd() % (uint32_t)sj.nbase); while (!ok[in->base]);
   for (int i = 0; i < 4; i++) { in->a[i] = sy_pick_arg(in->base, i); in->f[i] = sy_pick_farg(in->base, i); }
+  for (int k = 0; k < SY_STK; k++) in->s[k] = sy_nstk[k] ? sy_value(sy_stext[k][sy_rnd() % (uint32_t)sy_nstk[k]], in->base) : 0;
   in->np = 0;
 }
 static void sy_mutate(sy_input *in) {
   int n = 1 + (int)(sy_rnd() % 2);
   while (n--) {
     uint32_t k = sy_rnd() % 8;
-    if (k < 2) { int i = (int)(sy_rnd() % 4); in->a[i] = sy_pick_arg(in->base, i); }
+    if (k < 2) {
+      int i = (int)(sy_rnd() % 4);
+      in->a[i] = sy_pick_arg(in->base, i);
+      int j = (int)(sy_rnd() % SY_STK); /* S18: a stack argument too */
+      if (sy_nstk[j]) in->s[j] = sy_value(sy_stext[j][sy_rnd() % (uint32_t)sy_nstk[j]], in->base);
+    }
     else if (k < 3) { int i = (int)(sy_rnd() % 4); in->f[i] = sy_pick_farg(in->base, i); }
     else if (k < 7 && in->np < SY_POKES && !sj.nopoke) {
       /* a poke: a word of an argument's object, or a global the function names */
@@ -1106,6 +1115,8 @@ static void sy_apply(const sy_input *in, uint8_t *ram, SH4 *c) {
   for (int i = 0; i < in->np; i++) memcpy(ram + (in->pa[i] & 0xFFFFFC), &in->pv[i], 4);
   *c = sy_cpu[in->base];
   for (int i = 0; i < 4; i++) { c->r[4 + i] = in->a[i]; c->fr.u[4 + i] = in->f[i]; }
+  for (int k = 0; k < SY_STK; k++) /* S18: the stack arguments the spec names (the base's stack words elsewhere) */
+    if (sy_nstk[k]) memcpy(ram + ((c->r[15] + 4u * (uint32_t)k) & 0xFFFFFC), &in->s[k], 4);
   c->pc = sj.fn;
   c->pr = SY_RET;
 }
@@ -1249,6 +1260,7 @@ int hwt_synth(const char *spec) {
     if (!n || tok[0][0] == '#') continue;
     if (!strcmp(tok[0], "job") && n >= 7) {
       memset(&sj, 0, sizeof sj);
+      memset(sy_nstk, 0, sizeof sy_nstk);
       hwt_synth_hw = 0;
       sj.fn = (uint32_t)strtoul(tok[1], 0, 16); sj.end = (uint32_t)strtoul(tok[2], 0, 16);
       sj.insn = (uint32_t)strtoul(tok[3], 0, 10); sj.iters = (uint32_t)strtoul(tok[4], 0, 10);
@@ -1276,6 +1288,9 @@ int hwt_synth(const char *spec) {
     } else if (!strcmp(tok[0], "arg") && n >= 3) {
       int i = atoi(tok[1]) & 3;
       for (int k = 2; k < n && sj.ncand[i] < SY_CAND; k++) snprintf(sy_ctext[i][sj.ncand[i]++], 24, "%s", tok[k]);
+    } else if (!strcmp(tok[0], "stk") && n >= 3) {
+      int i = atoi(tok[1]) & (SY_STK - 1);
+      for (int k = 2; k < n && sy_nstk[i] < SY_CAND; k++) snprintf(sy_stext[i][sy_nstk[i]++], 24, "%s", tok[k]);
     } else if (!strcmp(tok[0], "farg") && n >= 3) {
       int i = atoi(tok[1]) & 3;
       for (int k = 2; k < n && sj.nfcand[i] < SY_CAND; k++) { float x = strtof(tok[k], 0); memcpy(&sj.fcand[i][sj.nfcand[i]++], &x, 4); }

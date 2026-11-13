@@ -139,6 +139,7 @@ def extra_lines(path):
         if s.startswith('for '):
             cur = s.split()[1]  # an address, or name:C_FUNCTION (every export of that C function: copies too)
             cur = cur if cur.startswith('name:') else cur.lower()
+            out[cur] = []  # S18: a later block for the same function replaces the earlier one (S18's hints after S17's)
             continue
         if cur:
             out.setdefault(cur, []).append(s)

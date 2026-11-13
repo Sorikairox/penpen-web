@@ -1761,3 +1761,254 @@ nopoke
 for name:race_scene_view_bit
 # a bit of the current view's row bits (0..319)
 arg 1 0 1 1f 40 13f
+
+# ---- S18 (the lead): the new exports, the never-executed ones (stack arguments `stk`, loaders `slow`, constructors
+# that pass frames `frames`) ----
+for 8c02af9c
+arg 0 [8c096230]
+# this = the RaceScene of a race (constructor func_8C0297AC); RaceScene.substate (0x34) 0-3 picks the step
+
+for 8c03a4c8
+# this = a fresh 0x24-byte block (EffectDrops); the constructor fills it and returns it
+pre 8c09f4d6 24 0 0 0
+arg 0 $0
+
+for 8c03a634
+# this = an EffectDrops built by its constructor func_8C03A4C8 on a fresh 0x24 block
+pre 8c09f4d6 24 0 0 0
+pre 8c03a4c8 $0 0 0 0
+arg 0 $1
+
+for 8c03a6b4
+# this = an EffectDrops (constructor func_8C03A4C8)
+pre 8c09f4d6 24 0 0 0
+pre 8c03a4c8 $0 0 0 0
+arg 0 $1
+
+for 8c03a75c
+# this = an EffectDrops (constructor func_8C03A4C8)
+pre 8c09f4d6 24 0 0 0
+pre 8c03a4c8 $0 0 0 0
+arg 0 $1
+
+for 8c03a7e4
+# this = an EffectDrops (constructor func_8C03A4C8); r5 = a RibbonFrame (0x98 bytes: f78 at 0x78 is the speed)
+pre 8c09f4d6 24 0 0 0
+pre 8c03a4c8 $0 0 0 0
+arg 0 $1
+
+for 8c03fbfe
+# r4 unused, r5 = a Vec3, r6 = the number (texanim cell number + 5)
+arg 2 0 1 2 3 4 5
+
+for 8c03fb62
+# this = a LaneRacer (computer player, syMalloc(0x6C0) + func_8C03DB9A): lane (0x62C) 0-3, branch (0x620) 0-1
+
+for 8c039b14
+# this = a RibbonSet (RacerEffects.ribbons, 0x58 bytes, ribbon_set_construct); r5 = a Vec3;
+# r6 = the side flag; fr4 = a height, fr5 = the heading (angle units and the runtime's float functions)
+arg 2 0 1
+farg 0 0 1 3.5
+farg 1 0 1000 16384 -8192
+
+for 8c03adce
+# this = the trail pair (two NjModel pointers at 0x00, two Body chains of 16 at 0x08); r5 = a Matrix; fr4 a height
+farg 0 0 1 2.5
+
+for 8c02c1aa
+# this = the RaceScene of a mode-2 race (three players)
+
+for 8c02c1aa
+# this = the RaceScene (g_panel)
+arg 0 [8c096230]
+
+for 8c0215c4
+# a fresh 0x558-byte block: the TrapSet's body (loads OBJTRAP_A's container and textures)
+slow
+pre 8c09f4d6 558 0 0 0
+arg 0 $0
+for 8c021614
+slow
+pre 8c09f4d6 558 0 0 0
+arg 0 $0
+for 8c02162a
+# a TrapSet built by its constructor
+slow
+pre 8c09f4d6 558 0 0 0
+pre 8c021614 $0 0 0 0
+arg 0 $1
+for 8c021658
+slow
+pre 8c09f4d6 558 0 0 0
+pre 8c021614 $0 0 0 0
+arg 0 $1
+arg 1 0 1
+for 8c02167c
+slow
+pre 8c09f4d6 558 0 0 0
+pre 8c021614 $0 0 0 0
+arg 0 $1
+for 8c021718
+# a TrapSet built by its constructor: populate places its layout's objects
+slow
+pre 8c09f4d6 558 0 0 0
+pre 8c021614 $0 0 0 0
+arg 0 $1
+for 8c02176e
+slow
+pre 8c09f4d6 558 0 0 0
+pre 8c021614 $0 0 0 0
+pre 8c021718 $1 0 0 0
+arg 0 $1
+for 8c02168e
+slow
+pre 8c09f4d6 558 0 0 0
+pre 8c021614 $0 0 0 0
+pre 8c021718 $1 0 0 0
+arg 0 $1
+for 8c02189a
+slow
+pre 8c09f4d6 558 0 0 0
+pre 8c021614 $0 0 0 0
+pre 8c021718 $1 0 0 0
+arg 0 $1
+for 8c01f74c
+slow
+pre 8c09f4d6 558 0 0 0
+pre 8c021614 $0 0 0 0
+arg 0 $1
+arg 1 0 1 2
+for 8c01f780
+# the factory: a TrapSet as the group, r5 = a placement type
+slow
+pre 8c09f4d6 558 0 0 0
+pre 8c021614 $0 0 0 0
+arg 0 $1
+arg 1 0 3 4 8 e 23 33 34 40
+
+for 8c0200e8
+# a CastScene built by its constructor (its body shows a loading screen: the prelude passes frames)
+frames
+pre 8c09f4d6 98 0 0 0
+pre 8c02004c $0 0 0 0
+arg 0 $1
+for 8c0213c8
+frames
+pre 8c09f4d6 98 0 0 0
+pre 8c02004c $0 0 0 0
+arg 0 $1
+for 8c01f752
+# the CastScene's RacerEffects (its word at 0x94); r5 a Vec3 (the scene's camera at 0x80), r6 0/1
+frames
+pre 8c09f4d6 98 0 0 0
+pre 8c02004c $0 0 0 0
+arg 0 [$1+94]
+arg 1 $1+80
+arg 2 0 1
+farg 0 7.5
+farg 1 0 4096 -4096
+for 8c01fe58
+frames
+pre 8c09f4d6 98 0 0 0
+arg 0 $0
+for 8c02004c
+frames
+pre 8c09f4d6 98 0 0 0
+arg 0 $0
+
+for 8c0329ac
+# this = the race scene's player 0 (a Racer)
+arg 0 [[8c096230]+4c]
+for 8c032a3a
+# this = the race scene's player 0 (a Racer)
+arg 0 [[8c096230]+4c]
+for 8c033efe
+# this = the race scene's player 0 (a Racer)
+arg 0 [[8c096230]+4c]
+for 8c03481a
+# this = the race scene's player 0 (a Racer)
+arg 0 [[8c096230]+4c]
+for 8c0349e8
+# this = the race scene's player 0 (a Racer)
+arg 0 [[8c096230]+4c]
+for 8c034d96
+# this = the race scene's player 0 (a Racer)
+arg 0 [[8c096230]+4c]
+for 8c034eb4
+# this = the race scene's player 0 (a Racer)
+arg 0 [[8c096230]+4c]
+for 8c034ed6
+# this = the race scene's player 0 (a Racer)
+arg 0 [[8c096230]+4c]
+for 8c034ef8
+# this = the race scene's player 0 (a Racer)
+arg 0 [[8c096230]+4c]
+
+for 8c01f714
+# this = a MotionPlayer (the race scene's player 0: a Racer is one); r5 = a motion set
+arg 0 [[8c096230]+4c]
+arg 1 0 1 2 3 5 a 14
+for 8c029ed2
+# this = the race scene (g_panel); state 1 builds the race (files: slow)
+slow
+arg 0 [8c096230]
+for 8c041dd0
+# the race scene's Course; r5 = a cell index; r6 / r7 = two Vec3s (the scene's camera-free scratch: its bodies)
+arg 0 [[8c096230]+38]
+arg 1 0 1 2 5 a 20 40
+arg 2 [8c096230]+100
+arg 3 [8c096230]+120
+for 8c04469e
+# the race scene's ActorGroup
+arg 0 [[8c096230]+48]
+for 8c044766
+# the race scene's ActorGroup
+arg 0 [[8c096230]+48]
+
+for 8c044766
+# the race scene's ActorGroup (its actors re-attached: slow)
+slow
+arg 0 [[8c096230]+48]
+
+for 8c02fd06
+# an OwnerScene built by its constructor (0x10C bytes; r5 = the RaceSetup: the game root's child in a mode-7 base);
+# the construction loads files and passes frames
+frames
+pre 8c09f4d6 10c 0 0 0
+pre 8c02fc12 $0 [8ce16b34] 0 0
+arg 0 $1
+for 8c030244
+frames
+pre 8c09f4d6 10c 0 0 0
+pre 8c02fc12 $0 [8ce16b34] 0 0
+arg 0 $1
+
+for 8c030ede
+# a plain racer on a fresh 0x5A8 block: (racer, index, b, character r7, fr4, costume @r15); its model loads (slow)
+slow
+pre 8c09f4d6 5a8 0 0 0
+arg 0 $0
+arg 1 0 1 2 3
+arg 3 0 1 2 3 4 5 6 7
+farg 0 0
+stk 0 0 1 2
+for 8c0377e8
+# the replay racer's construction on a fresh block: (racer, scene, index, b, character @r15, costume @(4,r15), fr4)
+slow
+pre 8c09f4d6 5a8 0 0 0
+arg 0 $0
+arg 1 [8c096230]
+arg 2 0 1 2 3
+stk 0 0 1 2 3 4 5 6 7
+stk 1 0 1 2
+farg 0 0
+for 8c037816
+slow
+pre 8c09f4d6 5a8 0 0 0
+arg 0 $0
+arg 1 [8c096230]
+arg 2 0 1 2 3
+stk 0 0 1 2 3 4 5 6 7
+stk 1 0 1 2
+farg 0 0
+
