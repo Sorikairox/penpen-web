@@ -101,8 +101,10 @@ def read_routes(p):
 # S14: a frame line's interpreter-call count is not program state: the pure translation runs code it lacks (a
 # function Ghidra cut short) in the interpreter, a hand-written function replaces it: the count is left out
 _INTERP = re.compile(r' interp \d+ ')
+# S20: so is the guest-SDK call count (the hand-written game calls the SDK's C directly, not through the table)
+_GUEST = re.compile(r' guest \d+ ')
 def no_interp(line):
-    return _INTERP.sub(' interp - ', line, 1)
+    return _GUEST.sub(' guest - ', _INTERP.sub(' interp - ', line, 1), 1)
 
 
 def reference(r, digest):
