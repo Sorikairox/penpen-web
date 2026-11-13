@@ -314,6 +314,8 @@ void course_env_draw_particles(gaddr env);                                   /* 
 void course_env_set_keys(gaddr env, gaddr src);                              /* game/actor.c */
 void course_env_update_keys(gaddr env);                                      /* game/actor.c */
 void course_env_set_table(gaddr env, gaddr table);                           /* game/actor.c */
+void course_env_place_particles(gaddr env);                                  /* game/course_env.c */
+void course_env_update_weather(gaddr env);                                   /* S16 b05: game/course_env_weather.c */
 
 /* S15 b07: game/course_ground.c */
 int32_t course_segment_kind(gaddr course, int32_t cell);

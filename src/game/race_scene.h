@@ -64,7 +64,7 @@ typedef struct RaceScene {
   gaddr actors;                 /* 0x048: ActorGroup */
   gaddr players[RACE_RACERS];   /* 0x04C: Racer (0 = an empty slot) */
   uint32_t word6c;              /* 0x06C */
-  uint8_t pad_070[0x074 - 0x070];
+  uint32_t word70;              /* 0x070: S16 b03: 0 at construction (race_scene_build) */
   f32 f74;                      /* 0x074 */
   f32 f78;                      /* 0x078: (func_8C02DF96 tests it against 0) */
   union {
@@ -74,12 +74,15 @@ typedef struct RaceScene {
   int32_t view_player[4];       /* 0x09C: the player a view shows (-1: none) */
   int32_t view_cell[4];         /* 0x0AC: the course cell under the view's camera */
   int32_t player_view[RACE_RACERS]; /* 0x0BC: the view a player is shown on (-1: none) */
-  int32_t focus[4];             /* 0x0DC: per view, the player its camera follows (focus[0]: the one the sounds
-                                 * and the ending go by) */
-  uint8_t pad_0ec[0x0FC - 0x0EC];
+  int32_t focus[RACE_RACERS];   /* 0x0DC: per view, the player its camera follows (focus[0]: the one the sounds
+                                 * and the ending go by); S16 b03: eight words, each set to its index at
+                                 * construction (race_scene_build) */
   uint32_t player_item[8];      /* 0x0FC */
-  int32_t watched;              /* 0x11C: the player watched from the other view */
-  uint8_t pad_120[0x15C - 0x120];
+  union {
+    int32_t watched;            /* 0x11C: the player watched from the other view */
+    int32_t player_pairs[RACE_RACERS][2]; /* 0x11C: S16 b03: two words per racer slot, both set to its index at
+                                 * construction (race_scene_build) */
+  };
   Vec3 vec15c[64];              /* 0x15C */
   f32 values[8][8];             /* 0x45C: row 0 = the players' distances (the watched player's sound fades by it) */
   Vec3 points[8][8];            /* 0x55C */
@@ -117,6 +120,8 @@ HW_OFFSET(RaceScene, slots, 0x03C);
 HW_OFFSET(RaceScene, actors, 0x048);
 HW_OFFSET(RaceScene, players, 0x04C);
 HW_OFFSET(RaceScene, word6c, 0x06C);
+HW_OFFSET(RaceScene, word70, 0x070);
+HW_OFFSET(RaceScene, player_pairs, 0x11C);
 HW_OFFSET(RaceScene, pad, 0x024);
 HW_OFFSET(RaceScene, f74, 0x074);
 HW_OFFSET(RaceScene, f78, 0x078);

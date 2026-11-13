@@ -6,6 +6,7 @@
  * language, faded in and out; it leaves to another mode through its owner, the Game. The movie scene (0x28 bytes,
  * constructor func_8C01DDE2 -> func_8C01DD7A) plays the Sofdec opening movie. */
 #include "hw.h"
+#include "../core/sprite_text.h" /* text_draw (S16: hand-written) */
 #include "sdk.h"
 #include "../core/task.h"
 #include "../core/view.h"
@@ -90,7 +91,6 @@ static const struct { int32_t first, count; } label_pages[3] = {{0, 4}, {4, 3}, 
 /* still translated */
 static int32_t game_language(void) { return (int32_t)CALL0(0x8C019860u); } /* func_8C019860: 0-6 */
 /* func_8C01529A: draws a string at (x, y) with the text style */
-static int32_t text_draw(int32_t x, int32_t y, gaddr string) { return (int32_t)CALL3(0x8C01529Au, x, y, string); }
 
 /* ---- construction (S15) ---- */
 

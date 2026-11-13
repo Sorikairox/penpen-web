@@ -2,6 +2,7 @@
  * port/symbols/copies.tsv: byte-identical C++ inline methods and thunks; do not edit, run the tool). Each
  * copy runs the same C as the copy it repeats (named in the comment above its lines). */
 #include "hw.h"
+#include "../../core/sprite_text.h"
 #include "sdk.h"
 #include "../../core/vec.h"
 #include "../../core/view.h"
@@ -12,6 +13,7 @@
 #include "../../game/motion.h"
 #include "../../game/menu.h"
 #include "../../game/race_scene.h"
+#include "../../game/game.h"
 
 /* copies of 8c022730 */
 HW_EXPORT(8c01d0fa, house_view_camera((int32_t)ARG0, ARG1, ARG2, FARG0, FARG1))

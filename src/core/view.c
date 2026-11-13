@@ -3,7 +3,6 @@
 #include "sdk.h"
 
 /* still translated: the camera maths of a view (floats) and a view's layout set-up */
-static void view_apply_camera(View *view) { CALL1(0x8C011C7Cu, hw_addr(view)); }      /* func_8C011C7C */
 static void view_set_layout(View *view, int32_t layout) { CALL2(0x8C011AFCu, hw_addr(view), layout); } /* func_8C011AFC */
 
 /* was func_8C010DD6 and func_8C010DDA: empty in this build (frame hooks around the views) */

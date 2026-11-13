@@ -44,7 +44,6 @@ static void background_set(uint32_t argb, f32 fog_near, f32 fog_far) {
   CALL1(0x8C010F04u, argb);
 }
 /* func_8C0433D6 (still translated): move the weather particles (replaced when the weather key changes) */
-static void course_env_update_weather(gaddr env) { CALL1(0x8C0433D6u, env); }
 /* func_8C042648: the variant of the race scene's course */
 static int32_t race_scene_course_variant(gaddr scene) { return (int32_t)CALL1(0x8C042648u, scene); }
 /* func_8C02EE6A: stop the sound on a player's channel */

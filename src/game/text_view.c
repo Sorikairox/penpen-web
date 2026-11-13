@@ -1,11 +1,11 @@
 /* Pen Pen port, S15 (b01): a string drawn in the current view with one of two colour schemes (game/text_view.c). */
 #include "hw.h"
+#include "../core/sprite_text.h" /* text_draw (S16: hand-written) */
 #include "../core/view.h"
 
 #define g_text_color ((f32 *)hw_ptr(0x8C1B3B34u)) /* a, r, g, b (core/sprite_text.c) */
 
 /* func_8C01529A (core/sprite_text.c, still translated): draws a string at (x, y) with the text style */
-static int32_t text_draw(int32_t x, int32_t y, gaddr string) { return (int32_t)CALL3(0x8C01529Au, x, y, string); }
 
 /* was func_8C016BAE: draws `string` at (x, y) from the current view's top-left corner, at alpha `alpha`: yellow
  * (1, 0.9, 0.3) when `highlight`, else pale blue (0.5, 0.8, 1) */

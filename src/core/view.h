@@ -45,7 +45,7 @@ typedef struct View {
   int32_t fog;                  /* 0x0F0: fog on */
   Vec3 light_dir;               /* 0x0F4: the lights' direction (turned by the camera) */
   Vec3 light_intensity;         /* 0x100: (unused, diffuse, ambient): nj_Light*Intensity */
-  f32 light_10c;                /* 0x10C: S15 b01: 1.0 when the layout is set */
+  f32 light_10c;                /* 0x10C: S15 b01: 1.0 when the layout is set (S16 w4: not read by view_apply_camera) */
   Vec3 light_color;             /* 0x110: nj_Light*Color */
   int32_t word11c;              /* 0x11C: S15 b01: 1 when the layout is set */
   struct {
@@ -105,5 +105,8 @@ void view_init_layout(View *view, int32_t layout);
 void view_fog_on(int32_t index);
 void view_current_set_light_color(f32 r, f32 g, f32 b);
 void view_current_set_light_dir(f32 x, f32 y, f32 z);
+
+/* S16 w4: core/view_camera.c (was func_8C011C7C; view.c called it through a static wrapper) */
+void view_apply_camera(View *view);
 
 #endif

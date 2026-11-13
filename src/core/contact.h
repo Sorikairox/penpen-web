@@ -23,7 +23,7 @@ typedef struct Contacts {
   gaddr restitution;     /* 0x3C: f32 per contact */
   gaddr normal;          /* 0x40: Vec3 per contact (unit) */
   gaddr depth;           /* 0x44: f32 per contact: how far to push out */
-  gaddr unknown48;       /* 0x48: a word per contact */
+  gaddr unknown48;       /* 0x48: a word per contact (S16 w4: the kind its adder gave it, contacts_add_triangle) */
   gaddr unknown4c;       /* 0x4C: a word per contact */
   gaddr handler;         /* 0x50: per contact, a function (self, index, a, b, c) or 0 */
 } Contacts;
@@ -37,6 +37,9 @@ static inline Contacts *contacts_at(gaddr a) { return (Contacts *)hw_ptr(a); }
 /* core/contact.c */
 gaddr contacts_construct(gaddr self, gaddr owner, f32 radius, int32_t capacity); /* S14 b05 declares it */
 void contacts_free(gaddr self);
+
+/* S16 w4: core/contact_triangle.c (was func_8C013E1C) */
+void contacts_add_triangle(gaddr self, gaddr a, gaddr b, gaddr c, uint32_t kind);
 
 void contacts_holder_destroy(gaddr obj);
 gaddr contacts_holder_destroy_self(gaddr obj);

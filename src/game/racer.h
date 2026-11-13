@@ -55,6 +55,12 @@ typedef struct ButtonEdges {
 } ButtonEdges;
 HW_SIZE(ButtonEdges, 8);
 
+/* S16 b04: a pair of horizontal dampings (CharacterParams.run_damping) */
+typedef struct RunDamping {
+  f32 x, z;
+} RunDamping;
+HW_SIZE(RunDamping, 8);
+
 /* the character parameters (0x434 bytes per character at 0x8C085648) */
 typedef struct CharacterParams {
   f32 radius;     /* 0x00: S15 b04: the racer's collider's radius (racer_base_init) */
@@ -62,9 +68,16 @@ typedef struct CharacterParams {
   f32 mass;       /* 0x08: the racer's Contacts' mass */
   f32 dash_mass;  /* 0x0C: S15 b05: its mass while action 2 (the dash) starts */
   f32 hit_mass;   /* 0x10: S15 b05: its mass while action 3 (hit) runs */
-  uint8_t pad_14[0x44 - 0x14];
+  uint8_t pad_14[0x18 - 0x14];
+  f32 walk_push[3]; /* 0x18: S16 b04: state 3's forward push per stick length, by how far the stick turns from
+                     * ahead (racer_run: below 100 degrees, below 150, more) */
+  f32 walk_turn[3]; /* 0x24: S16 b04: its turn rate per stick y, the same way */
+  f32 jump_push;  /* 0x30: S16 b04: state 3 on special ground: the upward push when button 0 is pressed */
+  f32 lift_push;  /* 0x34: S16 b04: state 3 elsewhere: the upward push while button 0 is held */
+  uint8_t pad_38[0x44 - 0x38];
   f32 dash_push;  /* 0x44: S15 b05: added to the moving body's push (z) when the dash starts */
-  uint8_t pad_48[0x64 - 0x48];
+  uint8_t pad_48[0x4C - 0x48];
+  f32 walk_scale[6]; /* 0x4C: S16 b04: state 3 on special ground: the push scaled by Racer.ground */
   f32 damping_y;  /* 0x64: S15 b05: the moving body's vertical damping in the dash and the hit */
   f32 ground_damping[7]; /* 0x68: S15 b05: its horizontal damping while hit, by Racer.ground (0-4 seen) */
   f32 dash_damping;      /* 0x84: S15 b05: its horizontal damping in the dash */
@@ -72,14 +85,21 @@ typedef struct CharacterParams {
   int32_t dash_frames;    /* 0x90: S15 b05: the dash's first part */
   int32_t dash_end_frames; /* 0x94: its second part */
   int32_t hit_frames[3];  /* 0x98: S15 b05: action 3's length by hit_strength: [0] for 2, [1] for 1, [2] for 0 */
-  uint8_t pad_a4[0x1F8 - 0xA4];
+  f32 run_push[6][7];     /* 0x0A4: S16 b04: state 4's forward push (z) per update, by Racer.ground and stroke_level */
+  f32 run_turn[6][7];     /* 0x14C: S16 b04: its turn rate (times stick_y), the same way */
+  f32 slow_turn;          /* 0x1F4: S16 b04: how much more it turns at rest (scaled by how far f434 is below
+                           * 0.463) */
   f32 f1f8;       /* 0x1F8: S15 b05: state 4's action 4: push (z) while on the special ground */
   f32 f1fc;       /* 0x1FC: its turn rate (times stick_y) */
   f32 f200;       /* 0x200: its damping (all axes off the special ground; y on it) */
-  uint8_t pad_204[0x354 - 0x204];
+  RunDamping run_damping[6][7]; /* 0x204: S16 b04: state 4's x / z damping on special ground, by ground and
+                                 * stroke_level */
   f32 f354;       /* 0x354: its x damping on the special ground */
   f32 f358;       /* 0x358: its z damping on the special ground */
-  uint8_t pad_35c[0x378 - 0x35C];
+  uint8_t pad_35c[0x360 - 0x35C];
+  int32_t hold_levels[5]; /* 0x360: S16 b04: state 4: the stroke level is n + 1 once the button was held longer
+                           * than hold_levels[n] (the highest that holds) */
+  int32_t release_frames_max; /* 0x374: S16 b04: level 6 while released for 1 to this many updates */
   int32_t frames378; /* 0x378: its length (scaled by the item, func_8C03438C) */
   uint8_t pad_37c[0x434 - 0x37C];
 } CharacterParams;
@@ -94,6 +114,16 @@ HW_OFFSET(CharacterParams, f1f8, 0x1F8);
 HW_OFFSET(CharacterParams, f200, 0x200);
 HW_OFFSET(CharacterParams, f354, 0x354);
 HW_OFFSET(CharacterParams, frames378, 0x378);
+HW_OFFSET(CharacterParams, run_push, 0x0A4);
+HW_OFFSET(CharacterParams, walk_push, 0x018);
+HW_OFFSET(CharacterParams, lift_push, 0x034);
+HW_OFFSET(CharacterParams, walk_scale, 0x04C);
+HW_OFFSET(CharacterParams, run_turn, 0x14C);
+HW_OFFSET(CharacterParams, slow_turn, 0x1F4);
+HW_OFFSET(CharacterParams, run_damping, 0x204);
+HW_OFFSET(CharacterParams, f354, 0x354);
+HW_OFFSET(CharacterParams, hold_levels, 0x360);
+HW_OFFSET(CharacterParams, release_frames_max, 0x374);
 HW_SIZE(CharacterParams, 0x434);
 static inline CharacterParams *character_params_at(gaddr a) { return (CharacterParams *)hw_ptr(a); }
 
@@ -116,9 +146,15 @@ typedef struct Racer {
                               * (func_8C031D8C) */
   int32_t object_contact;    /* 0x0B8: the contact with something else, -1: none */
   Vec3 vec0bc;               /* 0x0BC: S15 b06: the squash axis that mark_d sets (racer_squash_update) */
-  uint8_t pad_0c8[0x0F0 - 0x0C8];
-  f32 speed;                 /* 0x0F0 */
-  uint8_t pad_0f4[0x100 - 0x0F4];
+  Vec3 object_push;          /* 0x0C8: S16 b04: the same push from the contacts with something else
+                              * (racer_sort_contacts) */
+  Vec3 racer_velocity;       /* 0x0D4: S16 b04: the other racer's velocity + its own, of the first racer contact */
+  Vec3 object_velocity;      /* 0x0E0: S16 b04: the same, of the first object contact */
+  f32 racer_speed;           /* 0x0EC: S16 b04: |racer_velocity| */
+  f32 speed;                 /* 0x0F0: (S16 b04: |object_velocity|, set by racer_sort_contacts) */
+  f32 object_grip;           /* 0x0F4: S16 b04: 0 when the object contact's kind is 0xCD, else 1 */
+  uint8_t pad_0f8[0x0FC - 0x0F8];
+  uint32_t word0fc;          /* 0x0FC: S16 w3: racer_reset's third argument for players 0-3 (index < 4), else 0 */
   /* S14 b08: the racer's controls (its pad, or the computer player's choices; func_8C030F00 clears them) */
   int32_t button_prev[2];    /* 0x100: button[] of the previous update */
   int32_t button[2];         /* 0x108: the two buttons held */
@@ -128,7 +164,9 @@ typedef struct Racer {
   f32 stick_angle;           /* 0x11C: the stick's direction in Ninja angle units (kept while |stick| <= 0.1) */
   ButtonEdges edges[2];      /* 0x120: per button, pressed / released this update */
   int32_t button_lock[2];    /* 0x130: updates a button stays ignored after a release (15) */
-  uint8_t pad_138[0x144 - 0x138];
+  int32_t on_kind4_prev;     /* 0x138: S16 b04: (read only by racer_sort_contacts here) */
+  int32_t on_kind4;          /* 0x13C: S16 b04: an object contact of kind 4 this update */
+  int32_t on_kind4_new;      /* 0x140: S16 b04: on_kind4 and not on_kind4_prev: action 4 starts */
   int32_t word144;           /* 0x144: S15 b05: state 2 plays motion set 2 when set, 3 when 0 */
   union {
     struct {
@@ -141,20 +179,27 @@ typedef struct Racer {
     int32_t marks[5];        /* 0x148: S15 b06: cleared every update after being noted in marks_prev */
   };
   int32_t marks_prev[5];     /* 0x15C: S15 b06: marks[] of the previous update (racer_squash_update) */
-  uint8_t pad_170[0x174 - 0x170];
+  int32_t word170;           /* 0x170: S16 b04: word174 of the previous update (racer_ground) */
   int32_t word174;           /* 0x174: S15 b05 (copied into the frame for set C) */
-  uint8_t pad_178[0x17C - 0x178];
+  int32_t word178;           /* 0x178: S16 b04: word174 is set this update and was not the previous one */
   int32_t word17c;           /* 0x17C: S15 b05 */
   int32_t word180;           /* 0x180: S15 b05 */
   int32_t stick_damped;      /* 0x184: S14 b08: the update scales the stick down (x by 0.5, y by 0.75) */
-  uint8_t pad_188[0x18C - 0x188];
+  f32 f188;                  /* 0x188: S16 w3: 0 at reset */
   int32_t had_contacts;      /* 0x18C: racer_handle_contacts saw contacts this frame */
-  uint8_t pad_190[0x194 - 0x190];
+  int32_t word190;           /* 0x190: S16 w3: 0 at reset */
   gaddr scene;               /* 0x194: the RaceScene */
-  uint8_t pad_198[0x19C - 0x198];
+  union {
+    int32_t word198;         /* 0x198: S16 w3: 0 at reset */
+    int32_t state_prev;      /* 0x198: S16 w4: state at the start of the update (racer_base_update) */
+  };
   int32_t state;             /* 0x19C */
   int32_t effects_shown;     /* 0x1A0: 0 = its effects are not drawn (racer_effects_draw) */
-  uint8_t pad_1a4[0x1A8 - 0x1A4];
+  union {
+    int32_t word1a4;         /* 0x1A4: S16 w3: 0 at reset */
+    int32_t progress_prev;   /* 0x1A4: S16 w4: word1a8 before this update's ground kind counted (a kind 9 cell
+                              * clears it); a time is noted in times298 when the two differ */
+  };
   int32_t word1a8;           /* 0x1A8: S15 b04: (func_8C029150; the time trial's timer shows times298[word1a8 - 3]
                               * once the player is in state 2) */
   uint32_t word1ac;          /* 0x1AC */
@@ -162,7 +207,8 @@ typedef struct Racer {
   gaddr collider_data;       /* 0x1B0: = racer + 0x21C */
   int32_t collider_word;     /* 0x1B4: -1 */
   Contacts contacts;         /* 0x1B8: capacity 8 */
-  uint8_t pad_20c[0x214 - 0x20C];
+  int32_t contacts_word;     /* 0x20C: S16 w3: the collider's word after its Contacts (Collider.contacts_word): 4 */
+  int32_t word210;           /* 0x210: S16 w3: 3 at reset */
   uint32_t collider_a;       /* 0x214 */
   uint32_t collider_b;       /* 0x218 */
   uint8_t pad_21c[0x238 - 0x21C];
@@ -172,13 +218,15 @@ typedef struct Racer {
   Vec3 vec240;               /* 0x240: (S15 b05: where the special ground was touched) */
   int32_t ground_touch_prev; /* 0x24C: S15 b05: ground_touch of the previous update */
   int32_t ground_touch;      /* 0x250: S15 b05: its contacts touch special ground this update */
-  uint8_t pad_254[0x258 - 0x254];
+  int32_t word254;           /* 0x254: S16 b04: it left special ground this update (ground_touch_prev and not
+                              * ground_touch; racer_run keeps step_timer at 3 while it is set) */
   int32_t mark_a_on;         /* 0x258: mark_a counts */
   int32_t mark_b_on;         /* 0x25C: mark_b counts */
   Vec3 vec260;               /* 0x260 */
   f32 mark_b_value;          /* 0x26C */
   f32 mark_a_value;          /* 0x270 */
-  uint8_t pad_274[0x278 - 0x274];
+  int32_t step_timer;        /* 0x274: S16 b04: racer_run: counts down off special ground; at 0 motion set 0
+                              * plays and word144 flips (below 0 it stays -1); 3 while word254 is set */
   int32_t hit_strength;      /* 0x278: 1 or 2, for action 3 */
   int32_t action;            /* 0x27C: set with its two arguments cleared (racer_set_action) */
   union {
@@ -188,10 +236,22 @@ typedef struct Racer {
       int32_t action_step;   /* 0x284: the action's step (0: start it) */
     };
   };
-  int32_t word288;           /* 0x288: S15 b05: cleared when state 4 starts (func_8C033DC4) */
-  int32_t word28c;           /* 0x28C: the same */
-  int32_t word290;           /* 0x290: the same */
-  int32_t word294;           /* 0x294: the same */
+  union {
+    int32_t word288;         /* 0x288: S15 b05: cleared when state 4 starts (func_8C033DC4) */
+    int32_t stroke_level;    /* 0x288: S16 b04: state 4: 0-6, picks the push, turn and damping (racer_state4_run) */
+  };
+  union {
+    int32_t word28c;         /* 0x28C: the same */
+    int32_t hold_frames;     /* 0x28C: S16 b04: updates button 0 has been held */
+  };
+  union {
+    int32_t word290;         /* 0x290: the same */
+    int32_t last_hold;       /* 0x290: S16 b04: hold_frames of the last hold, noted at the release */
+  };
+  union {
+    int32_t word294;         /* 0x294: the same */
+    int32_t release_frames;  /* 0x294: S16 b04: updates since button 0 was released */
+  };
   f32 times298[5];           /* 0x298: S15 b04: times (func_8C029168 reads one; the timer shows it) */
   Vec3 vec2ac;               /* 0x2AC */
   FrameBody body;            /* 0x2B8 */
@@ -229,12 +289,34 @@ typedef struct Racer {
   uint32_t word530;          /* 0x530 */
   Vec3 vec534;               /* 0x534 */
   Vec3 vec540;               /* 0x540 */
-  uint8_t pad_54c[0x55C - 0x54C];
-  uint32_t word55c;          /* 0x55C */
-  uint8_t pad_560[0x568 - 0x560];
-  int32_t variant_on;        /* 0x568 */
-  uint8_t pad_56c[0x570 - 0x56C];
-  uint32_t variant_word;     /* 0x570: from the table at 0x8C0806FC by variant */
+  uint8_t pad_54c[0x554 - 0x54C];
+  int32_t word554;           /* 0x554: S16 w3: 0 at reset */
+  union {
+    int32_t word558;         /* 0x558: S16 w3: 0 at reset */
+    int32_t backwards_prev;  /* 0x558: S16 w4: backwards of the previous update */
+  };
+  union {
+    uint32_t word55c;        /* 0x55C */
+    int32_t backwards;       /* 0x55C: S16 w4: in action 1, it faced against its cell's direction for more than 120
+                              * updates in a row (racer_base_update) */
+  };
+  union {
+    int32_t word560;         /* 0x560: S16 w3: 0 at reset */
+    int32_t backwards_count; /* 0x560: S16 w4: how often backwards was newly set */
+  };
+  union {
+    int32_t word564;         /* 0x564: S16 w3: 0 at reset */
+    int32_t backwards_frames; /* 0x564: S16 w4: updates in a row it has faced backwards (0 outside action 1) */
+  };
+  union {
+    int32_t variant_on;      /* 0x568 */
+    int32_t vib_ready;       /* 0x568: S16 w3: its vibration unit is ready (pdVibMxIsReady at reset; 0 for none) */
+  };
+  int32_t vib_port;          /* 0x56C: S16 w3: the vibration unit's port (2, 8, 14, 20 for players 0-3), 0xFF: none */
+  union {
+    uint32_t variant_word;   /* 0x570: from the table at 0x8C0806FC by variant */
+    int32_t vib_frames;      /* 0x570: S16 w4: updates the variant's vibration still runs (racer_base_update) */
+  };
   int32_t variant;           /* 0x574: 1 to 5 (racer_set_variant) */
   f32 camera_f578;           /* 0x578 */
   f32 camera_f57c;           /* 0x57C */
@@ -256,6 +338,13 @@ HW_OFFSET(Racer, mark_d, 0x154);
 HW_OFFSET(Racer, marks_prev, 0x15C);
 HW_OFFSET(Racer, word180, 0x180);
 HW_OFFSET(Racer, speed, 0x0F0);
+HW_OFFSET(Racer, object_push, 0x0C8);
+HW_OFFSET(Racer, racer_velocity, 0x0D4);
+HW_OFFSET(Racer, object_velocity, 0x0E0);
+HW_OFFSET(Racer, racer_speed, 0x0EC);
+HW_OFFSET(Racer, object_grip, 0x0F4);
+HW_OFFSET(Racer, on_kind4_prev, 0x138);
+HW_OFFSET(Racer, on_kind4_new, 0x140);
 HW_OFFSET(Racer, button_prev, 0x100);
 HW_OFFSET(Racer, button, 0x108);
 HW_OFFSET(Racer, stick_x, 0x110);
@@ -282,6 +371,12 @@ HW_OFFSET(Racer, action_arg, 0x280);
 HW_OFFSET(Racer, action_step, 0x284);
 HW_OFFSET(Racer, word288, 0x288);
 HW_OFFSET(Racer, word294, 0x294);
+HW_OFFSET(Racer, stroke_level, 0x288);
+HW_OFFSET(Racer, word254, 0x254);
+HW_OFFSET(Racer, word170, 0x170);
+HW_OFFSET(Racer, word178, 0x178);
+HW_OFFSET(Racer, step_timer, 0x274);
+HW_OFFSET(Racer, release_frames, 0x294);
 HW_OFFSET(Racer, ground, 0x23C);
 HW_OFFSET(Racer, ground_touch, 0x250);
 HW_OFFSET(Racer, vec2ac, 0x2AC);
@@ -310,6 +405,25 @@ HW_OFFSET(Racer, child, 0x52C);
 HW_OFFSET(Racer, vec540, 0x540);
 HW_OFFSET(Racer, word55c, 0x55C);
 HW_OFFSET(Racer, variant_on, 0x568);
+HW_OFFSET(Racer, word0fc, 0x0FC);
+HW_OFFSET(Racer, f188, 0x188);
+HW_OFFSET(Racer, word190, 0x190);
+HW_OFFSET(Racer, word198, 0x198);
+HW_OFFSET(Racer, word1a4, 0x1A4);
+HW_OFFSET(Racer, contacts_word, 0x20C);
+HW_OFFSET(Racer, word210, 0x210);
+HW_OFFSET(Racer, word554, 0x554);
+HW_OFFSET(Racer, word558, 0x558);
+HW_OFFSET(Racer, word560, 0x560);
+HW_OFFSET(Racer, state_prev, 0x198);
+HW_OFFSET(Racer, progress_prev, 0x1A4);
+HW_OFFSET(Racer, backwards_prev, 0x558);
+HW_OFFSET(Racer, backwards, 0x55C);
+HW_OFFSET(Racer, backwards_count, 0x560);
+HW_OFFSET(Racer, backwards_frames, 0x564);
+HW_OFFSET(Racer, vib_frames, 0x570);
+HW_OFFSET(Racer, vib_ready, 0x568);
+HW_OFFSET(Racer, vib_port, 0x56C);
 HW_OFFSET(Racer, variant_word, 0x570);
 HW_OFFSET(Racer, variant, 0x574);
 HW_OFFSET(Racer, camera_distance, 0x584);
@@ -337,7 +451,11 @@ typedef struct LaneRacer {
   gaddr lanes[4][2];         /* 0x58C: [lane][branch]: the vertex pairs */
   gaddr lane_extra[4][2];    /* 0x5AC: the model set's fourth word */
   gaddr lane_motion[4][2];   /* 0x5CC */
-  gaddr lane_texlist[4][2];  /* 0x5EC */
+  union {
+    gaddr lane_texlist[4][2];  /* 0x5EC */
+    gaddr lane_markers[4][2];  /* 0x5EC: S16 b05: per quad of the lane a LaneMarker list (-1-terminated) or 0
+                                * (lane_racer_look_ahead) */
+  };
   int32_t lane_last[4];      /* 0x60C: the course's row count of the lane, - 1: its quads */
   gaddr lane_points;         /* 0x61C: lanes[lane][branch], the table in use */
   int32_t branch;            /* 0x620: 0 = the main way, 1 = the side way */
@@ -363,10 +481,23 @@ typedef struct LaneRacer {
   int32_t word67c;           /* 0x67C */
   int32_t word680;           /* 0x680 */
   int32_t word684;           /* 0x684 */
-  int32_t word688;           /* 0x688: -1 at reset */
-  int32_t word68c;           /* 0x68C */
-  int32_t word690;           /* 0x690: -1 at reset */
-  f32 f694;                  /* 0x694: 0.5 at reset */
+  union {
+    int32_t word688;         /* 0x688: -1 at reset */
+    int32_t pending_kind;    /* 0x688: S16 b05: the kind of the marker the racer is acting on (3, 4, 11, 12, 18),
+                              * -1: none (a kind 5 marker on the racer's quad clears it) */
+  };
+  union {
+    int32_t word68c;         /* 0x68C */
+    gaddr pending_marker;    /* 0x68C: S16 b05: that LaneMarker */
+  };
+  union {
+    int32_t word690;         /* 0x690: -1 at reset */
+    int32_t pending_level;   /* 0x690: S16 b05: its priority (1 or 2), -1 with pending_kind */
+  };
+  union {
+    f32 f694;                /* 0x694: 0.5 at reset */
+    f32 target_x;            /* 0x694: S16 b05: the side of the lane to steer to (a kind 4 marker sets it) */
+  };
   uint8_t pad_698[0x6A4 - 0x698];
   uint8_t second_base_at[0x1C]; /* 0x6A4: Racer.second_base points here */
 } LaneRacer;
@@ -387,6 +518,10 @@ HW_OFFSET(LaneRacer, reset_position, 0x66C);
 HW_OFFSET(LaneRacer, f678, 0x678);
 HW_OFFSET(LaneRacer, word690, 0x690);
 HW_OFFSET(LaneRacer, f694, 0x694);
+HW_OFFSET(LaneRacer, lane_markers, 0x5EC);
+HW_OFFSET(LaneRacer, pending_kind, 0x688);
+HW_OFFSET(LaneRacer, pending_marker, 0x68C);
+HW_OFFSET(LaneRacer, pending_level, 0x690);
 HW_OFFSET(LaneRacer, second_base_at, 0x6A4);
 #define LANE_RACER_VTABLE 0x8C23DB34u
 static inline LaneRacer *lane_racer_at(gaddr a) { return (LaneRacer *)hw_ptr(a); }
@@ -404,6 +539,8 @@ gaddr collider_construct(gaddr self, gaddr position, f32 radius, gaddr unused, g
 void racer_body_destroy(gaddr racer);
 void racer_set_state(gaddr racer, int32_t state);
 void racer_reset_at(gaddr racer, gaddr position, f32 b, f32 heading, f32 c);
+/* S16 w3, game/racer_reset.c */
+void racer_reset(gaddr racer, gaddr position, f32 heading, uint32_t word);
 static inline FrameBody *frame_body_at(gaddr a) { return (FrameBody *)hw_ptr(a); }
 
 /* game/course.c (S13; S14 b08 declares it) */
@@ -449,6 +586,9 @@ void racer_draw_thunk(gaddr racer);
 
 /* S15 b04: game/racer.c */
 gaddr frame_body_init(gaddr obj);
+/* S16 b04: game/racer.c declares them for racer_run.c */
+void racer_contacts_reset(gaddr racer);
+void racer_handle_contacts(gaddr racer);
 /* game/save.c: entry i of the save's byte table at 0x44 */
 int32_t save_byte44(int32_t i);
 /* S15 b06: game/motion_draw.c, game/racer_squash.c, game/racer_camera_update.c */
@@ -456,6 +596,16 @@ void racer_draw(gaddr racer);
 void racer_squash_update(gaddr racer);
 void racer_camera_start(gaddr racer);
 void racer_camera_update(gaddr racer);
+/* S16 w4: hand-written functions the racer's update calls (exported in src/ but not declared before) */
+void racer_sort_contacts(gaddr racer);                 /* game/racer_contacts.c */
+void frame_body_step(gaddr obj);                       /* game/racer.c */
+void racer_check_scene_stop(gaddr racer);              /* game/racer_body.c */
+void racer_ground(gaddr racer);                        /* game/racer_ground.c */
+f32 race_scene_f74(gaddr scene);                       /* game/racer.c */
+int32_t race_scene_cell_kind(gaddr scene, int32_t i);  /* game/racer.c */
+void racer_check_marks(gaddr racer);                   /* game/racer.c */
+/* S16 w4: game/racer_update.c */
+void racer_base_update(gaddr racer);
 /* S15 b04: game/racer_base.c (was func_8C030BF4) */
 #define CHARACTER_PARAMS 0x8C085648u /* CharacterParams[], by character */
 gaddr racer_base_init(gaddr racer, uint32_t index, gaddr unused_b, int32_t character, f32 unused_f, int32_t costume);

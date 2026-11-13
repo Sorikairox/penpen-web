@@ -7,6 +7,7 @@
  * choices back to the set-up first. The VMU then shows each player's picture. A state's first update (phase 0)
  * starts its music, places the menu's sprite Bodies and lights the scene. */
 #include "hw.h"
+#include "../core/sprite_text.h" /* text_draw (S16: hand-written) */
 #include "sdk.h"
 #include "../core/vec.h"
 #include "../core/view.h"
@@ -39,7 +40,6 @@ enum { HOUSE_PLAY, HOUSE_CHOICE_1, HOUSE_CHOICE_2, HOUSE_CHOICE_3, HOUSE_GOOD_NI
 enum { MENU_LEAVE_5 = 5, MENU_LEAVE_6 = 6, MENU_LEAVE_TO_RACE = 7, MENU_LEAVE_8 = 8 };
 
 /* ---- still translated ---- */
-static void text_style_reset(void) { CALL0(0x8C022A78u); } /* func_8C022A78 (core/sprite_text.c, no header) */
 /* func_8C0107C4 (core/random.c, no header): a random float in [0, range) */
 static f32 random_scaled(f32 range) {
   FARGS1(range);
@@ -57,7 +57,6 @@ static int32_t shape_motion_draw(gaddr object, gaddr motion, gaddr shape, gaddr 
   return (int32_t)CALL5(0x8C0117F8u, object, motion, shape, frame, loop);
 }
 /* func_8C01529A: draws a string at (x, y) with the text style */
-static int32_t text_draw(int32_t x, int32_t y, gaddr string) { return (int32_t)CALL3(0x8C01529Au, x, y, string); }
 /* func_8C018C20 (game/vmu.c, no header): picture `picture` on the VMU of the player's slot */
 static void vmu_show_picture(int32_t slot, uint32_t picture) { CALL2(0x8C018C20u, slot, picture); }
 /* func_8C027DC2: builds (or resets) the menu's penguins, posing or not */
@@ -65,14 +64,8 @@ static void house_penguins_reset(gaddr menu, int32_t posing) { CALL2(0x8C027DC2u
 static void house_draw_27aa8(gaddr menu, int32_t n) { CALL2(0x8C027AA8u, menu, n); }               /* func_8C027AA8 */
 static void house_draw_27c58(gaddr menu, int32_t n, int32_t k) { CALL3(0x8C027C58u, menu, n, k); } /* func_8C027C58 */
 static void house_penguins_update(gaddr menu) { CALL1(0x8C027E98u, menu); }                        /* func_8C027E98 */
-/* the other states' updates and draws */
-static void selection_update(gaddr menu) { CALL1(0x8C023D16u, menu); }  /* func_8C023D16: state 1 */
-static void selection2_update(gaddr menu) { CALL1(0x8C02478Cu, menu); } /* func_8C02478C: state 2 */
-static void state3_update(gaddr menu) { CALL1(0x8C025CECu, menu); }     /* func_8C025CEC */
+/* state 4's update (still translated; states 1-3 and the screens: game/menu_selection.c, game/menu_costume.c) */
 static void state4_update(gaddr menu) { CALL1(0x8C0270D2u, menu); }     /* func_8C0270D2 */
-static void selection2_draw(gaddr menu) { CALL1(0x8C0250E4u, menu); }   /* func_8C0250E4: states 2 and 7 */
-static void state3_draw(gaddr menu) { CALL1(0x8C0265ECu, menu); }       /* func_8C0265EC */
-static void state4_draw(gaddr menu) { CALL1(0x8C027234u, menu); }       /* func_8C027234 */
 
 /* func_8C015AA8: the frame drawn between two corners (in pixels) */
 static void frame_draw(int32_t x0, int32_t y0, int32_t x1, int32_t y1) { CALL4(0x8C015AA8u, x0, y0, x1, y1); }
@@ -339,7 +332,7 @@ void setup_menu_update(gaddr menu) {
   case 0: house_update(menu); break;
   case 1: selection_update(menu); break;
   case 2: selection2_update(menu); break;
-  case 3: state3_update(menu); break;
+  case 3: costume_update(menu); break;
   case 4: state4_update(menu); break;
   case MENU_LEAVE_5: menu_setup(m)->requested = 3; break;
   case MENU_LEAVE_6: menu_setup(m)->requested = 6; break;
@@ -484,9 +477,203 @@ void setup_menu_draw(gaddr menu) {
   case 0: case MENU_LEAVE_5: house_draw(menu); break;
   case 1: case MENU_LEAVE_6: selection_draw(menu); break;
   case 2: case MENU_LEAVE_TO_RACE: selection2_draw(menu); break;
-  case 3: state3_draw(menu); break;
-  case 4: state4_draw(menu); break;
+  case 3: costume_draw(menu); break;
+  case 4: records_draw(menu); break;
   default: break;
   }
 }
 HW_EXPORT(8c0235d8, setup_menu_draw(ARG0))
+
+/* ---- the SetupMenu's construction (S16, lead: resumable) ---- */
+
+void texture_load(gaddr name, gaddr texlist, gaddr dir_name); /* core/texture.c */
+int32_t game_language(void);                                   /* game/save.c */
+int32_t save_cup0_complete(void);                              /* game/save_progress.c */
+void loading_screen_show(int32_t picture);                     /* game/loading.c */
+#include "game.h"                                              /* g_video_running, g_soft_reset */
+
+/* the original's file names (its data) */
+#define FILE_SELECT       0x8C07ED54u /* "select.dat" */
+#define FILE_HOUSE_PVM    0x8C07EDF4u /* "penhouse.pvm" */
+#define FILE_HOUSE_PEN    0x8C07EE08u /* "house_pen.bin": the penguins' models and motions */
+#define FILE_OWNER        0x8C07EE1Cu /* "Owner.bin": the course mascots */
+#define FILE_OWNER_PVM    0x8C07EE2Cu /* "Owner.pvm" */
+/* the course map's textures by the language: English (0 and 1), German, French, Spanish, Italian, Dutch */
+static const gaddr course_map_pvm[7] = {0x8C07ED64u, 0x8C07ED64u, 0x8C07ED7Cu, 0x8C07ED94u, 0x8C07EDACu, 0x8C07EDC4u,
+                                        0x8C07EDDCu};
+#define MENU_SPRITE_TEXANIM 0x8C093300u /* the menu sprite's NJS_TEXANIM */
+#define HOUSE_PEN_HELD      27          /* house_pen.bin's entry with penguin 2's held motions (12-byte records) */
+#define CTOR_BODY           0x8C022D16u /* body_reset, as an array constructor */
+#define CTOR_BODY1          0x8C022D56u /* quat_identity: a Body1 at rest */
+#define NJ_OBJECT_SIBLING   0x30        /* NJS_OBJECT's sibling pointer */
+#define MENU_START_LOCK     60          /* frames the buttons are ignored after the menu starts */
+
+/* func_8C062800: the C++ runtime's array construction (count elements of `size` bytes, each by `ctor`) */
+static void array_construct(int32_t count, uint32_t size, gaddr base, gaddr ctor) { CALL4(0x8C062800u, count, size, base, ctor); }
+/* the data address of a loaded container's entry */
+static gaddr container_entry_data(gaddr file, int32_t i) {
+  return (gaddr)((const ContainerEntry *)hw_ptr(file))[i].offset;
+}
+
+/* the frame of the original (0x1C bytes of locals under 9 saved registers): the camera's target and eye live there
+ * when view_set_camera is called (DECOMP.md 15.4's frame depth) */
+typedef struct SetupMenuFrame {
+  uint32_t scratch; /* 0x00 */
+  Vec3 target;      /* 0x04 */
+  Vec3 eye;         /* 0x10 */
+  uint8_t saved[0x40 - 0x1C];
+} SetupMenuFrame;
+HW_OFFSET(SetupMenuFrame, target, 0x04);
+HW_OFFSET(SetupMenuFrame, eye, 0x10);
+HW_SIZE(SetupMenuFrame, 0x40);
+
+/* was func_8C022D80: the SetupMenu's construction (argument: the RaceSetup it sets up). The Task's fields, its pad,
+ * the Bodies at rest; the loading screen (picture 1: it ends frames, so this is resumable); then the video stopped,
+ * a pending soft reset dropped, the files loaded (select.dat and the course map's textures in the console's
+ * language, the house's textures, the penguins, the course mascots), the penguins and the mascot reset, the menu
+ * sprite, the first state (the house, or the first selection for the VS modes), the buttons locked for a second,
+ * the players' words copied from the set-up, the springs' damping, the house's choices (a fifth one once the first
+ * cup is won), one full-screen view looking down -z, the menu's sound set, and the video on again */
+gaddr setup_menu_init(gaddr menu, gaddr setup) {
+  HW_RESUMABLE(0x8C022D80u, menu);
+  HW_RESUME_AT(0);
+  {
+    SetupMenu *m = setup_menu_at(menu);
+    m->task.linger = 0;
+    m->task.active = 1;
+    m->task.stops_on_pause = 1;
+    m->task.child = 0;
+    m->task.next = 0;
+    m->task.parent = 0;
+    m->task.owner = 0;
+    word_construct(member_addr(menu, SetupMenu, pad), 0);
+    m->setup = setup;
+    m->b148.value = F32(0.0f);
+    m->b148.velocity = F32(0.0f);
+    m->b148.force = F32(0.0f);
+    m->b148.damping = F32(1.0f);
+    vec3_set(F32(0.0f), F32(0.0f), F32(0.0f), member_addr(menu, SetupMenu, model_body.position));
+    vec3_set(F32(0.0f), F32(0.0f), F32(0.0f), member_addr(menu, SetupMenu, model_body.velocity));
+    vec3_set(F32(0.0f), F32(0.0f), F32(0.0f), member_addr(menu, SetupMenu, model_body.force));
+    vec3_set(F32(1.0f), F32(1.0f), F32(1.0f), member_addr(menu, SetupMenu, model_body.damping));
+    array_construct(2, sizeof(Body), member_addr(menu, SetupMenu, place_a), CTOR_BODY);      /* place_a, place_b */
+    array_construct(2, sizeof(Body), member_addr(menu, SetupMenu, icon_position), CTOR_BODY); /* and icon_scale */
+    array_construct(4, sizeof(Body), member_addr(menu, SetupMenu, slots), CTOR_BODY);
+    array_construct(4, sizeof(Body1), member_addr(menu, SetupMenu, alphas), CTOR_BODY1);
+    array_construct(4, sizeof(Body1), member_addr(menu, SetupMenu, fades), CTOR_BODY1);
+  }
+  HW_YIELDING_RET(0, loading_screen_show(1), 0);
+  SetupMenu *m = setup_menu_at(menu);
+  g_video_running = 0;
+  g_soft_reset = 0;
+
+  m->select_file = container_load(FILE_SELECT, 0);
+  m->map_texlist = container_entry_data(m->select_file, 0);
+  m->texlist = container_entry_data(m->select_file, 1);
+  m->select_data2 = container_entry_data(m->select_file, 2);
+  m->character_models = container_entry_data(m->select_file, 4);
+  for (int32_t i = 0; i < 4; i++)
+    m->select_data5[i] = container_entry_data(m->select_file, 5 + i);
+  m->select_data9[0] = container_entry_data(m->select_file, 9);
+  m->select_data9[1] = container_entry_data(m->select_file, 10);
+  int32_t language = game_language();
+  if (language >= 0 && language <= 6)
+    texture_load(course_map_pvm[language], m->map_texlist, 0);
+  texture_load(FILE_HOUSE_PVM, m->texlist, 0);
+  for (uint32_t i = 0; i < 8; i++) /* each character's model stands alone */
+    hw_write32(((const gaddr *)hw_ptr(m->character_models))[i] + NJ_OBJECT_SIBLING, 0);
+
+  m->penguin_file = container_load(FILE_HOUSE_PEN, 0);
+  gaddr held = container_entry_data(m->penguin_file, HOUSE_PEN_HELD);
+  m->held_actions[1] = held;
+  m->held_actions[0] = held;
+  m->held_actions[2] = m->held_actions[0] + 0xC;
+  m->held_index = 0;
+  for (int32_t variant = 0; variant < 2; variant++)
+    for (int32_t character = 0; character < 8; character++)
+      m->penguins[character][variant] = 0;
+  menu_penguins_reset(menu, 1);
+
+  m->owner_file = container_load(FILE_OWNER, 0);
+  m->owner_texlist = container_entry_data(m->owner_file, 0);
+  m->models[0] = container_entry_data(m->owner_file, 1);
+  m->motion_tables[0] = container_entry_data(m->owner_file, 2);
+  m->models[1] = container_entry_data(m->owner_file, 3);
+  m->motion_tables[1] = container_entry_data(m->owner_file, 4);
+  m->models[2] = container_entry_data(m->owner_file, 5);
+  m->motion_tables[2] = container_entry_data(m->owner_file, 6);
+  m->models[3] = container_entry_data(m->owner_file, 7);
+  m->motion_tables[3] = container_entry_data(m->owner_file, 8);
+  texture_load(FILE_OWNER_PVM, m->owner_texlist, 0);
+  mascot_reset(menu, 0);
+
+  m->sprite.sx = F32(1.0f);
+  m->sprite.sy = F32(1.0f);
+  m->sprite.tlist = m->map_texlist;
+  m->sprite.tanim = MENU_SPRITE_TEXANIM;
+  RaceSetup *s = race_setup_at(m->setup);
+  if (s->mode == 0) {
+    m->state = 0; /* the house */
+    m->phase = 0;
+  } else {
+    m->state = 1; /* the VS modes start at the selection */
+    m->phase = 0;
+  }
+  m->repeat_lock = MENU_START_LOCK;
+  m->pressed[MENU_PRESS_A] = 0;
+  m->pressed[MENU_PRESS_B] = 0;
+  m->pressed[MENU_PRESS_RIGHT] = 0;
+  m->pressed[MENU_PRESS_LEFT] = 0;
+  m->pressed[MENU_PRESS_UP] = 0;
+  m->pressed[MENU_PRESS_DOWN] = 0;
+  m->cursor = 0;
+  m->word1a4 = 0;
+  m->grid_column = 0;
+  m->grid_row = 0;
+  m->course = 0;
+  m->variant = 0;
+  for (int32_t i = 0; i < 8; i++) {
+    m->player_a[i] = race_setup_at(m->setup)->words68[i];
+    m->player_b[i] = race_setup_at(m->setup)->words88[0]; /* (the first player's, for every one) */
+    m->order[i] = i;
+    m->picked[i] = 0;
+  }
+  switch (race_setup_at(m->setup)->mode) {
+  case 1: m->player_count = 2; break;
+  case 2: m->player_count = 3; break;
+  case 3: m->player_count = 4; break;
+  default: m->player_count = 1; break;
+  }
+  for (int32_t i = 0; i < 4; i++) {
+    m->slots[i].damping.z = F32(0.5f);
+    m->slots[i].damping.y = F32(0.5f);
+    m->slots[i].damping.x = F32(0.5f);
+  }
+  for (int32_t i = 0; i < 4; i++)
+    m->alphas[i].damping = F32(0.5f);
+  for (int32_t i = 0; i < 4; i++)
+    m->fades[i].damping = F32(0.75f);
+  m->cursor_count = 4;
+  m->word60 = 4;
+  m->word68 = 3;
+  if (save_cup0_complete())
+    m->cursor_count = 5;
+  m->f144 = F32(0.0f);
+  view_set_split(0);
+
+  gaddr frame = hw_stack_alloc(sizeof(SetupMenuFrame));
+  gaddr target = member_addr(frame, SetupMenuFrame, target), eye = member_addr(frame, SetupMenuFrame, eye);
+  Vec3 *t = vec3_at(target), *e = vec3_at(eye);
+  t->z = F32(-1.0f);
+  t->y = F32(0.0f);
+  t->x = F32(0.0f);
+  e->z = F32(0.0f);
+  e->y = F32(0.0f);
+  e->x = F32(0.0f);
+  view_set_camera(hw_addr(&g_views[0]), eye, target, F32(0.0f), F32_BITS(CAMERA_FOV), 0);
+  hw_stack_free(sizeof(SetupMenuFrame));
+  sound_select_set(0);
+  g_video_running = 1;
+  return menu;
+}
+HW_EXPORT_RESUMABLE(8c022d80, RET(setup_menu_init(ARG0, ARG1)))

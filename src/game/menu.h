@@ -22,7 +22,10 @@ typedef struct SetupMenu {
     gaddr setup;            /* 0x028: b02: the RaceSetup it sets up (the constructor's argument) */
   };
   int32_t state;            /* 0x02C: b02: 0 the house, 1 and 2 two selections, 3, 4; 5-8 leave (setup_menu_update) */
-  uint32_t word30;          /* 0x030 */
+  union {
+    uint32_t word30;        /* 0x030 */
+    int32_t countdown;      /* 0x030: S16 w3: frames the penguin selection waits after the last pick */
+  };
   int32_t phase;            /* 0x034: b02: 0 = the state was just entered (cleared with each new state) */
   uint32_t pressed[6];      /* 0x038: buttons 4, 2 (repeat-locked), 0x40, 0x80, 0x10, 0x20 (MENU_PRESS_*) */
   int32_t repeat_lock;      /* 0x050 */
@@ -31,7 +34,10 @@ typedef struct SetupMenu {
   int32_t course;           /* 0x05C: b02: handed to the set-up's course on leaving */
   uint32_t word60;          /* 0x060 */
   int32_t variant;          /* 0x064: b02: handed to the set-up's variant */
-  uint32_t word68;          /* 0x068 */
+  union {
+    uint32_t word68;        /* 0x068 */
+    int32_t variant_count;  /* 0x068: S16 w3: the variants the one-player game offers on the course (3 or 5) */
+  };
   int32_t order[8];         /* 0x06C: b02: i at the selection's start */
   int32_t picked[8];        /* 0x08C: b02: 0 at the selection's start */
   uint32_t player_a[8];     /* 0x0AC: b02: the set-up's words68, copied back on leaving; each passed to the VMU picture */
@@ -41,16 +47,42 @@ typedef struct SetupMenu {
   gaddr held_actions[3];    /* 0x130: S15 b03: what penguin 2 holds, three motions played in turn (HeldAction) */
   int32_t held_index;       /* 0x13C: S15 b03: the one playing; 0 when the penguins are reset */
   f32 held_frame;           /* 0x140: S15 b03: its frame; 0 when the penguins are reset, +1 each penguin update */
-  uint8_t pad_144[0x158 - 0x144];
+  union {
+    f32 f144;               /* 0x144: S16: 0 at construction */
+    f32 spin_target;        /* 0x144: S16 w3: state 3: the penguin's turn, half a turn more or less at random */
+  };
+  union {
+    Body1 b148;             /* 0x148: S16: at rest (0, 0, 0, damping 1) at construction */
+    Body1 spin;             /* 0x148: S16 w3: state 3: the penguin's turn, pulled toward spin_target */
+  };
   gaddr select_file;        /* 0x158: b02: "select.dat" */
-  gaddr map_texlist;        /* 0x15C: b02: the course map's textures (the file's first texture list) */
-  gaddr texlist;            /* 0x160: the backdrop's texture list (b02: the house's, "penhouse.pvm") */
-  uint8_t pad_164[0x168 - 0x164];
-  gaddr character_models;   /* 0x168: S15 b03: an array of a model per character, drawn after its penguin */
-  uint8_t pad_16c[0x17C - 0x16C];
+  /* S16: the data of select.dat's entries 0-2 and 4-10 (setup_menu_init; entry 3 is not kept) */
+  gaddr map_texlist;        /* 0x15C: b02: the course map's textures (the file's first texture list): entry 0 */
+  gaddr texlist;            /* 0x160: the backdrop's texture list (b02: the house's, "penhouse.pvm"): entry 1 */
+  gaddr select_data2;       /* 0x164: entry 2 */
+  gaddr character_models;   /* 0x168: S15 b03: an array of a model per character, drawn after its penguin: entry 4 */
+  union {
+    gaddr select_data5[4];  /* 0x16C: entries 5 to 8 */
+    /* S16 w3: the course map's nodes (NJS_OBJECT pointers), shown and hidden by the course selection */
+    struct {
+      gaddr map_marks;      /* 0x16C: per course 8 (gaddr[4][8]): the variants' marks, two rows of four */
+      gaddr map_badges;     /* 0x170: per course 2 (gaddr[4][2]): one of the two is shown */
+      gaddr map_lights;     /* 0x174: per course 4 pairs (gaddr[4][4][2]): one of a pair blinks on */
+      gaddr map_dots;       /* 0x178: per course 4 (gaddr[4][4]) */
+    };
+  };
   NjSprite sprite;          /* 0x17C */
-  uint8_t pad_19c[0x1A4 - 0x19C];
-  int32_t word1a4;          /* 0x1A4: S15 b09: 0 with the grid cursor (setup_menu_grid_reset) */
+  union {
+    gaddr select_data9[2];  /* 0x19C: entries 9 and 10 */
+    struct {
+      gaddr costume_model;  /* 0x19C: S16 w3: the costumes' model (state 3 draws it) */
+      gaddr costume_nodes;  /* 0x1A0: S16 w3: its 44 nodes (NJS_OBJECT pointers), one per costume item */
+    };
+  };
+  union {
+    int32_t word1a4;        /* 0x1A4: S15 b09: 0 with the grid cursor (setup_menu_grid_reset) */
+    int32_t grid_item;      /* 0x1A4: S16 w3: the item (a save flag number) of the grid cell the cursor is on */
+  };
   int32_t grid_column;      /* 0x1A8: S15 b09: a cursor in a 12-column grid (the table at 0x8C073C0C) */
   int32_t grid_row;         /* 0x1AC: S15 b09 */
   gaddr owner_file;         /* 0x1B0: b02: "Owner.bin" */
@@ -82,6 +114,7 @@ HW_OFFSET(SetupMenu, pad, 0x024);
 HW_OFFSET(SetupMenu, setup, 0x028);
 HW_OFFSET(SetupMenu, state, 0x02C);
 HW_OFFSET(SetupMenu, phase, 0x034);
+HW_OFFSET(SetupMenu, countdown, 0x030);
 HW_OFFSET(SetupMenu, repeat_lock, 0x050);
 HW_OFFSET(SetupMenu, cursor, 0x054);
 HW_OFFSET(SetupMenu, course, 0x05C);
@@ -95,6 +128,18 @@ HW_OFFSET(SetupMenu, player_b, 0x0CC);
 HW_OFFSET(SetupMenu, penguin_file, 0x0EC);
 HW_OFFSET(SetupMenu, penguins, 0x0F0);
 HW_OFFSET(SetupMenu, select_file, 0x158);
+HW_OFFSET(SetupMenu, f144, 0x144);
+HW_OFFSET(SetupMenu, b148, 0x148);
+HW_OFFSET(SetupMenu, spin, 0x148);
+HW_OFFSET(SetupMenu, spin_target, 0x144);
+HW_OFFSET(SetupMenu, grid_item, 0x1A4);
+HW_OFFSET(SetupMenu, select_data5, 0x16C);
+HW_OFFSET(SetupMenu, map_badges, 0x170);
+HW_OFFSET(SetupMenu, map_lights, 0x174);
+HW_OFFSET(SetupMenu, map_dots, 0x178);
+HW_OFFSET(SetupMenu, variant_count, 0x068);
+HW_OFFSET(SetupMenu, select_data9, 0x19C);
+HW_OFFSET(SetupMenu, costume_nodes, 0x1A0);
 HW_OFFSET(SetupMenu, texlist, 0x160);
 HW_OFFSET(SetupMenu, sprite, 0x17C);
 HW_OFFSET(SetupMenu, word1a4, 0x1A4);
@@ -171,6 +216,14 @@ void house_view_camera(int32_t index, gaddr eye, gaddr target, f32 roll, f32 fov
 void selection_enter(gaddr menu);
 void selection_draw(gaddr menu);
 void selection2_enter(gaddr menu);
+/* S16 w3, game/menu_selection.c */
+void selection_update(gaddr menu);
+void selection2_update(gaddr menu);
+void selection2_draw(gaddr menu);
+/* S16 w3, game/menu_costume.c */
+void costume_update(gaddr menu);
+void costume_draw(gaddr menu);
+void records_draw(gaddr menu);
 
 /* game/house.c: the C runtime's floorf (func_8C062988), through the game's thunk */
 f32 rt_floor(f32 x);
@@ -190,5 +243,8 @@ void material_set_2(f32 r, f32 g, f32 b, f32 a);
 void penguin_look_update(gaddr menu);
 void menu_penguins_draw(gaddr menu);
 void penguin_profile_draw(gaddr menu, int32_t character);
+
+/* S16 w4: game/menu_times.c (was func_8C028882; menu_selection.c called it through a static wrapper) */
+void variant_panel_draw_mode4(gaddr menu);
 
 #endif

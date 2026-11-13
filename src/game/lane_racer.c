@@ -33,7 +33,6 @@ static void racer_base_reset(gaddr self, gaddr position, uint32_t word, f32 valu
 static void lane_racer_state5(gaddr self) { CALL1(0x8C03F470u, self); }
 
 /* func_8C0317D4: the Racer's update (after the controls are made) */
-static void racer_base_update(gaddr self) { CALL1(0x8C0317D4u, self); }
 
 /* func_8C03E150 / func_8C03ED24: the computer player's step in racer states 3 and 4 */
 static void lane_racer_state3(gaddr self) { CALL1(0x8C03E150u, self); }

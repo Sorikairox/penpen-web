@@ -31,7 +31,6 @@ static f32 rt_atan2f(f32 y, f32 x) {
   return hw_fret();
 }
 /* func_8C0317D4: the rest of the racer's update (still translated) */
-static void racer_update_rest(gaddr racer) { CALL1(0x8C0317D4u, racer); }
 
 /* was func_8C0374C2: the base construction, then the word at 0x588 and the race scene; returns the racer */
 gaddr racer_init_base(gaddr racer, gaddr scene, uint32_t a, uint32_t b, uint32_t c, uint32_t d, uint32_t e, f32 f) {
@@ -89,7 +88,7 @@ void racer_read_controls(gaddr racer) {
     r->stick_angle = f32_from_int(f32_to_int(fdiv(fmul(a, F32(65536.0f)), TWO_PI)));
     r->stick_angle = angle_wrap(r->stick_angle);
   }
-  racer_update_rest(racer);
+  racer_base_update(racer);
 }
 HW_EXPORT(8c0375c2, racer_read_controls(ARG0))
 

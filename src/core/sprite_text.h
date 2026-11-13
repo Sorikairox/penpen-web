@@ -12,4 +12,9 @@ void sprite_big_draw(int32_t n, uint32_t attr, f32 x, f32 y, f32 scale);
 /* S15 b04: was func_8C022A78 (and its copy func_8C029332): the style back to its default (white, scale 1) */
 void text_style_reset(void);
 
+/* S16 w4: core/text_draw.c (was func_8C01529A; game files called it through static text_draw wrappers): a
+ * Shift-JIS string at (x, y) through the small sprite in the text style; returns the advance before the last
+ * character's extra spacing */
+int32_t text_draw(int32_t x, int32_t y, gaddr string);
+
 #endif

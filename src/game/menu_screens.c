@@ -6,6 +6,7 @@
  * The menu's sprite Bodies: icon_position / icon_scale follow an IconTarget (the menu's icon), place_a / place_b an
  * IconPlace (core of a frame drawn between them; left and right push place_b sideways). */
 #include "hw.h"
+#include "../core/sprite_text.h" /* text_draw (S16: hand-written) */
 #include "sdk.h"
 #include "../core/vec.h"
 #include "../core/pad.h"
@@ -420,7 +421,6 @@ HW_EXPORT(8c027ef0, menu_penguins_draw(ARG0))
 int32_t game_language(void);                                      /* game/save.c */
 void text_set_scale(f32 sx, f32 sy, f32 v);                       /* core/sprite_text.c */
 /* func_8C01529A (core/sprite_text.c, still translated): draws a string at (x, y) with the text style */
-static int32_t text_draw(int32_t x, int32_t y, gaddr string) { return (int32_t)CALL3(0x8C01529Au, x, y, string); }
 
 /* the profiles' strings: per language, one per character */
 #define g_profile_strings ((const gaddr (*)[MENU_CHARACTERS])hw_ptr(0x8C095A28u))

@@ -92,7 +92,7 @@ static inline gaddr actor_model(const Actor *a, int32_t i) { return ((const gadd
  * (func_8C046564 draws it) */
 typedef struct ActorPair {
   Actor base;               /* 0x00 */
-  uint8_t pad_28[0x2C - 0x28];
+  int32_t kind;             /* 0x28: S16 b06: the placement's param: which of the three pairs (0-2) */
   Vec3 position_a;          /* 0x2C */
   Vec3 position_b;          /* 0x38 */
   Vec3 center;              /* 0x44: S14 b10: a player nearer than 60 turns both parts toward their targets */
@@ -110,6 +110,7 @@ typedef struct ActorPair {
   gaddr second_vtable;      /* 0x88 */
 } ActorPair;
 HW_OFFSET(ActorPair, position_a, 0x2C);
+HW_OFFSET(ActorPair, kind, 0x28);
 HW_OFFSET(ActorPair, center, 0x44);
 HW_OFFSET(ActorPair, target_b, 0x58);
 HW_OFFSET(ActorPair, angle_a, 0x5C);
@@ -150,17 +151,21 @@ typedef struct Piece {
   Vec3 angle;               /* 0x30: about x, y, z */
   Body1 tip;                /* 0x3C: a falling piece tips by it */
   int32_t state;            /* 0x4C: 0 falling, 1, 2 and more: gone */
-  uint32_t word50;          /* 0x50 */
+  uint32_t word50;          /* 0x50: S16 b06: set: its first landing scatters it sideways (by its index) */
   uint32_t alt_model;       /* 0x54: model 8 of the list instead of 9 */
-  uint32_t word58;          /* 0x58 */
-  uint32_t size;            /* 0x5C: handed to the race scene's visibility test */
-  uint8_t pad_60[0x64 - 0x60];
+  uint32_t word58;          /* 0x58: S16 b06: updates before it falls (counted down while the actor is not held) */
+  union {
+    uint32_t size;          /* 0x5C: handed to the race scene's visibility test */
+    int32_t cell;           /* 0x5C: S16 b06: the course cell it is on (pieces_update refreshes one per update) */
+  };
+  int32_t sound_timer;      /* 0x60: S16 b06: updates before a contact may sound again (60) */
   Contacts contacts;        /* 0x64: S14 b10: owned by the body, radius 10, capacity 3 */
   uint8_t pad_b8[0xBC - 0xB8];
 } Piece;
 HW_OFFSET(Piece, tip, 0x3C);
 HW_OFFSET(Piece, state, 0x4C);
 HW_OFFSET(Piece, size, 0x5C);
+HW_OFFSET(Piece, sound_timer, 0x60);
 HW_OFFSET(Piece, contacts, 0x64);
 HW_SIZE(Piece, 0xBC);
 
@@ -168,17 +173,22 @@ HW_SIZE(Piece, 0xBC);
 /* type 5 (constructor func_8C046C50) */
 typedef struct Pieces {
   Actor base;               /* 0x00 */
-  uint8_t pad_28[0x38 - 0x28];
+  int32_t state;            /* 0x28: S16 b06: 0 waits for a player on cell 0x77, 1 the pieces fall */
+  uint8_t pad_2c[0x38 - 0x2C];
   Piece pieces[PIECE_COUNT]; /* 0x38 */
-  uint8_t pad_b3c[0xB40 - 0xB3C];
+  int32_t cell_turn;        /* 0xB3C: S16 b06: the piece whose cell is refreshed next */
   Body body;                /* 0xB40: S14 b10 */
   Contacts contacts;        /* 0xB70: owned by the body, radius 16, capacity 4 */
-  uint8_t pad_bc4[0xBD0 - 0xBC4];
+  uint8_t pad_bc4[0xBCC - 0xBC4];
+  int32_t held;             /* 0xBCC: S16 b06: while set, the pieces' fall delays do not count down */
   gaddr second_vtable;      /* 0xBD0 */
 } Pieces;
 HW_OFFSET(Pieces, pieces, 0x38);
 HW_OFFSET(Pieces, body, 0xB40);
 HW_OFFSET(Pieces, contacts, 0xB70);
+HW_OFFSET(Pieces, state, 0x28);
+HW_OFFSET(Pieces, cell_turn, 0xB3C);
+HW_OFFSET(Pieces, held, 0xBCC);
 HW_SIZE(Pieces, 0xBD4);
 
 /* type 0x1F (constructor func_8C048476): three parts: part 0 (drawn twice, the second time turned half a turn) and
@@ -456,20 +466,59 @@ HW_OFFSET(Turner, angle, 0x38);
 HW_SIZE(Turner, 0x40);
 
 /* type 0x2B (constructor func_8C049CB0, 0x1B8 bytes): only its construction is written */
+/* S16 b06: an entry of type 0x2B's motion table (12 bytes) */
+typedef struct Type2BMotion {
+  gaddr motion;             /* 0x00: NJS_MOTION (core/file.h: NjMotion) */
+  uint32_t word4;           /* 0x04: copied with it into the blend */
+  uint32_t word8;           /* 0x08 */
+} Type2BMotion;
+HW_SIZE(Type2BMotion, 12);
+
 typedef struct ActorType2B {
   Actor base;               /* 0x000 */
-  uint8_t pad_028[0x05C - 0x028];
+  uint8_t pad_028[0x02C - 0x028];
+  int32_t motion_index;     /* 0x02C: S16 b06: the entry of `motions` playing (0 idle, 1 hit, 2 reach) */
+  int32_t active;           /* 0x030: S16 b06: 0: it never reaches out and its body stays */
+  uint8_t pad_034[0x038 - 0x034];
+  int32_t state;            /* 0x038: S16 b06: 0-2 the reach cycle, 10-15 hit by a racer */
+  uint8_t pad_03c[0x040 - 0x03C];
+  int32_t timer;            /* 0x040: S16 b06 */
+  int32_t reach;            /* 0x044: S16 b06: how far out the body is (0 to reach_max) */
+  int32_t reach_max;        /* 0x048: S16 b06 */
+  int32_t blending;         /* 0x04C: S16 b06: 1 while two motions blend */
+  int32_t side;             /* 0x050: S16 b06: which pair of points the body moves between (flips each cycle) */
+  f32 frame;                /* 0x054: S16 b06: the motion's frame */
+  f32 frame_end;            /* 0x058: S16 b06: its last frame */
   Body1 values[6];          /* 0x05C */
   Body body;                /* 0x0BC */
   Vec3 points_a[2];         /* 0x0EC */
   Vec3 points_b[2];         /* 0x104 */
-  uint8_t pad_11c[0x15C - 0x11C];
+  f32 angle_a;              /* 0x11C: S16 b06: the turn for side 0 */
+  f32 angle_b;              /* 0x120: S16 b06: for side 1 */
+  f32 angle;                /* 0x124: S16 b06: where values[4] turns to (a hit adds -0.25..0.25 turn) */
+  uint8_t pad_128[0x130 - 0x128];
+  gaddr motions;            /* 0x130: S16 b06: Type2BMotion[3] */
+  f32 blend_time;           /* 0x134: S16 b06 */
+  f32 blend_length;         /* 0x138: S16 b06 */
+  gaddr blend_motion[2];    /* 0x13C: S16 b06: from, to */
+  f32 blend_frame[2];       /* 0x144: S16 b06 */
+  uint32_t blend_word[2];   /* 0x14C: S16 b06 */
+  f32 blend_frame_b[2];     /* 0x154: S16 b06 */
   Contacts contacts;        /* 0x15C: owned by the body, radius 5, capacity 2 */
   int32_t contacts_word;    /* 0x1B0 */
   gaddr second_vtable;      /* 0x1B4 */
 } ActorType2B;
 HW_OFFSET(ActorType2B, body, 0x0BC);
 HW_OFFSET(ActorType2B, points_b, 0x104);
+HW_OFFSET(ActorType2B, motion_index, 0x02C);
+HW_OFFSET(ActorType2B, state, 0x038);
+HW_OFFSET(ActorType2B, frame_end, 0x058);
+HW_OFFSET(ActorType2B, values, 0x05C);
+HW_OFFSET(ActorType2B, angle_a, 0x11C);
+HW_OFFSET(ActorType2B, motions, 0x130);
+HW_OFFSET(ActorType2B, blend_motion, 0x13C);
+HW_OFFSET(ActorType2B, blend_word, 0x14C);
+HW_OFFSET(ActorType2B, blend_frame_b, 0x154);
 HW_OFFSET(ActorType2B, contacts, 0x15C);
 HW_SIZE(ActorType2B, 0x1B8);
 
@@ -553,7 +602,13 @@ typedef struct ActorType19 {
   uint8_t pad_028[0x030 - 0x028];
   int32_t slow;             /* 0x030: 0 = the clock runs at double speed */
   int32_t state;            /* 0x034: picks the step (func_8C050BAE, func_8C05106C, func_8C0512A4, func_8C051548) */
-  uint8_t pad_038[0x050 - 0x038];
+  uint8_t pad_038[0x03C - 0x038];
+  int32_t phase;            /* 0x03C: S16 b06: state 2's phase: 0 waits for a player on trigger_cell, 1 counts
+                             * delay down, 2 flies */
+  int32_t delay;            /* 0x040: S16 b06: updates before it leaps (5 to 65, at random) */
+  int32_t trigger_cell;     /* 0x044: S16 b06 */
+  int32_t first_player;     /* 0x048: S16 b06: the players before it (in focus order) are not watched */
+  int32_t waiting;          /* 0x04C: S16 b06: 1 while it waits, 0 while it flies */
   f32 clock;                /* 0x050 */
   uint8_t pad_054[0x064 - 0x054];
   Vec3 points[3];           /* 0x064 */
@@ -568,6 +623,8 @@ typedef struct ActorType19 {
 } ActorType19;
 HW_OFFSET(ActorType19, state, 0x034);
 HW_OFFSET(ActorType19, clock, 0x050);
+HW_OFFSET(ActorType19, phase, 0x03C);
+HW_OFFSET(ActorType19, waiting, 0x04C);
 HW_OFFSET(ActorType19, points, 0x064);
 HW_OFFSET(ActorType19, turns, 0x088);
 HW_OFFSET(ActorType19, body, 0x0B8);
@@ -628,8 +685,9 @@ typedef struct ActorType24 {
   f32 f54;                  /* 0x054 */
   Vec3 angle;               /* 0x058: the placement's angles */
   Vec3 points_a[4];         /* 0x064: random points around 0 */
-  Vec3 points_b[4];         /* 0x094: copies of points_a */
-  uint8_t pad_0c4[0x0D0 - 0x0C4];
+  Vec3 points_b[4];         /* 0x094: copies of points_a (S16 b06: the curve's four control points, re-picked
+                             * from points_a each time the curve is run through) */
+  Vec3 curve_point;         /* 0x0C4: S16 b06: the point of the curve at f54 (body2 is pulled toward it) */
   Vec3 home;                /* 0x0D0: the placement's position */
   Body1 values[4];          /* 0x0DC */
   Body body;                /* 0x11C */
@@ -648,6 +706,7 @@ HW_OFFSET(ActorType24, frame, 0x04C);
 HW_OFFSET(ActorType24, angle, 0x058);
 HW_OFFSET(ActorType24, points_b, 0x094);
 HW_OFFSET(ActorType24, home, 0x0D0);
+HW_OFFSET(ActorType24, curve_point, 0x0C4);
 HW_OFFSET(ActorType24, model, 0x180);
 HW_OFFSET(ActorType24, motions, 0x188);
 HW_OFFSET(ActorType24, values, 0x0DC);
@@ -1068,13 +1127,14 @@ typedef struct ActorType01 {
   f32 heading;              /* 0x034: the placement's angle about y */
   f32 word38;               /* 0x038: 0 */
   Body1 spin;               /* 0x03C: (0, 0, 0, 1) at construction */
-  f32 word4c;               /* 0x04C */
+  f32 word4c;               /* 0x04C: S16 b06: the wind's strength (level times 0.0194), push = point times it */
   Vec3 push;                /* 0x050: the wind it adds (func_8C045514: 40 long) */
-  int32_t word5c;           /* 0x05C */
-  uint8_t pad_60[0x64 - 0x60];
-  int32_t word64;           /* 0x064: 0, or 3 when kind_b is not 0 */
-  int32_t kind_a;           /* 0x068: the placement's param bits 0-3 */
-  int32_t word6c;           /* 0x06C */
+  int32_t word5c;           /* 0x05C: S16 b06: the step in its level table */
+  int32_t timer;            /* 0x060: S16 b06: updates in the step (a step lasts 121) */
+  int32_t word64;           /* 0x064: 0, or 3 when kind_b is not 0 (S16 b06: the state: 0 waits for a player on
+                             * cell 0x39, 1 steps through the level table, 2 stops, 3 spins) */
+  int32_t kind_a;           /* 0x068: the placement's param bits 0-3 (S16 b06: picks the level table) */
+  int32_t word6c;           /* 0x06C: S16 b06: the level (from the table; 0 ends it, -1 starts it over) */
   int32_t kind_b;           /* 0x070: param bits 4-7 */
   Contacts contacts;        /* 0x074 */
   int32_t contacts_word;    /* 0x0C8: 4 */
@@ -1087,6 +1147,8 @@ HW_OFFSET(ActorType01, position, 0x028);
 HW_OFFSET(ActorType01, spin, 0x03C);
 HW_OFFSET(ActorType01, push, 0x050);
 HW_OFFSET(ActorType01, word64, 0x064);
+HW_OFFSET(ActorType01, timer, 0x060);
+HW_OFFSET(ActorType01, word6c, 0x06C);
 HW_OFFSET(ActorType01, kind_b, 0x070);
 HW_OFFSET(ActorType01, contacts, 0x074);
 HW_OFFSET(ActorType01, contacts_word, 0x0C8);
@@ -1111,7 +1173,7 @@ typedef struct ActorType02 {
   int32_t contacts_word;    /* 0xC8: 4 */
   gaddr model;              /* 0xCC */
   int32_t delay;            /* 0xD0: param bits 8-15, times 5 */
-  int32_t wordd4;           /* 0xD4: 0 at set-up */
+  int32_t wordd4;           /* 0xD4: 0 at set-up (S16 b06: updates it has rolled; past 300 it bursts) */
   gaddr burst;              /* 0xD8: Burst (10 particles) or 0 */
   gaddr second_vtable;      /* 0xDC */
 } ActorType02;
@@ -1216,6 +1278,10 @@ void effect_defaults(gaddr fx);          /* S15 b08 */
 gaddr burst_construct(gaddr obj, uint32_t count);
 /* S15 b08: game/actor_group.c */
 void actor_set_cell(gaddr actor, gaddr pos, int32_t hint);
+/* game/actor.c (S16 b06 declares it for actor_pieces_update.c) */
+void piece_kick(gaddr obj, int32_t i);
+/* game/burst.c (S16 b06 declares it for actor_type02.c) */
+void burst_update(gaddr obj);
 int32_t actor_in_view(gaddr actor);
 gaddr actor_group_init(gaddr group);
 gaddr actor_group_construct(gaddr group);
