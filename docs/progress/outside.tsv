@@ -2,7 +2,7 @@
 # library	translated_functions	translated_bytes	executed_functions	executed_bytes	hand_written_functions	hand_written_bytes
 game_unlisted	80	19642	26	9590	0	0
 Ninja	527	250140	49	8800	0	0
-shc_rt	104	15094	29	2120	6	946
+shc_rt	104	15094	29	2120	12	1426
 bu	84	12712	6	596	0	0
 sy	71	7274	7	394	0	0
 unknown	30	1260	4	362	0	0
@@ -26,4 +26,4 @@ gdFs_unlisted	1	778	0	0	0	0
 kd	14	1006	0	0	0	0
 sd	84	7610	0	0	0	0
 sy_unlisted	8	784	0	0	0	0
-total	1927	414700	133	22100	6	946
+total	1927	414700	133	22100	12	1426

@@ -1503,6 +1503,7 @@ address	c_function	bases	returned	kept	pass	fail	covered_bytes	insn_bytes	note	r
 8c049ccc	actor_type2b_destroy	8	488	1	1	0	22	22		n1
 8c049ce2	actor_type2b_delete	8	600	1	1	0	36	36		n1
 8c049d06	actor_type2b_destroy_self	8	539	8	8	0	18	18		s18dv06
+8c049d2c	actor_type2b_init	10	111	2	2	0	978	1158		s19u2
 8c04a1b2	type2b_update	10	623	12	12	0	588	1652		s18div1
 8c04a8fc	-	8	501	2	2	0	240	240		s18n4
 8c04aa28	-	8	401	1	1	0	98	98		s18n4
@@ -1724,6 +1725,7 @@ address	c_function	bases	returned	kept	pass	fail	covered_bytes	insn_bytes	note	r
 8c04d966	balls_delete	8	588	2	2	0	36	36		n6
 8c04d98a	balls_destroy_self	8	586	1	1	0	18	18		n6
 8c04d99c	balls_init	10	378	1	1	0	224	268		h1
+8c04daca	balls_update	10	316	1	1	0	390	620		s19u2
 8c04dd36	balls_draw	8	423	8	8	0	60	60		s18dx0
 8c04dd94	balls_respond	6	374	2	2	0	290	270		s18nv
 8c04dee0	method_self	8	601	1	1	0	4	4		h1
@@ -1842,6 +1844,7 @@ address	c_function	bases	returned	kept	pass	fail	covered_bytes	insn_bytes	note	r
 8c04fab4	wobbler_construct	12	559	1	1	0	28	28		h1
 8c04fad0	wobbler_destroy	8	599	1	1	0	22	22		n6
 8c04fae6	wobbler_delete	8	597	2	2	0	36	36		n6
+8c04fb4e	wobbler_init	10	0	0	0	0	0	794		s19u2
 8c04fe68	wobbler_update	10	714	9	9	0	240	240		s18dx0
 8c04ff80	wobbler_draw	6	379	1	1	0	158	158		s18nv
 8c050030	vec3_copy	8	529	1	1	0	20	20		h1
@@ -1888,6 +1891,7 @@ address	c_function	bases	returned	kept	pass	fail	covered_bytes	insn_bytes	note	r
 8c050558	actor_type19_destroy	8	595	1	1	0	22	22		n6
 8c05056e	actor_type19_delete	8	600	1	1	0	36	36		n6
 8c050592	actor_type19_destroy_self	8	599	1	1	0	18	18		n6
+8c0505a4	actor_type19_init	8	0	0	0	0	0	1232		s19u2
 8c050a74	type19_update	10	848	10	10	0	128	132		s18dw0
 8c050b18	actor_type19_draw	8	478	1	1	0	24	150		n6
 8c050bae	type19_step0	12	552	6	6	0	118	802		s18dv10
@@ -2252,6 +2256,7 @@ address	c_function	bases	returned	kept	pass	fail	covered_bytes	insn_bytes	note	r
 8c05768c	text_set_color	10	400	1	1	0	12	12		s19u
 8c0576be	sign_base_construct	10	560	1	1	0	130	130		h1
 8c0577e4	sign_destroy_self	8	599	1	1	0	18	18		n9
+8c057810	sign_init	10	299	5	5	0	504	738		s19u2
 8c057af2	sign_update	10	75	12	12	0	246	888		s18div2
 8c057ed2	sign_draw	10	706	11	11	0	238	878		s18div1
 8c058334	vec3_diff	8	507	1	1	0	34	34		h1
@@ -2475,6 +2480,7 @@ address	c_function	bases	returned	kept	pass	fail	covered_bytes	insn_bytes	note	r
 8c05b1c6	ornament_delete	8	608	2	2	0	36	36		n10
 8c05b1ea	ornament_destroy_self	8	597	1	1	0	18	18		n10
 8c05b230	ornament_init	10	792	10	10	0	368	580		s18dv01
+8c05b4b4	ornament_update	10	282	4	4	0	348	782		s19u2
 8c05b7c2	ornament_draw_model	8	373	1	1	0	70	70		n10
 8c05b8b0	method_empty	8	601	1	1	0	4	4		h1
 8c05b8b4	method_empty	8	601	1	1	0	4	4		h1

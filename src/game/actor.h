@@ -499,12 +499,13 @@ HW_SIZE(Type2BMotion, 12);
 
 typedef struct ActorType2B {
   Actor base;               /* 0x000 */
-  uint8_t pad_028[0x02C - 0x028];
+  int32_t kind;             /* 0x028: S19 u2: the placement's param bits 8-11: which model of the model set */
   int32_t motion_index;     /* 0x02C: S16 b06: the entry of `motions` playing (0 idle, 1 hit, 2 reach) */
-  int32_t active;           /* 0x030: S16 b06: 0: it never reaches out and its body stays */
+  int32_t active;           /* 0x030: S16 b06: 0: it never reaches out and its body stays (S19 u2: the param's
+                             * bits 0-3; 1-3 reach 100, 130, 145 ahead) */
   uint8_t pad_034[0x038 - 0x034];
   int32_t state;            /* 0x038: S16 b06: 0-2 the reach cycle, 10-15 hit by a racer */
-  uint8_t pad_03c[0x040 - 0x03C];
+  int32_t word3c;           /* 0x03C: S19 u2: 0 at init */
   int32_t timer;            /* 0x040: S16 b06 */
   int32_t reach;            /* 0x044: S16 b06: how far out the body is (0 to reach_max) */
   int32_t reach_max;        /* 0x048: S16 b06 */
@@ -536,6 +537,11 @@ HW_OFFSET(ActorType2B, body, 0x0BC);
 HW_OFFSET(ActorType2B, points_b, 0x104);
 HW_OFFSET(ActorType2B, motion_index, 0x02C);
 HW_OFFSET(ActorType2B, state, 0x038);
+HW_OFFSET(ActorType2B, kind, 0x028);
+HW_OFFSET(ActorType2B, word3c, 0x03C);
+HW_OFFSET(ActorType2B, timer, 0x040);
+HW_OFFSET(ActorType2B, reach_max, 0x048);
+HW_OFFSET(ActorType2B, angle, 0x124);
 HW_OFFSET(ActorType2B, frame_end, 0x058);
 HW_OFFSET(ActorType2B, values, 0x05C);
 HW_OFFSET(ActorType2B, angle_a, 0x11C);
@@ -601,11 +607,14 @@ HW_SIZE(Balls, 0x3F8);
  * (func_8C04FE68) */
 typedef struct Wobbler {
   Actor base;               /* 0x000 */
-  uint8_t pad_028[0x02C - 0x028];
-  int32_t motion;           /* 0x02C: S17 b06: the entry of the motion table it is drawn with */
-  uint8_t pad_030[0x040 - 0x030];
+  int32_t kind;             /* 0x028: S19 u2: the placement's param bits 8-11: which model of the model set */
+  int32_t motion;           /* 0x02C: S17 b06: the entry of the motion table it is drawn with (S19 u2: param bits
+                             * 0-3) */
+  int32_t small;            /* 0x030: S19 u2: the placement's param bits 4-7: non-zero = rest 0.65 and half the
+                             * contacts' radius (else 1.3 and the full radius) */
+  uint8_t pad_034[0x040 - 0x034];
   f32 clock;                /* 0x040: + 1 each step (S17 b06: the motion's frame, handed by address) */
-  uint8_t pad_044[0x048 - 0x044];
+  f32 last_frame;           /* 0x044: S19 u2: the motion's last frame (its frame count - 1) */
   f32 rest;                 /* 0x048: the value its three Body1s are pulled toward */
   Vec3 angle;               /* 0x04C: S17 b06: drawn turned about z, y, then x by it */
   Vec3 position;            /* 0x058: the contacts' owner */
@@ -619,6 +628,9 @@ typedef struct Wobbler {
   gaddr second_vtable;      /* 0x128 */
 } Wobbler;
 HW_OFFSET(Wobbler, clock, 0x040);
+HW_OFFSET(Wobbler, kind, 0x028);
+HW_OFFSET(Wobbler, small, 0x030);
+HW_OFFSET(Wobbler, last_frame, 0x044);
 HW_OFFSET(Wobbler, motion, 0x02C);
 HW_OFFSET(Wobbler, angle, 0x04C);
 HW_OFFSET(Wobbler, object, 0x0C4);
@@ -633,7 +645,8 @@ HW_SIZE(Wobbler, 0x12C);
 /* type 0x19 (constructor func_8C050504, 0x1BC bytes): S14 b10: its construction and its update (func_8C050A74) */
 typedef struct ActorType19 {
   Actor base;               /* 0x000 */
-  uint8_t pad_028[0x030 - 0x028];
+  uint8_t pad_028[0x02C - 0x028];
+  int32_t kind;             /* 0x02C: S19 u2: which model of the model set (0 at init) */
   int32_t slow;             /* 0x030: 0 = the clock runs at double speed (S17 b06: also the entry of the motion
                              * table it is drawn with) */
   int32_t state;            /* 0x034: picks the step (func_8C050BAE, func_8C05106C, func_8C0512A4, func_8C051548) */
@@ -645,7 +658,7 @@ typedef struct ActorType19 {
   int32_t first_player;     /* 0x048: S16 b06: the players before it (in focus order) are not watched */
   int32_t waiting;          /* 0x04C: S16 b06: 1 while it waits, 0 while it flies */
   f32 clock;                /* 0x050 */
-  uint8_t pad_054[0x058 - 0x054];
+  f32 last_frame;           /* 0x054: S19 u2: the motion's last frame (its frame count - 1) */
   f32 radius;               /* 0x058: S18 b04: state 1 circles points[0] at this distance */
   f32 roll_target;          /* 0x05C: S18 b04: turns[2] (its roll) is pulled to it: 0, or half a turn */
   f32 circle_angle;         /* 0x060: S18 b04: state 1's angle about points[0] (Ninja units) */
@@ -673,6 +686,12 @@ typedef struct ActorType19 {
 } ActorType19;
 HW_OFFSET(ActorType19, state, 0x034);
 HW_OFFSET(ActorType19, clock, 0x050);
+HW_OFFSET(ActorType19, kind, 0x02C);
+HW_OFFSET(ActorType19, last_frame, 0x054);
+HW_OFFSET(ActorType19, delay, 0x040);
+HW_OFFSET(ActorType19, trigger_cell, 0x044);
+HW_OFFSET(ActorType19, first_player, 0x048);
+HW_OFFSET(ActorType19, texlist, 0x0EC);
 HW_OFFSET(ActorType19, phase, 0x03C);
 HW_OFFSET(ActorType19, waiting, 0x04C);
 HW_OFFSET(ActorType19, points, 0x064);
@@ -955,7 +974,7 @@ HW_SIZE(Swimmer, 0x270);
  * the first player's state (6) (func_8C057AF2 steps it, func_8C057ED2 draws it) */
 typedef struct Sign {
   Actor base;               /* 0x000 */
-  uint8_t pad_028[0x02C - 0x028];
+  uint32_t param;           /* 0x028: S19 u2: the placement's param (bits 0-3 the mode, 4-7 the state) */
   int32_t mode;             /* 0x02C: 0 to 6 */
   int32_t state;            /* 0x030: mode 0: 0 = it has contacts; mode 6: 0 in, 1 out, 2 hidden, 3 gone */
   int32_t timer;            /* 0x034 */
@@ -968,7 +987,9 @@ typedef struct Sign {
   int32_t contacts_word;    /* 0x11C */
   gaddr second_vtable;      /* 0x120 */
 } Sign;
+HW_OFFSET(Sign, param, 0x028);
 HW_OFFSET(Sign, mode, 0x02C);
+HW_OFFSET(Sign, state, 0x030);
 HW_OFFSET(Sign, timer, 0x034);
 HW_OFFSET(Sign, body, 0x038);
 HW_OFFSET(Sign, position, 0x068);

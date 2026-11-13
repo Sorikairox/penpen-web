@@ -4179,3 +4179,21 @@ for 8c05c054
 
 for 8c047c58
 # this: Chain (type 0x1D, constructor 8c04795c, init 8c0479ec); the per-view draw (needs a draw context: a view drawing)
+# S19 batch u2
+for 8c04daca
+# this = Balls (type 0x1E, constructor func_8C04D924, 0x3F8 bytes); state (0x3C) 0..2 picks the path; table (0x40) must point at an int list (0x8C08824C, as balls_init sets it); cells[] (0x3D4) are course cell hints
+
+for 8c049d2c
+# this = ActorType2B (constructor func_8C049CB0, 0x1B8 bytes), r5 = an ActorPlacement (0x20 bytes) whose param bits 0-3 (active) are 0..3 (4+ = the default path) and bits 8-11 index the model set; base.model_set/texlist/word1c (0x14/0x18/0x1C) must be loaded ContainerEntries (offset = address)
+
+for 8c04fb4e
+# this = Wobbler (type 0x33, constructor func_8C04FAB4, 0x12C bytes), r5 = an ActorPlacement: param bits 0-3 the motion entry, 4-7 small (0 or not), 8-11 the model index; base.model_set/texlist/word1c must be loaded ContainerEntries
+
+for 8c0505a4
+# this = ActorType19 (constructor func_8C050504, 0x1BC bytes), r5 = an ActorPlacement: param bits 0-3 the state 0..3 (4+ = default); slow ends 0 or 1, and motions[slow].motion is read without a check (must be an NJS_MOTION); base.model_set/texlist/word1c loaded ContainerEntries; base.scene a RaceScene (actor_set_cell, states 1 and 2)
+
+for 8c057810
+# this = Sign (type 0x22, constructor func_8C057784, 0x124 bytes), r5 = an ActorPlacement: param bits 0-3 the mode 0..6 (7+ = default), 4-7 the state; mode 5 needs base.models (0x20) with an NJS_OBJECT at [4] that has a child, and the motes array constructed; mode 6 reads g_race_setup's mode / variant
+
+for 8c05b4b4
+# this = Ornament (type 0x14, constructor func_8C05B194, 0x10C bytes); style (0x2C) 0..4 picks the path (5+ = none); subkind (0x30) 0 or not; word3c (0x3C) 0..3 and word38 (0x38) around 0x95 for style 3; style 0 needs base.models[model] (0x20, 0x34) with a child that has a sibling; style 3 needs base.scene a RaceScene

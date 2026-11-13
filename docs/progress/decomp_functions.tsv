@@ -2277,6 +2277,7 @@
 8c049ccc	22	actor_type2b_destroy	src/game/actor_lifetimes.c	plain
 8c049ce2	36	actor_type2b_delete	src/game/actor_lifetimes.c	plain
 8c049d06	18	actor_type2b_destroy_self	src/game/actor_lifetimes.c	plain
+8c049d2c	1158	actor_type2b_init	src/game/actor_type2b_init.c	plain
 8c04a1b2	1804	type2b_update	src/game/actor_type2b.c	plain
 8c04a8fc	240	actor_type2b_draw	src/game/actor_misc_b04.c	plain
 8c04aa28	98	contact_respond_slide	src/game/actor_misc_b04.c	plain
@@ -2566,6 +2567,7 @@
 8c04d966	36	balls_delete	src/game/actor_bodies_b06.c	plain
 8c04d98a	18	balls_destroy_self	src/game/actor_bodies_b06.c	plain
 8c04d99c	302	balls_init	src/game/actor_bodies.c	plain
+8c04daca	620	balls_update	src/game/actor_balls_update.c	plain
 8c04dd36	60	balls_draw	src/game/actor_bodies_b06.c	plain
 8c04dd94	302	balls_respond	src/game/actor_bodies_b04.c	plain
 8c04dee0	4	method_self	src/copies/core/inline.c	plain
@@ -2706,6 +2708,7 @@
 8c04fab4	28	wobbler_construct	src/game/actor_bodies.c	plain
 8c04fad0	22	wobbler_destroy	src/game/actor_type19_b06.c	plain
 8c04fae6	36	wobbler_delete	src/game/actor_type19_b06.c	plain
+8c04fb4e	794	wobbler_init	src/game/actor_wobbler_init.c	plain
 8c04fe68	258	wobbler_update	src/game/actor_bodies.c	plain
 8c04ff80	158	wobbler_draw	src/game/actor_type19_b06.c	plain
 8c05002c	4	method_self	src/copies/core/inline.c	plain
@@ -2781,6 +2784,7 @@
 8c050558	22	actor_type19_destroy	src/game/actor_type19_b06.c	plain
 8c05056e	36	actor_type19_delete	src/game/actor_type19_b06.c	plain
 8c050592	18	actor_type19_destroy_self	src/game/actor_type19_b06.c	plain
+8c0505a4	1232	actor_type19_init	src/game/actor_type19_init.c	plain
 8c050a74	132	type19_update	src/game/actor_bodies.c	plain
 8c050b18	150	actor_type19_draw	src/game/actor_type19_b06.c	plain
 8c050bae	922	type19_step0	src/game/actor_type19_b04.c	plain
@@ -3319,6 +3323,7 @@
 8c0577a0	32	sign_destroy	src/game/actor_sign.c	plain
 8c0577c0	36	sign_delete	src/game/actor_sign.c	plain
 8c0577e4	18	sign_destroy_self	src/game/scenery_b07.c	plain
+8c057810	738	sign_init	src/game/actor_sign_init.c	plain
 8c057af2	992	sign_update	src/game/actor_sign.c	plain
 8c057ed2	1092	sign_draw	src/game/sign_draw.c	plain
 8c058320	20	vec3_copy	src/copies/core/vec.c	plain
@@ -3612,6 +3617,7 @@
 8c05b1c6	36	ornament_delete	src/game/scenery_b08.c	plain
 8c05b1ea	18	ornament_destroy_self	src/game/scenery_b08.c	plain
 8c05b230	602	ornament_init	src/game/actor_ornament.c	plain
+8c05b4b4	782	ornament_update	src/game/actor_ornament_update.c	plain
 8c05b7c2	70	ornament_draw_model	src/game/scenery_b08.c	plain
 8c05b8a4	12	RETF	src/copies/core/vec.c	plain
 8c05b8b0	4	method_empty	src/copies/core/inline.c	plain
