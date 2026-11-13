@@ -21,6 +21,18 @@ MAX_SAMPLES = 160      # per mutant
 MAX_COST_US = 4000000  # side B's recorded time per mutant (the replay also loads 16 MiB per sample: ~3 ms)
 
 
+def excluded():
+    """S20: the samples tools/replay_exclude.tsv leaves out of every replay gate (path -> reason)"""
+    out = {}
+    p = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'replay_exclude.tsv')
+    if os.path.exists(p):
+        for line in open(p):
+            f = line.rstrip('\n').split('\t')
+            if line.startswith('/') and len(f) >= 3:
+                out[f[0]] = f[2]
+    return out
+
+
 def load_index(root):
     """[(path, addr, cost_us, entered set)] over every route of the corpus; S17: ROOT may be several, comma-separated
     (a route corpus and the synthetic samples' /corpus/syn: tools/synth.py)"""
@@ -41,8 +53,13 @@ def load_index(root):
             if len(f) < 6:
                 continue
             ent = frozenset(int(x, 16) for x in f[5].split(',') if x)
+            if os.path.join(d, f[0] + '.smp') in EXCLUDED:
+                continue
             out.append((os.path.join(d, f[0] + '.smp'), int(f[1], 16), int(f[3]), ent, route))
     return out
+
+
+EXCLUDED = excluded()
 
 
 def was_addresses(repo):

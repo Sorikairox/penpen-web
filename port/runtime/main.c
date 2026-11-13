@@ -156,6 +156,7 @@ int main(int argc, char **argv) {
   for (int i = 1; i < argc; i++) {
     if (!strcmp(argv[i], "--disc")) disc_dir = argv[++i];
     else if (!strcmp(argv[i], "--frames")) hle_max_frames = atoi(argv[++i]);
+    else if (!strcmp(argv[i], "--no-interp")) { extern int rt_no_interp; rt_no_interp = 1; } /* S20 */
     else if (!strcmp(argv[i], "--verbose")) hle_verbose = atoi(argv[++i]);
     else if (!strcmp(argv[i], "--pad")) { if (hle_set_pad_script(argv[++i]) < 0) return 2; }
     else if (!strcmp(argv[i], "--watch")) { if (hle_set_watch(argv[++i]) < 0) return 2; }

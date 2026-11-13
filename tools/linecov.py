@@ -14,6 +14,10 @@ gate cannot see it: the routes' fallback ran it, or nothing does); one on a line
 invisible" (an equivalent mutant, or a comparison gap). Paths and counts only (our vocabulary).
 """
 import concurrent.futures, glob, gzip, json, os, subprocess, sys
+EXCLUDED = set()  # S20: the samples tools/replay_exclude.tsv leaves out
+_x = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'replay_exclude.tsv')
+if os.path.exists(_x):
+    EXCLUDED = {l.split('\t')[0] for l in open(_x) if l.startswith('/')}
 
 CF = ('-O2 -std=gnu11 -Wall -Wno-unused-label -Wno-unused-function -fwrapv -fno-strict-aliasing -ffp-contract=off '
       '-I/src/port/recomp -I/src/port/runtime -I/src/port/render -I/src/port/audio -I/build/genhand '
@@ -51,7 +55,7 @@ def main():
             dd = os.path.dirname(d)
             for l in open(d):
                 f = l.split('\t')
-                if len(f) >= 6:
+                if len(f) >= 6 and dd + '/' + f[0] + '.smp' not in EXCLUDED:  # S20: tools/replay_exclude.tsv
                     samples.append(dd + '/' + f[0] + '.smp')
     chunks = [samples[i::parts] for i in range(parts)]
 

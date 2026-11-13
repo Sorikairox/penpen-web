@@ -208,6 +208,7 @@ static uint32_t rw_pop_interp(uint32_t a, int tag) {
   rw_n--;
   return rw[rw_n].t;
 }
+int rt_no_interp; /* S20: --no-interp */
 uint32_t rt_force_interp; /* test hook: run this function in the interpreter although it is translated */
 static void interp_call(SH4 *c, uint32_t a) {
   uint32_t ret = c->pr, sp = c->r[15], t = 0;
@@ -221,6 +222,10 @@ static void interp_call(SH4 *c, uint32_t a) {
     int known = 0;
     for (int i = 0; i < interp_seen_n; i++) known |= interp_seen[i] == a;
     if (!known && interp_seen_n < SEEN_N) { interp_seen[interp_seen_n++] = a; rt_log("rt interp %08x", a); }
+    if (rt_no_interp && !rt_sandbox) { /* S20 (--no-interp): a build meant to run without the fallback stops here */
+      rt_log("rt interp refused %08x (called from %08x)", a, c->pr);
+      rt_stop("interpreter fallback entered (--no-interp)");
+    }
     n_interp_calls++;
     c->pc = a;
   }

@@ -841,7 +841,7 @@ int hwt_synth_live;
 #define SY_POKES 6
 #define SY_QUEUE 64
 #define SY_STK 4 /* S18: stack arguments (the 5th.. of a call: @(4K,r15)) */
-typedef struct { int base; uint32_t a[4], f[4], s[SY_STK]; int np; uint32_t pa[SY_POKES], pv[SY_POKES]; } sy_input;
+typedef struct { int base; uint32_t a[4], f[4], s[SY_STK], r[4]; int np; uint32_t pa[SY_POKES], pv[SY_POKES]; } sy_input;
 static struct {
   uint32_t fn, end, insn, iters, keep, seed, steps, stale, secs; /* S17: stale / secs: 0 = 600 / 20 */
   int diverse;                     /* `diverse N`: keep up to N passing inputs even without new code (values for arithmetic) */
@@ -915,6 +915,7 @@ static uint32_t sy_value(const char *t, int base) {
   return (uint32_t)strtoul(t, 0, 16);
 }
 static char sy_ctext[4][SY_CAND][24], sy_pretext[SY_PRE][4][24];
+static char sy_rtext[4][SY_CAND][24]; static int sy_nreg[4]; /* S20: `reg R V...`: candidates for r0-r3 (the C runtime's own register conventions) */
 static char sy_stext[SY_STK][SY_CAND][24]; /* S18: `stk K V...`: candidates for the stack word @(4K,r15) */
 static int sy_nstk[SY_STK];
 
@@ -1102,6 +1103,7 @@ static void sy_fresh(sy_input *in, const int *ok) {
   do in->base = (int)(sy_rnd() % (uint32_t)sj.nbase); while (!ok[in->base]);
   for (int i = 0; i < 4; i++) { in->a[i] = sy_pick_arg(in->base, i); in->f[i] = sy_pick_farg(in->base, i); }
   for (int k = 0; k < SY_STK; k++) in->s[k] = sy_nstk[k] ? sy_value(sy_stext[k][sy_rnd() % (uint32_t)sy_nstk[k]], in->base) : 0;
+  for (int k = 0; k < 4; k++) in->r[k] = sy_nreg[k] ? sy_value(sy_rtext[k][sy_rnd() % (uint32_t)sy_nreg[k]], in->base) : sy_cpu[in->base].r[k];
   in->np = 0;
 }
 static void sy_mutate(sy_input *in) {
@@ -1113,6 +1115,8 @@ static void sy_mutate(sy_input *in) {
       in->a[i] = sy_pick_arg(in->base, i);
       int j = (int)(sy_rnd() % SY_STK); /* S18: a stack argument too */
       if (sy_nstk[j]) in->s[j] = sy_value(sy_stext[j][sy_rnd() % (uint32_t)sy_nstk[j]], in->base);
+      int q = (int)(sy_rnd() % 4); /* S20: a register argument too */
+      if (sy_nreg[q]) in->r[q] = sy_value(sy_rtext[q][sy_rnd() % (uint32_t)sy_nreg[q]], in->base);
     }
     else if (k < 3) { int i = (int)(sy_rnd() % 4); in->f[i] = sy_pick_farg(in->base, i); }
     else if (k < 7 && in->np < SY_POKES && !sj.nopoke) {
@@ -1146,6 +1150,7 @@ static void sy_apply(const sy_input *in, uint8_t *ram, SH4 *c) {
   for (int i = 0; i < in->np; i++) memcpy(ram + (in->pa[i] & 0xFFFFFC), &in->pv[i], 4);
   *c = sy_cpu[in->base];
   for (int i = 0; i < 4; i++) { c->r[4 + i] = in->a[i]; c->fr.u[4 + i] = in->f[i]; }
+  for (int i = 0; i < 4; i++) if (sy_nreg[i]) c->r[i] = in->r[i]; /* S20 */
   for (int k = 0; k < SY_STK; k++) /* S18: the stack arguments the spec names (the base's stack words elsewhere) */
     if (sy_nstk[k]) memcpy(ram + ((c->r[15] + 4u * (uint32_t)k) & 0xFFFFFC), &in->s[k], 4);
   c->pc = sj.fn;
@@ -1154,6 +1159,7 @@ static void sy_apply(const sy_input *in, uint8_t *ram, SH4 *c) {
 static void sy_describe(const sy_input *in, char *o, size_t n) {
   int k = snprintf(o, n, "base %d args %08x %08x %08x %08x f %08x %08x %08x %08x pokes", in->base, in->a[0], in->a[1],
                    in->a[2], in->a[3], in->f[0], in->f[1], in->f[2], in->f[3]);
+  for (int i = 0; i < 4; i++) if (sy_nreg[i] && k < (int)n - 20) k += snprintf(o + k, n - (size_t)k, " r%d=%08x", i, in->r[i]);
   for (int i = 0; i < in->np && k < (int)n - 20; i++) k += snprintf(o + k, n - (size_t)k, " %08x=%08x", in->pa[i], in->pv[i]);
 }
 static FILE *sy_log, *sy_fail_f;
@@ -1273,6 +1279,7 @@ static void sy_job(void) {
  *   pre FN A0 A1 A2 A3               (0-6: prelude calls on each base; $k = the k-th call's result)
  *   arg I V V ...                    (candidates for argument I: hex, $k, $k+hex)
  *   farg I F F ...                   (float candidates)
+ *   reg R V V ...                    (S20: candidates for r0-r3: the C runtime's helpers take their operands there)
  *   end */
 int hwt_synth(const char *spec) {
   if (hwt_alloc() < 0 || !corpus_k) { rt_log("hw synth: needs --hwcorpus DIR:K"); return 2; }
@@ -1292,6 +1299,7 @@ int hwt_synth(const char *spec) {
     if (!strcmp(tok[0], "job") && n >= 7) {
       memset(&sj, 0, sizeof sj);
       memset(sy_nstk, 0, sizeof sy_nstk);
+      memset(sy_nreg, 0, sizeof sy_nreg);
       hwt_synth_hw = 0;
       sj.fn = (uint32_t)strtoul(tok[1], 0, 16); sj.end = (uint32_t)strtoul(tok[2], 0, 16);
       sj.insn = (uint32_t)strtoul(tok[3], 0, 10); sj.iters = (uint32_t)strtoul(tok[4], 0, 10);
@@ -1319,6 +1327,9 @@ int hwt_synth(const char *spec) {
     } else if (!strcmp(tok[0], "arg") && n >= 3) {
       int i = atoi(tok[1]) & 3;
       for (int k = 2; k < n && sj.ncand[i] < SY_CAND; k++) snprintf(sy_ctext[i][sj.ncand[i]++], 24, "%s", tok[k]);
+    } else if (!strcmp(tok[0], "reg") && n >= 3) { /* S20 */
+      int i = atoi(tok[1]) & 3;
+      for (int k = 2; k < n && sy_nreg[i] < SY_CAND; k++) snprintf(sy_rtext[i][sy_nreg[i]++], 24, "%s", tok[k]);
     } else if (!strcmp(tok[0], "stk") && n >= 3) {
       int i = atoi(tok[1]) & (SY_STK - 1);
       for (int k = 2; k < n && sy_nstk[i] < SY_CAND; k++) snprintf(sy_stext[i][sy_nstk[i]++], 24, "%s", tok[k]);

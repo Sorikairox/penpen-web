@@ -1,0 +1,22 @@
+# S20: corpus samples the replay gates leave out (tools/replay_corpus.py load_index: Mull, tools/replay_all.sh,
+# tools/linecov.py). Kept in the corpus (not deleted: the user's rule); each line: sample path, function, reason.
+# The 14 synthetic samples below were recorded in S17 / S18, while a fresh stack frame still held whatever earlier code
+# had left there. Their recorded side A (the original, interpreted then) read such never-written stack words (the
+# racer cameras' and the title intro's stale slots, type 0x30's part draw past part 4: DECOMP 20.1 / 20.2); since S19
+# the runtime clears a frame when r15 is lowered, so side B (and a side A run today) read zeros there and the
+# recorded side A no longer matches. The same five functions have fresh samples recorded under the defined stack
+# (S19's s19re, S20's s20re) that pass.
+/corpus/syn/d1_0_0/s000210.smp	8c03cbc2	recorded under the undefined stack (stale slot read): DECOMP 21.6
+/corpus/syn/h1_0_0/s001090.smp	8c03cbc2	recorded under the undefined stack (stale slot read): DECOMP 21.6
+/corpus/syn/n1_0_0/s000094.smp	8c01bef8	recorded under the undefined stack (stale slot read): DECOMP 21.6
+/corpus/syn/s18b05b_1_0/s000004.smp	8c05e098	recorded under the undefined stack (stale slot read): DECOMP 21.6
+/corpus/syn/s18dv12_1_0/s000028.smp	8c05e098	recorded under the undefined stack (stale slot read): DECOMP 21.6
+/corpus/syn/s18dv12_1_0/s000029.smp	8c05e098	recorded under the undefined stack (stale slot read): DECOMP 21.6
+/corpus/syn/s18dv12_1_0/s000030.smp	8c05e098	recorded under the undefined stack (stale slot read): DECOMP 21.6
+/corpus/syn/s18dv12_1_0/s000031.smp	8c05e098	recorded under the undefined stack (stale slot read): DECOMP 21.6
+/corpus/syn/s18dv12_1_0/s000032.smp	8c05e098	recorded under the undefined stack (stale slot read): DECOMP 21.6
+/corpus/syn/s18dv12_1_0/s000033.smp	8c05e098	recorded under the undefined stack (stale slot read): DECOMP 21.6
+/corpus/syn/s18dv7_1_0/s000025.smp	8c03c99c	recorded under the undefined stack (stale slot read): DECOMP 21.6
+/corpus/syn/s18dz0_0_0/s000065.smp	8c01bef8	recorded under the undefined stack (stale slot read): DECOMP 21.6
+/corpus/syn/s18dz2_0_0/s000003.smp	8c03c804	recorded under the undefined stack (stale slot read): DECOMP 21.6
+/corpus/syn/s18n3_1_0/s000014.smp	8c03c99c	recorded under the undefined stack (stale slot read): DECOMP 21.6

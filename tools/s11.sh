@@ -3,6 +3,7 @@
 # disc's code runs in the sandboxed containers of tools/s3.sh.
 #   tools/s11.sh gen              the translation twice: pure (/build/gen) and without the functions src/ exports
 #                                 (/build/genhand, recomp.py --hand)
+#   tools/s11.sh genlib           S20: the hand build without generated code (/build/genlib; HG=genlib compare)
 #   tools/s11.sh native [args]    build + run the hand build natively (args as tools/s3.sh native)
 #   tools/s11.sh wasm [args]      the same as wasm32 in node
 #   tools/s11.sh test [B[:S]]     (S14: one build, then PAR=2 routes at a time) the in-run differential test of every hand-written function (difftest.c) over every
@@ -34,7 +35,15 @@ routes() { grep -v '^#' "$REPO/tools/routes.tsv" | grep . | awk -v want="${ROUTE
 padarg() { [ "$1" = - ] || printf -- '--pad %s' "$1"; }
 extra() { [ "$1" = - ] || printf '%s' "$1"; }
 RUN="--verbose 0 --frame-log 1 --digest 1 --digest-nostack 1"
+# S20: HG=genlib runs the hand side from the build without generated code (tools/s11.sh genlib); NOINTERP=1 adds --no-interp
+HG=${HG:-genhand}
+NI=${NOINTERP:+--no-interp}
 case "${1:-}" in
+  genlib)
+    # S20: the hand build without generated code: the translation trimmed to what the C and the runtime name
+    # (recomp.py --trim-hand strict): no translated function is left (/build/genlib); --classify lists every function's
+    # class (docs/progress/outside_classes.tsv via tools/outside_classify.py)
+    HAND=1 GEN=genlib "$REPO/tools/s3.sh" gen --trim-hand strict --croots /src/src,/src/port/runtime,/src/port/render --classify /build/genlib/classify.tsv | tail -2 ;;
   gen)
     "$REPO/tools/s3.sh" gen | tail -1
     HAND=1 GEN=genhand "$REPO/tools/s3.sh" gen | tail -1 ;;
@@ -97,7 +106,7 @@ case "${1:-}" in
     k=${2:-native}
     routes | while IFS='	' read -r r f p x; do
       "$REPO/tools/s3.sh" $k --frames "$f" $(padarg "$p") $(extra "$x") $RUN > "$LOGS/${k}_${r}_pure.log" 2>&1 || true
-      GEN=genhand "$REPO/tools/s3.sh" $k --frames "$f" $(padarg "$p") $(extra "$x") $RUN > "$LOGS/${k}_${r}_hand.log" 2>&1 || true
+      GEN=$HG "$REPO/tools/s3.sh" $k --frames "$f" $(padarg "$p") $(extra "$x") $RUN $NI > "$LOGS/${k}_${r}_hand.log" 2>&1 || true
       # S14: the interpreter-call count is left out (the pure translation interprets code that hand-written C replaces)
       grep '^frame ' "$LOGS/${k}_${r}_pure.log" | sed 's/ interp [0-9]* / interp - /' > "$LOGS/${k}_${r}_pure.frames" || true
       grep '^frame ' "$LOGS/${k}_${r}_hand.log" | sed 's/ interp [0-9]* / interp - /' > "$LOGS/${k}_${r}_hand.frames" || true

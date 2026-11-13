@@ -447,7 +447,7 @@ def sdk_names(a):
 CODE_REGIONS = ((0x8C010000, 0x8C066900), (0x8C0998D4, 0x8C17994C), (0x8C18F112, 0x8C197090))
 
 
-def trim(img, funcs, table, names, via_rt, hle_c):
+def trim(img, funcs, table, names, via_rt, hle_c, hand=None, hand_mode=None, c_roots=(), report=None):
     """S8: keep only the functions that can run (docs/port/RECOMP.md 9). Roots: every function of the game range
     (game code + the SHC runtime), the entries, the SDK functions the runtime runs as guest code (hle.c guest[]),
     and every function whose start address is stored as a word in the image outside the code (callbacks, tables:
@@ -467,7 +467,15 @@ def trim(img, funcs, table, names, via_rt, hle_c):
         k = bisect.bisect_right(starts, a) - 1
         return k >= 0 and code[k][0] <= a < code[k][1]
     roots = {f for f in funcs if 0x8C010000 <= f < 0x8C066900 or funcs[f][1].startswith('entry_')} | keep
+    hand = hand or {}
+    if hand_mode:
+        # S20 (--trim-hand): the hand-written C replaces the game and part of the libraries. Their translated bodies
+        # are not walked (the C's own references, c_roots, are the edges out of them); the roots are what the C and
+        # the runtime name (constants of src/ and port/ that are function starts) and the guest SDK list
+        roots = (set(c_roots) | keep) & set(funcs)
+    c_reach_roots = set(roots)
     data_ptrs = 0
+    data_roots = set()
     for o in range(0, len(img.data) - 3, 4):
         a = LOAD + o
         w = struct.unpack_from('<I', img.data, o)[0]
@@ -475,14 +483,52 @@ def trim(img, funcs, table, names, via_rt, hle_c):
             continue
         w = norm(w)
         if w in funcs and not in_code(a) and not any(lo <= a < hi for lo, hi in CODE_REGIONS):
-            roots.add(w)
+            data_roots.add(w)
             data_ptrs += 1
+    if hand_mode != 'strict':
+        roots |= data_roots
+
+    def walk(roots):
+        reach, work = set(), list(roots)
+        while work:
+            f = work.pop()
+            if f in reach or f not in funcs or f in hle:
+                continue
+            reach.add(f)
+            if f in hand:
+                continue
+            end = funcs[f][0]
+            for b in analyse(img, f, end)[0]:
+                op, name = decode(img, b)
+                t = None
+                if name in ('BSR', 'BRA'):
+                    t = norm(target(op, name, b))
+                elif name == 'MOVL_PC':
+                    w = img.u32(((b & ~3) + 4 + (op & 0xFF) * 4) & 0xFFFFFFFF)
+                    t = norm(w) if w is not None and not w & 1 else None
+                if t is not None and t in funcs and t not in reach and not (f <= t < end):
+                    work.append(t)
+        return reach
+    if report:
+        # S20: every function's class: hand (hand-written), hle (the runtime replaces it), c (reached from the C and the
+        # guest SDK list through translated code), data (reached only through a pointer stored in the image's data),
+        # dead (neither)
+        rc = walk(c_reach_roots) if hand_mode else walk(set(c_roots) | keep)
+        rd = walk(data_roots | rc)
+        with open(report, 'w') as o:
+            o.write('# address\tend\tname\tclass\n')
+            for f in sorted(funcs):
+                k = ('hand' if f in hand else 'hle' if f in hle else 'c' if f in rc else 'data' if f in rd
+                     else 'dead')
+                o.write('%08x\t%08x\t%s\t%s\n' % (f, funcs[f][0], funcs[f][1], k))
     reach, work = set(), list(roots)
     while work:
         f = work.pop()
         if f in reach or f not in funcs or f in hle:
             continue
         reach.add(f)
+        if hand_mode and f in hand:
+            continue
         end = funcs[f][0]
         for b in analyse(img, f, end)[0]:
             op, name = decode(img, b)
@@ -494,6 +540,8 @@ def trim(img, funcs, table, names, via_rt, hle_c):
                 t = norm(w) if w is not None and not w & 1 else None
             if t is not None and t in funcs and t not in reach and not (f <= t < end):
                 work.append(t)
+    if hand_mode:
+        reach |= set(hand) & set(funcs)  # every hand-written function stays in the table (rt_lookup finds its C)
     drop = [f for f in funcs if f not in reach]
     for f in drop:
         del funcs[f]
@@ -536,6 +584,12 @@ def main():
     ap.add_argument('--trim', metavar='HLE_C', help='S8: emit only the code that can run: drop the SDK functions the '
                     'runtime takes over (HLE) and what only they reach; HLE_C = port/runtime/hle.c (its guest[] names '
                     'stay translated)')
+    ap.add_argument('--trim-hand', choices=('data', 'strict'), help='S20: with --trim and --hand: the roots are what '
+                    'the hand-written C and the runtime name (CROOTS dirs scanned for 0x8C...... constants) and the '
+                    'guest SDK list; hand-written bodies are not walked. data: plus every function pointer in the '
+                    "image's data; strict: without them")
+    ap.add_argument('--croots', default='', help='S20: comma-separated directories of C scanned for function addresses')
+    ap.add_argument('--classify', help='S20: write every function\'s class (hand / hle / c / data / dead) to this file')
     ap.add_argument('--hand', metavar='DIR', help='S11: the hand-written C tree (src/): every function it exports '
                     '(HW_EXPORT(<addr>, ...)) is left out of the output; table.c points to the hand-written symbol')
     a = ap.parse_args()
@@ -610,9 +664,16 @@ def main():
             nmid += cand[k] == 'static'
             nextra += cand[k] == 'listed'
     ntrim = 0
-    if a.trim:
-        ntrim = trim(img, funcs, table, sdk_names(a), via_rt, a.trim)
     hand = hand_exports(a.hand) if a.hand else {}
+    if a.trim:
+        c_roots = set()
+        for d0 in [x for x in a.croots.split(',') if x]:
+            for d, _, files in os.walk(d0):
+                for fn in files:
+                    if fn.endswith(('.c', '.h')):
+                        for m in re.finditer(r'0[xX]([89][cC][0-9a-fA-F]{6})', open(os.path.join(d, fn), errors='replace').read()):
+                            c_roots.add(norm(int(m.group(1), 16)))
+        ntrim = trim(img, funcs, table, sdk_names(a), via_rt, a.trim, hand, a.trim_hand, c_roots, a.classify)
     for addr in hand:
         if addr not in funcs:
             raise SystemExit('gen hand: %08x (%s) is not a translated function' % (addr, hand[addr]))
