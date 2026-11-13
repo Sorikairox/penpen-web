@@ -476,6 +476,8 @@ def trim(img, funcs, table, names, via_rt, hle_c, hand=None, hand_mode=None, c_r
     c_reach_roots = set(roots)
     data_ptrs = 0
     data_roots = set()
+    live_data_roots = set()
+    c_set = {norm(x) for x in c_roots}
     for o in range(0, len(img.data) - 3, 4):
         a = LOAD + o
         w = struct.unpack_from('<I', img.data, o)[0]
@@ -485,8 +487,23 @@ def trim(img, funcs, table, names, via_rt, hle_c, hand=None, hand_mode=None, c_r
         if w in funcs and not in_code(a) and not any(lo <= a < hi for lo, hi in CODE_REGIONS):
             data_roots.add(w)
             data_ptrs += 1
+    # S20: the tables the C names: from each constant of src/ / port/ that lies outside the code, the words that
+    # follow while they are function starts or zeros (a vtable, a callback table): the C may call through them
+    for b in sorted(c_set):
+        if in_code(b) or any(lo <= b < hi for lo, hi in CODE_REGIONS) or not (LOAD <= b < img.end):
+            continue
+        if 0x8C179960 <= b < 0x8C1799A0 or 0x8C0668D8 <= b < 0x8C066904:
+            continue  # the start-up's section bounds (src/lib/sy/start.c): addresses it reads, never calls
+        for k in range(64):
+            v = img.u32(b + 4 * k)
+            if v is None or (v != 0 and (v & 1 or norm(v) not in funcs)):
+                break
+            if v:
+                live_data_roots.add(norm(v))
     if hand_mode != 'strict':
         roots |= data_roots
+    else:
+        roots |= live_data_roots  # S20: what the C may call through a table it names stays (none is left to translate)
 
     def walk(roots):
         reach, work = set(), list(roots)
@@ -511,15 +528,16 @@ def trim(img, funcs, table, names, via_rt, hle_c, hand=None, hand_mode=None, c_r
         return reach
     if report:
         # S20: every function's class: hand (hand-written), hle (the runtime replaces it), c (reached from the C and the
-        # guest SDK list through translated code), data (reached only through a pointer stored in the image's data),
+        # guest SDK list through translated code), ctable (through a pointer in a table the C names), data (reached only through a pointer stored in the image's data),
         # dead (neither)
         rc = walk(c_reach_roots) if hand_mode else walk(set(c_roots) | keep)
-        rd = walk(data_roots | rc)
+        rl = walk(live_data_roots | rc)
+        rd = walk(data_roots | rl)
         with open(report, 'w') as o:
             o.write('# address\tend\tname\tclass\n')
             for f in sorted(funcs):
-                k = ('hand' if f in hand else 'hle' if f in hle else 'c' if f in rc else 'data' if f in rd
-                     else 'dead')
+                k = ('hand' if f in hand else 'hle' if f in hle else 'c' if f in rc else 'ctable' if f in rl
+                     else 'data' if f in rd else 'dead')
                 o.write('%08x\t%08x\t%s\t%s\n' % (f, funcs[f][0], funcs[f][1], k))
     reach, work = set(), list(roots)
     while work:
