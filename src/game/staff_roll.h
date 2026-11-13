@@ -25,7 +25,9 @@ typedef struct StaffRoll {
   gaddr motion;               /* 0x60: S18 b02: its MotionEntry (game/motion.h: the motion, then the shape) */
   f32 frames;                 /* 0x64: +1 every update (the model's motion frame) */
   gaddr file;                 /* 0x68: the model file (file_free) */
-  uint8_t unknown6c[0x90 - 0x6C];
+  uint8_t unknown6c[0x70 - 0x6C];
+  gaddr penguins[8];          /* 0x70: S18 b01: the eight RollPenguins (by character), hung under the scene through
+                               * their Task part at 0xE0 (staff_roll_build) */
 } StaffRoll;
 HW_OFFSET(StaffRoll, started, 0x24);
 HW_OFFSET(StaffRoll, phase, 0x34);
@@ -41,6 +43,7 @@ HW_OFFSET(StaffRoll, prev_line, 0x48);
 HW_OFFSET(StaffRoll, line_fade, 0x4C);
 HW_OFFSET(StaffRoll, frames, 0x64);
 HW_OFFSET(StaffRoll, file, 0x68);
+HW_OFFSET(StaffRoll, penguins, 0x70);
 HW_SIZE(StaffRoll, 0x90);
 static inline StaffRoll *staff_roll_at(gaddr a) { return (StaffRoll *)hw_ptr(a); }
 
@@ -59,20 +62,23 @@ HW_SIZE(StaffRollLine, 12);
  * constructed by func_8C01E364 (vtables at 0xDC and 0x1A0) */
 typedef struct RollPenguin {
   MotionPlayer player;        /* 0x000 */
-  uint8_t unknown_d8[0xE0 - sizeof(MotionPlayer)];
-  uint8_t member_e0[0x104 - 0xE0]; /* 0x0E0: a member with an empty destructor (S18 b02: 0x24 bytes, a Task part:
-                                    * the constructor hangs it under its parent) */
+  uint8_t unknown_d8[0xDC - sizeof(MotionPlayer)];
+  uint32_t word_dc;           /* 0x0DC: S18 b01: 0 at construction (word_construct) */
+  Task member_e0;             /* 0x0E0: a member with an empty destructor (S18 b02: 0x24 bytes, a Task part: the
+                               * constructor hangs it under its parent; S18 b01: its vtable 0x8C23D9B4 at 0x100) */
   Body body;                  /* 0x104: S18 b02: where the penguin stands (its place by character, roll_penguin_update) */
   Body1 turn;                 /* 0x134: S18 b02: its heading (Ninja units, as a float) */
   uint8_t contacts[0x19C - 0x144]; /* 0x144: core/contact.h's contact set (contacts_free) */
   gaddr extra;                /* 0x19C: a 0x3C-byte object of func_8C038C1C, or 0 */
-  uint8_t unknown1a0[0x1A4 - 0x1A0];
+  gaddr vtable_1a0;           /* 0x1A0: S18 b01: 0x8C23D9CC (the part at 0x1A4 the first word points at) */
 } RollPenguin;
 HW_OFFSET(RollPenguin, member_e0, 0xE0);
 HW_OFFSET(RollPenguin, body, 0x104);
 HW_OFFSET(RollPenguin, turn, 0x134);
 HW_OFFSET(RollPenguin, contacts, 0x144);
 HW_OFFSET(RollPenguin, extra, 0x19C);
+HW_OFFSET(RollPenguin, word_dc, 0xDC);
+HW_OFFSET(RollPenguin, vtable_1a0, 0x1A0);
 
 /* a line of text with its style (the scene draws its lines through it) */
 typedef struct TextLabel {
@@ -95,6 +101,9 @@ gaddr staff_roll_destroy(gaddr scene, int32_t free_memory);
 gaddr staff_roll_destroy_member(gaddr scene);
 gaddr roll_penguin_destroy(gaddr penguin, int32_t free_memory);
 int32_t text_label_draw(gaddr label);
+/* S18 b01: game/staff_roll_build.c */
+gaddr staff_roll_build(gaddr scene);
+gaddr roll_penguin_construct(gaddr penguin, int32_t character, int32_t variant, gaddr container, int32_t table);
 /* S18 b02: game/staff_roll_draw.c */
 gaddr staff_roll_construct(gaddr scene);
 void staff_roll_draw(gaddr scene);

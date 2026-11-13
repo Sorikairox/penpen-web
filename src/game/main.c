@@ -1,5 +1,6 @@
 /* Pen Pen port, S11: start-up, the main loop and the per-frame callbacks. */
 #include "game.h"
+#include "../core/sb_system.h" /* sb_init_system / sb_exit_system (core/sb_system.c) */
 #include "../core/view.h"
 #include "sound.h"
 #include "sdk.h"
@@ -7,11 +8,8 @@
 #include "../core/system.h" /* system_language, video_mode (S16: hand-written, called directly) */
 
 /* still translated (the start-up of each subsystem; names say what they are where known) */
-static void sb_init_system(int32_t mode, int32_t frame, int32_t count) { CALL3(0x8C010184u, mode, frame, count); } /* the SDK sample's sbInitSystem, linked into the game */
-static void sb_exit_system(void) { CALL0(0x8C01022Cu); }
 static void graphics_init(void) { CALL0(0x8C010C28u); }    /* heaps, texture/vertex buffers, matrices, lights */
 static int32_t video_info_c(void) { return (int32_t)CALL0(0x8C062440u); }
-static void game_shutdown(void) { CALL0(0x8C016792u); }    /* never reached: the game leaves through syBtExit */
 static void run_static_destructors(void) { CALL0(0x8C016510u); }
 static void draw_panel(gaddr panel, int32_t split_mode) { CALL2(0x8C02CC3Eu, panel, split_mode); }
 #define func_8C061DB8() CALL0(0x8C061DB8u)

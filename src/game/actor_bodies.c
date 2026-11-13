@@ -363,10 +363,7 @@ void type24_init(gaddr obj, gaddr placement) {
 HW_EXPORT(8c05205c, type24_init(ARG0, ARG1))
 
 /* type 0x19's steps by state (still translated) */
-static void type19_step0(gaddr obj) { CALL1(0x8C050BAEu, obj); } /* func_8C050BAE */
-static void type19_step1(gaddr obj) { CALL1(0x8C05106Cu, obj); } /* func_8C05106C */
 static void type19_step2(gaddr obj) { CALL1(0x8C0512A4u, obj); } /* func_8C0512A4 */
-static void type19_step3(gaddr obj) { CALL1(0x8C051548u, obj); } /* func_8C051548 */
 
 /* was func_8C050A74: step type 0x19: its clock counts by 1 (2 when not slow), the step of its state runs, its
  * three turns step and its contacts go into the race scene's slot 8 */

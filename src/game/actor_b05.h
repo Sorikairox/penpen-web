@@ -49,11 +49,17 @@ typedef struct ActorType2F {
   int32_t word30;           /* 0x30: 0 at init */
   Vec3 home;                /* 0x34: the placement's position */
   Body body;                /* 0x40: at rest at the origin; at init, home + 2 in y */
-  uint32_t word70;          /* 0x70 */
+  union {
+    uint32_t word70;        /* 0x70 */
+    f32 lift;               /* 0x70: S18 b04: in state 4, how far above the player it rides (150, less 2 an update) */
+  };
   Contacts contacts;        /* 0x74: owned by the body, cell = the actor's, response func_8C048B56 */
   int32_t contacts_word;    /* 0xC8: 4 at init */
   NjArgb color;             /* 0xCC: (a 0.6, r 0, g 1, b 0) at init */
-  int32_t worddc;           /* 0xDC: -1 at init */
+  union {
+    int32_t worddc;         /* 0xDC: -1 at init */
+    int32_t player;         /* 0xDC: S18 b04: the player it marks (one of its contacts' others, below 8) */
+  };
   gaddr second_vtable;      /* 0xE0 */
 } ActorType2F;
 HW_OFFSET(ActorType2F, param, 0x28);
@@ -63,6 +69,8 @@ HW_OFFSET(ActorType2F, contacts, 0x74);
 HW_OFFSET(ActorType2F, contacts_word, 0xC8);
 HW_OFFSET(ActorType2F, color, 0xCC);
 HW_OFFSET(ActorType2F, worddc, 0xDC);
+HW_OFFSET(ActorType2F, player, 0xDC);
+HW_OFFSET(ActorType2F, lift, 0x70);
 HW_OFFSET(ActorType2F, second_vtable, 0xE0);
 HW_SIZE(ActorType2F, 0xE4);
 

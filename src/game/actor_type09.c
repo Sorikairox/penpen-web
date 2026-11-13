@@ -22,7 +22,6 @@
 enum { TYPE09_WHOLE = 0, TYPE09_BURST = 1 };
 
 /* func_8C0482A0: draw a Burst's particles (still translated) */
-static void burst_draw(gaddr burst) { CALL1(0x8C0482A0u, burst); }
 
 /* was func_8C04CD5A: the base construction: the Actor, the contacts owned by the position (radius 7, room for 2),
  * a Burst of 20 particles (0 when out of memory) */

@@ -118,6 +118,20 @@ extern int hw_ret_set; /* RET was used: the difftest compares r0 */
 /* main: resumable, and never sampled by the difftest (it never returns; the whole-run comparison covers it) */
 #define HW_EXPORT_MAIN(addr, stmt) \
   void f_##addr(SH4 *c) { hw_entry hw_e_; hw_enter(&hw_e_, c, 0x##addr##u, HW_RESUMES | HW_NOT_SAMPLED); stmt; hw_leave(&hw_e_); }
+/* S18: a "function" of port/symbols/functions.tsv that is a piece of another one (Ghidra split it off its parent at a
+ * literal pool, or it is an epilogue / tail reached only by the parent's branches): the parent's hand-written C does
+ * its work, so it has no body of its own. Its translated copy is left out (recomp.py --hand), and entering it on its
+ * own (a call, a pointer, a jump from outside the parent: checked absent when it is declared) stops the run. A
+ * corpus sample of the parent whose side A ran into its start shows that its code was compared there. */
+void hw_fragment_entered(uint32_t addr, uint32_t parent);
+#define HW_EXPORT_FRAGMENT(addr, parent) \
+  void f_##addr(SH4 *c) { (void)c; hw_fragment_entered(0x##addr##u, 0x##parent##u); }
+/* S18: a register a piece of a function inherits from the code that falls into it (a piece whose true entry is not
+ * a function of functions.tsv: the translation of that entry runs on into the piece with its registers) */
+#define INHERITED_R0 (hw_e_.c->r[0])
+/* S18: an export switched off for a bisect (tools: port_work/s18/bisect.sh renames HW_EXPORT to it and back) */
+#define HW_OFF_BISECT(...)
+#define HW_OFF_BISECT_R(...)
 #define HW_RESUMES 1
 #define HW_NOT_SAMPLED 2
 

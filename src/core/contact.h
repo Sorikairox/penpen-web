@@ -41,6 +41,15 @@ void contacts_free(gaddr self);
 /* S16 w4: core/contact_triangle.c (was func_8C013E1C) */
 void contacts_add_triangle(gaddr self, gaddr a, gaddr b, gaddr c, uint32_t kind);
 
+/* S18 b01: core/contact_models.c: one model's triangles into the contacts, and the ground under a point */
+void contacts_add_model(gaddr contacts, gaddr model);              /* was func_8C01431E: a basic model */
+void contacts_add_cnk_model(gaddr contacts, gaddr model);          /* was func_8C0144F2: a chunk model as stored */
+void contacts_add_cnk_model_posed(gaddr contacts, gaddr model);    /* was func_8C0146F8: placed by the matrix */
+void contacts_add_object_posed(gaddr contacts, gaddr object);      /* was func_8C0148C4: a chunk model tree */
+int32_t cnk_triangle_under(gaddr point, gaddr a, gaddr b, gaddr c, gaddr height_out, gaddr normal_out); /* 8C014980 */
+int32_t cnk_model_under(gaddr point, gaddr model, gaddr height_out, gaddr normal_out);   /* was func_8C014A94 */
+int32_t cnk_tree_under(gaddr point, gaddr object, gaddr height_out, gaddr normal_out);  /* was func_8C014E20 */
+
 void contacts_holder_destroy(gaddr obj);
 gaddr contacts_holder_destroy_self(gaddr obj);
 

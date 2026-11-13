@@ -341,4 +341,10 @@ void course_env_setup(gaddr env, int32_t view, int32_t particle_max, gaddr track
 void course_env_draw_sky(gaddr env);
 void course_env_update_sounds(gaddr env);
 
+/* S18 b04: game/course_ground_b04.c (course_ground_below supersedes the static CALL5 wrapper of that name in
+ * game/actor_type06.c) */
+int32_t course_ground_below(gaddr course, gaddr pos, int32_t cell, gaddr distance, gaddr normal);
+void course_start_position(gaddr course, int32_t i, gaddr out); /* game/course_positions.c (func_8C041F70) */
+int32_t course_ground_below_search(gaddr course, gaddr pos, gaddr distance, gaddr normal);
+
 #endif

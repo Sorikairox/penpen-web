@@ -7,6 +7,7 @@
 #include "hw.h"
 #include "../core/vec.h"
 #include "../core/contact.h"
+#include "../core/ninja.h" /* S18 b05: NjSprite */
 #include "actor.h"
 
 /* placement type 0x0A (constructor func_8C05568A, 0x60 bytes; vtable 0x8C23E35C, second 0x8C23E37C; its destructor
@@ -85,18 +86,31 @@ HW_SIZE(ActorType0B, 0x13C);
  * contacts (radius 4, room for 3), three Body1s and a matrix */
 typedef struct ActorType0F {
   Actor base;               /* 0x000 */
-  uint8_t pad_028[0x034 - 0x028];
+  Vec3 home;                /* 0x028: S18 b04: the placement's position */
   Body body;                /* 0x034: the contacts' owner */
-  Body1 values[3];          /* 0x064: (0, 0, 0, 1) at construction */
-  uint8_t pad_094[0x098 - 0x094];
+  Body1 values[3];          /* 0x064: (0, 0, 0, 1) at construction; S18 b04: [0] its pitch, [1] its yaw (Ninja
+                             * units), [2] its height above the body (drawn that much higher) */
+  f32 scale;                /* 0x094: S18 b04: 0.5 + 0.2 param (the model's scale; the contacts' radius 4 times it) */
   Matrix matrix;            /* 0x098: the identity at construction */
-  uint8_t pad_0d8[0x0F4 - 0x0D8];
+  f32 rest_yaw;             /* 0x0D8: S18 b04: by param (a table) */
+  Vec3 goal;                /* 0x0DC: S18 b04: by param (a table of x, z; y 0): where it ends its run */
+  int32_t state;            /* 0x0E8: S18 b04: 0 waits, 1 placed at the first waypoint, 2 speeds up, 3 runs the
+                             * waypoints, 4 runs to its goal, 5 rests there, 6 starts over (state 1) */
+  int32_t waypoint;         /* 0x0EC: S18 b04: the waypoint it runs to (state 3) */
+  int32_t timer;            /* 0x0F0: S18 b04: updates (state 0 counts param * 240 + 1 down) */
   int32_t shown;            /* 0x0F4: not 0 = drawn (model 9 of the list, by the matrix) */
   Contacts contacts;        /* 0x0F8 */
   int32_t contacts_word;    /* 0x14C */
   gaddr second_vtable;      /* 0x150 */
 } ActorType0F;
+HW_OFFSET(ActorType0F, home, 0x028);
 HW_OFFSET(ActorType0F, body, 0x034);
+HW_OFFSET(ActorType0F, scale, 0x094);
+HW_OFFSET(ActorType0F, rest_yaw, 0x0D8);
+HW_OFFSET(ActorType0F, goal, 0x0DC);
+HW_OFFSET(ActorType0F, state, 0x0E8);
+HW_OFFSET(ActorType0F, waypoint, 0x0EC);
+HW_OFFSET(ActorType0F, timer, 0x0F0);
 HW_OFFSET(ActorType0F, values, 0x064);
 HW_OFFSET(ActorType0F, matrix, 0x098);
 HW_OFFSET(ActorType0F, shown, 0x0F4);
@@ -109,20 +123,35 @@ HW_SIZE(ActorType0F, 0x154);
  * a matrix and contacts (radius 2.5, room for 3) owned by a point */
 typedef struct ActorType10 {
   Actor base;               /* 0x000 */
-  uint8_t pad_028[0x030 - 0x028];
-  Body1 value30;            /* 0x030: (0, 0, 0, 1) at construction */
-  uint8_t pad_040[0x04C - 0x040];
-  Vec3 point;               /* 0x04C: the contacts' owner */
-  Body1 value58;            /* 0x058 */
-  uint8_t pad_068[0x06C - 0x068];
-  Body1 value6c;            /* 0x06C */
-  uint8_t pad_07c[0x0A0 - 0x07C];
-  Matrix matrix;            /* 0x0A0: the identity at construction */
+  int32_t state;            /* 0x028: S18 b05: 0 waiting, 1 opening, 2 reaching out, 3 its tip turning back, 4
+                             * drawing in, 5 closing, 6 back to 0 */
+  int32_t timer;            /* 0x02C: S18 b05: steps of the state (-180 at the init with a param, else 0) */
+  Body1 value30;            /* 0x030: (0, 0, 0, 1) at construction; S18 b05: the doors' swing about y (Ninja units),
+                             * damping 0.7 */
+  Vec3 home;                /* 0x040: S18 b05: the placement's position */
+  Vec3 point;               /* 0x04C: the contacts' owner; S18 b05: the arm's end, moved by the update */
+  Body1 value58;            /* 0x058: S18 b05: the tip's turn about x (Ninja units) */
+  f32 heading;              /* 0x068: S18 b05: the placement's angle about y */
+  Body1 value6c;            /* 0x06C: S18 b05: the arm's length (1 at rest), damping 0.85 */
+  uint8_t pad_07c[0x088 - 0x07C];
+  f32 reach;                /* 0x088: S18 b05: the length the arm reaches out to (40) */
+  f32 pitch;                /* 0x08C: S18 b05: the arm's angle about x (-20 degrees out) */
+  f32 yaw;                  /* 0x090: S18 b05: the arm's angle about y (0) */
+  gaddr door_left;          /* 0x094: S18 b05: models 13 and 14 with a param, else 15 and 16 */
+  gaddr door_right;         /* 0x098 */
+  int32_t heard_by;         /* 0x09C: S18 b05: 1 + the player whose sound it played (0: none) */
+  Matrix matrix;            /* 0x0A0: the identity at construction; S18 b05: at home, turned by the heading */
   Contacts contacts;        /* 0x0E0 */
   int32_t contacts_word;    /* 0x134 */
   gaddr second_vtable;      /* 0x138 */
 } ActorType10;
 HW_OFFSET(ActorType10, value30, 0x030);
+HW_OFFSET(ActorType10, timer, 0x02C);
+HW_OFFSET(ActorType10, home, 0x040);
+HW_OFFSET(ActorType10, heading, 0x068);
+HW_OFFSET(ActorType10, reach, 0x088);
+HW_OFFSET(ActorType10, door_left, 0x094);
+HW_OFFSET(ActorType10, heard_by, 0x09C);
 HW_OFFSET(ActorType10, point, 0x04C);
 HW_OFFSET(ActorType10, value58, 0x058);
 HW_OFFSET(ActorType10, value6c, 0x06C);
@@ -135,29 +164,50 @@ HW_SIZE(ActorType10, 0x13C);
 /* placement type 0x26 (constructor func_8C058C2A, 0x11C bytes; vtable 0x8C23E4DC, second 0x8C23E4FC): a Body,
  * contacts owned by a point (room for 2), three 0x20-byte blocks and 8 Bodies (operator new[]) */
 #define TYPE26_BODIES 8
+#define TYPE26_STAGES 0 /* S18 b05: the blocks */
+#define TYPE26_SIZES  1
+#define TYPE26_TIMERS 2
 typedef struct ActorType26 {
   Actor base;               /* 0x000 */
-  uint8_t pad_028[0x030 - 0x028];
-  int32_t word30;           /* 0x030: picks the reset's table (0: 0x8C099428 and word100 = word88) */
-  uint8_t pad_034[0x03C - 0x034];
-  f32 f3c;                  /* 0x03C: the reset's counter (as a float) */
-  uint8_t pad_040[0x048 - 0x040];
+  uint8_t pad_028[0x02C - 0x028];
+  int32_t motion;           /* 0x02C: S18 b05: the entry of `motions` it is drawn with */
+  int32_t word30;           /* 0x030: picks the reset's table (0: 0x8C099428 and word100 = word88); S18 b05: also
+                             * the frame's speed (0: 1, else 0.5) and its particles' growth and timer */
+  f32 frame;                /* 0x034: S18 b05: the motion's frame (handed by address); a particle starts at 0 */
+  uint8_t pad_038[0x03C - 0x038];
+  union {
+    f32 f3c;                /* 0x03C: the reset's counter (as a float) */
+    Vec3 angle;             /* 0x03C: S18 b05: about x, y, z (drawn turned z, y, x; x is the sprite's angle) */
+  };
   Vec3 point;               /* 0x048: the contacts' owner */
   Body body;                /* 0x054: at rest at construction */
-  uint8_t pad_084[0x088 - 0x084];
-  uint32_t word88;          /* 0x088 */
-  uint8_t pad_08c[0x090 - 0x08C];
+  gaddr object;             /* 0x084: S18 b05: the NJS_OBJECT drawn */
+  uint32_t word88;          /* 0x088: S18 b05: its NJS_TEXLIST (the particles' too with word30 0) */
+  gaddr motions;            /* 0x08C: S18 b05: MotionEntry[] */
   Contacts contacts;        /* 0x090: radius g_type26_radius */
   int32_t contacts_word;    /* 0x0E4 */
-  uint8_t pad_0e8[0x0FC - 0x0E8];
-  int32_t counter;          /* 0x0FC: 0, then f3c at reset */
-  uint32_t word100;         /* 0x100: word88, or a global word, at reset */
-  gaddr table;              /* 0x104: a static table at reset */
+  union {
+    NjSprite sprite;        /* 0x0E8: S18 b05: the sprite every particle is drawn with */
+    struct {
+      uint8_t pad_0e8[0x0FC - 0x0E8];
+      int32_t counter;      /* 0x0FC: 0, then f3c at reset (the sprite's angle) */
+      uint32_t word100;     /* 0x100: word88, or a global word, at reset (the sprite's texlist) */
+      gaddr table;          /* 0x104: a static table at reset (the sprite's texanim) */
+    };
+  };
+  /* blocks[TYPE26_STAGES]: int32_t: 0 free, 1 rising, 2 done (back to 0); blocks[TYPE26_SIZES]: f32: the sprite's
+   * size, growing; blocks[TYPE26_TIMERS]: f32: counts up to g_type26_particle_life (S18 b05) */
   gaddr blocks[3];          /* 0x108: 0x20 bytes each (syMalloc) */
   gaddr bodies;             /* 0x114: Body[8] or 0 */
   gaddr second_vtable;      /* 0x118 */
 } ActorType26;
 HW_OFFSET(ActorType26, word30, 0x030);
+HW_OFFSET(ActorType26, motion, 0x02C);
+HW_OFFSET(ActorType26, frame, 0x034);
+HW_OFFSET(ActorType26, angle, 0x03C);
+HW_OFFSET(ActorType26, object, 0x084);
+HW_OFFSET(ActorType26, motions, 0x08C);
+HW_OFFSET(ActorType26, sprite, 0x0E8);
 HW_OFFSET(ActorType26, f3c, 0x03C);
 HW_OFFSET(ActorType26, word88, 0x088);
 HW_OFFSET(ActorType26, counter, 0x0FC);
@@ -179,13 +229,17 @@ HW_SIZE(ActorType26, 0x11C);
 typedef struct ActorType27 {
   Flyer flyer;              /* 0x000 */
   Body parts[TYPE27_PARTS]; /* 0x074: at rest at construction */
-  Quat turns[TYPE27_PARTS]; /* 0x464: (0, 0, 0, 1) at construction */
-  Matrix matrix_a;          /* 0x5B4: the identity at construction */
-  Matrix matrix_b;          /* 0x5F4: the identity at construction */
+  Body1 turns[TYPE27_PARTS]; /* 0x464: (0, 0, 0, 1) at construction (the Quat constructor); S18 b05: each part's
+                             * angle about x (its value; damping 0.98 at the init) */
+  Matrix matrix_a;          /* 0x5B4: the identity at construction; S18 b05: the view matrix the parts are drawn
+                             * in (njGetMatrix) */
+  Matrix matrix_b;          /* 0x5F4: the identity at construction; S18 b05: the parts' tree matrix (unit at the
+                             * draw's start, each node's own transform multiplied on for its children) */
   Contacts contacts;        /* 0x634 */
   int32_t contacts_word;    /* 0x688 */
-  uint8_t pad_68c[0x694 - 0x68C];
-  int32_t state;            /* 0x694: 0 at init */
+  int32_t phase;            /* 0x68C: S18 b05: 0 the Flyer (until it is touched), 1 its parts fly apart, 2 gone */
+  int32_t timer;            /* 0x690: S18 b05: steps of phase 1 (phase 2 after 180) */
+  int32_t part_next;        /* 0x694: 0 at init; S18 b05: the next part the draw's node walk takes */
   gaddr third_vtable;       /* 0x698 */
 } ActorType27;
 HW_OFFSET(ActorType27, parts, 0x074);
@@ -194,7 +248,9 @@ HW_OFFSET(ActorType27, matrix_a, 0x5B4);
 HW_OFFSET(ActorType27, matrix_b, 0x5F4);
 HW_OFFSET(ActorType27, contacts, 0x634);
 HW_OFFSET(ActorType27, contacts_word, 0x688);
-HW_OFFSET(ActorType27, state, 0x694);
+HW_OFFSET(ActorType27, phase, 0x68C);
+HW_OFFSET(ActorType27, timer, 0x690);
+HW_OFFSET(ActorType27, part_next, 0x694);
 HW_OFFSET(ActorType27, third_vtable, 0x698);
 HW_SIZE(ActorType27, 0x69C);
 
@@ -242,6 +298,27 @@ gaddr actor_type27_construct(gaddr obj);
 void actor_type27_destroy(gaddr obj);
 gaddr actor_type27_delete(gaddr obj, int32_t free_memory);
 gaddr actor_type27_destroy_self(gaddr obj);
+/* S18 b05: hand-written elsewhere, not in a header yet */
+void flyer_update(gaddr obj);                         /* game/actor_flyer.c */
+void flyer_pose(gaddr obj);                           /* game/actor_flyer.c */
+void flyer_draw(gaddr obj);                           /* game/actor_flyer.c */
+void resting_actor_init(gaddr actor, gaddr placement); /* game/actor_bodies.c */
+/* S18 b05: game/actor_type10.c */
+void actor_type10_init(gaddr obj, gaddr placement);
+void actor_type10_update(gaddr obj);
+void actor_type10_draw(gaddr obj);
+/* S18 b05: game/actor_type26.c */
+void actor_type26_update(gaddr obj);
+void actor_type26_draw(gaddr obj);
+void actor_type26_step_particles(gaddr obj);
+void actor_type26_draw_particles(gaddr obj);
+void actor_type26_spawn_particle(gaddr obj);
+/* S18 b05: game/actor_type27.c */
+void actor_type27_init(gaddr obj, gaddr placement);
+void actor_type27_update(gaddr obj);
+void actor_type27_draw(gaddr obj);
+void actor_type27_draw_parts(gaddr obj);
+void actor_type27_draw_part(gaddr obj, gaddr node);
 void material_set_89b8(f32 r, f32 g, f32 b, f32 a);
 /* game/scenery_b07.c */
 gaddr actor_b_delete(gaddr obj, int32_t free_memory); /* game/actor.c: exported there, declared here */

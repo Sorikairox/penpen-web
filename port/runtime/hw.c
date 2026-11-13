@@ -1,3 +1,4 @@
+#include <stdio.h>
 /* Pen Pen port, S11: the runtime half of src/include/hw.h: entering and leaving hand-written functions, their calls
  * into guest code, and the unwind/rewind records of the resumable ones (docs/port/DECOMP.md 3-4). */
 #include "rt.h"
@@ -61,6 +62,13 @@ gaddr hw_stack_alloc(uint32_t bytes) {
 }
 void hw_stack_free(uint32_t bytes) { hw_cpu->r[15] += (bytes + 3) & ~3u; }
 
+/* S18: a fragment (HW_EXPORT_FRAGMENT) was entered on its own: its parent's C was supposed to cover it */
+void hw_fragment_entered(uint32_t addr, uint32_t parent) {
+  static char why[96];
+  snprintf(why, sizeof why, "hw %08x: a fragment of %08x entered on its own", addr, parent);
+  rt_log("%s", why);
+  rt_stop(why);
+}
 void hw_enter(hw_entry *e, SH4 *c, uint32_t addr, int resumable) {
   e->c = c;
   e->addr = addr;

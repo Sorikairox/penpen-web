@@ -12,7 +12,6 @@
 #define THREE_PLAYERS 3
 
 /* func_8C041F70 (game/course.c, still translated): start position i of the course */
-static void course_start_position(gaddr course, int32_t i, gaddr out) { CALL3(0x8C041F70u, course, i, out); }
 
 /* the racer's virtual reset (RacerVtbl.reset): at `position`, word 0, facing `heading` */
 static void racer_vreset(gaddr racer, gaddr position, f32 heading) {

@@ -303,17 +303,24 @@ typedef struct Effect {
   gaddr motions;            /* 0x0F0: MotionEntry table (word1c's second word) */
   Contacts contacts;        /* 0x0F4: owned by the body, radius 6, capacity 2 */
   int32_t contacts_word;    /* 0x148 */
-  uint8_t pad_14c[0x158 - 0x14C];
-  f32 scale_a, scale_b;     /* 0x158 */
-  int32_t counter;          /* 0x160 */
-  uint32_t word164;         /* 0x164: = word_ec at reset */
-  gaddr table;              /* 0x168 */
+  union {
+    struct {
+      uint8_t pad_14c[0x158 - 0x14C];
+      f32 scale_a, scale_b; /* 0x158 */
+      int32_t counter;      /* 0x160 */
+      uint32_t word164;     /* 0x164: = word_ec at reset */
+      gaddr table;          /* 0x168 */
+    };
+    NjSprite sprite;        /* 0x14C: S18 b04: the particles' sprite (p: the particle's position, ang (counter) turns
+                             * 15 degrees a drawn particle, tlist (word164), tanim (table)) */
+  };
   uint8_t pad_16c[0x170 - 0x16C];
   gaddr frames;             /* 0x170: int32 per particle: its animation frame, 0..6 */
   gaddr countdowns;         /* 0x174: int32 per particle */
   gaddr states;             /* 0x178: int32 per particle: 1 = waiting, 2 = growing, 3 = ending, 0 = off */
   gaddr values;             /* 0x17C: f32 per particle */
-  gaddr extra;              /* 0x180: a word per particle (S14 b10: allocated by the constructor) */
+  gaddr extra;              /* 0x180: a word per particle (S14 b10: allocated by the constructor); S18 b04: f32: its
+                             * alpha (1 - value / 20) */
   gaddr bodies;             /* 0x184: Body per particle */
   gaddr second_vtable;      /* 0x188 */
 } Effect;
@@ -328,6 +335,7 @@ HW_OFFSET(Effect, word_ec, 0x0EC);
 HW_OFFSET(Effect, motions, 0x0F0);
 HW_OFFSET(Effect, contacts, 0x0F4);
 HW_OFFSET(Effect, contacts_word, 0x148);
+HW_OFFSET(Effect, sprite, 0x14C);
 HW_OFFSET(Effect, extra, 0x180);
 HW_OFFSET(Effect, scale_a, 0x158);
 HW_OFFSET(Effect, frames, 0x170);
@@ -495,14 +503,15 @@ typedef struct ActorType2B {
   int32_t side;             /* 0x050: S16 b06: which pair of points the body moves between (flips each cycle) */
   f32 frame;                /* 0x054: S16 b06: the motion's frame */
   f32 frame_end;            /* 0x058: S16 b06: its last frame */
-  Body1 values[6];          /* 0x05C */
+  Body1 values[6];          /* 0x05C: S18 b04: [0..2] the scale in x, y, z, [3..5] the angles about x, y, z */
   Body body;                /* 0x0BC */
   Vec3 points_a[2];         /* 0x0EC */
   Vec3 points_b[2];         /* 0x104 */
   f32 angle_a;              /* 0x11C: S16 b06: the turn for side 0 */
   f32 angle_b;              /* 0x120: S16 b06: for side 1 */
   f32 angle;                /* 0x124: S16 b06: where values[4] turns to (a hit adds -0.25..0.25 turn) */
-  uint8_t pad_128[0x130 - 0x128];
+  gaddr object;             /* 0x128: S18 b04: NJS_OBJECT */
+  gaddr texlist;            /* 0x12C: S18 b04 */
   gaddr motions;            /* 0x130: S16 b06: Type2BMotion[3] */
   f32 blend_time;           /* 0x134: S16 b06 */
   f32 blend_length;         /* 0x138: S16 b06 */
@@ -522,6 +531,8 @@ HW_OFFSET(ActorType2B, frame_end, 0x058);
 HW_OFFSET(ActorType2B, values, 0x05C);
 HW_OFFSET(ActorType2B, angle_a, 0x11C);
 HW_OFFSET(ActorType2B, motions, 0x130);
+HW_OFFSET(ActorType2B, object, 0x128);
+HW_OFFSET(ActorType2B, texlist, 0x12C);
 HW_OFFSET(ActorType2B, blend_motion, 0x13C);
 HW_OFFSET(ActorType2B, blend_word, 0x14C);
 HW_OFFSET(ActorType2B, blend_frame_b, 0x154);
@@ -625,8 +636,11 @@ typedef struct ActorType19 {
   int32_t first_player;     /* 0x048: S16 b06: the players before it (in focus order) are not watched */
   int32_t waiting;          /* 0x04C: S16 b06: 1 while it waits, 0 while it flies */
   f32 clock;                /* 0x050 */
-  uint8_t pad_054[0x064 - 0x054];
-  Vec3 points[3];           /* 0x064 */
+  uint8_t pad_054[0x058 - 0x054];
+  f32 radius;               /* 0x058: S18 b04: state 1 circles points[0] at this distance */
+  f32 roll_target;          /* 0x05C: S18 b04: turns[2] (its roll) is pulled to it: 0, or half a turn */
+  f32 circle_angle;         /* 0x060: S18 b04: state 1's angle about points[0] (Ninja units) */
+  Vec3 points[3];           /* 0x064: S18 b04: [0] its home, [1] the point its body is pulled to */
   Quat turns[3];            /* 0x088 */
   Body body;                /* 0x0B8 */
   gaddr object;             /* 0x0E8: S17 b06: NJS_OBJECT */
@@ -653,6 +667,9 @@ HW_OFFSET(ActorType19, clock, 0x050);
 HW_OFFSET(ActorType19, phase, 0x03C);
 HW_OFFSET(ActorType19, waiting, 0x04C);
 HW_OFFSET(ActorType19, points, 0x064);
+HW_OFFSET(ActorType19, radius, 0x058);
+HW_OFFSET(ActorType19, roll_target, 0x05C);
+HW_OFFSET(ActorType19, circle_angle, 0x060);
 HW_OFFSET(ActorType19, turns, 0x088);
 HW_OFFSET(ActorType19, body, 0x0B8);
 HW_OFFSET(ActorType19, contacts, 0x0F4);
@@ -695,8 +712,16 @@ typedef struct Burst {
   f32 gravity;              /* 0x40: added to the vertical velocity every step */
   gaddr texlist;            /* 0x44 */
   gaddr texture;            /* 0x48 */
-  uint8_t pad_4c[0x6C - 0x4C];
-  gaddr block_a, block_b;   /* 0x6C */
+  NjSprite sprite;          /* 0x4C: S18 b04: the particles' sprite (tlist = texlist, tanim = texture at each draw) */
+  union {
+    struct {
+      gaddr block_a, block_b; /* 0x6C */
+    };
+    struct {
+      int32_t sprite_n;     /* 0x6C: S18 b04: the sprite number drawn when there is no list */
+      gaddr sprite_list;    /* 0x70: S18 b04: int32 per drawn particle, in order (0: none) */
+    };
+  };
   gaddr vtable;             /* 0x74 */
 } Burst;
 HW_OFFSET(Burst, bodies, 0x10);
@@ -705,6 +730,8 @@ HW_OFFSET(Burst, depth, 0x20);
 HW_OFFSET(Burst, velocity_min, 0x30);
 HW_OFFSET(Burst, gravity, 0x40);
 HW_OFFSET(Burst, block_b, 0x70);
+HW_OFFSET(Burst, sprite, 0x4C);
+HW_OFFSET(Burst, sprite_list, 0x70);
 HW_OFFSET(Burst, vtable, 0x74);
 HW_SIZE(Burst, 0x78);
 
@@ -963,13 +990,24 @@ HW_SIZE(Buoy, 0xDC);
  * written */
 typedef struct ActorType25 {
   Actor base;               /* 0x00 */
-  uint8_t pad_28[0x44 - 0x28];
-  f32 clock;                /* 0x44: + 1 a tick */
-  uint8_t pad_48[0x5C - 0x48];
+  uint8_t pad_28[0x30 - 0x28];
+  int32_t motion;           /* 0x30: S18 b05: the entry of `motions` it is drawn with */
+  uint8_t pad_34[0x44 - 0x34];
+  f32 clock;                /* 0x44: + 1 a tick; S18 b05: the motion's frame (handed by address) */
+  uint8_t pad_48[0x4C - 0x48];
+  f32 scale;                /* 0x4C: S18 b05: drawn scaled by it on all three axes */
+  Vec3 angle;               /* 0x50: S18 b05: about x, y, z (drawn turned z, x, y) */
   Body body;                /* 0x5C */
-  uint8_t pad_8c[0x98 - 0x8C];
+  gaddr object;             /* 0x8C: S18 b05: the NJS_OBJECT drawn */
+  gaddr textures;           /* 0x90: S18 b05: its NJS_TEXLIST */
+  gaddr motions;            /* 0x94: S18 b05: MotionEntry[] */
   gaddr second_vtable;      /* 0x98 */
 } ActorType25;
+HW_OFFSET(ActorType25, motion, 0x30);
+HW_OFFSET(ActorType25, scale, 0x4C);
+HW_OFFSET(ActorType25, angle, 0x50);
+HW_OFFSET(ActorType25, object, 0x8C);
+HW_OFFSET(ActorType25, motions, 0x94);
 HW_OFFSET(ActorType25, clock, 0x44);
 HW_OFFSET(ActorType25, body, 0x5C);
 HW_OFFSET(ActorType25, second_vtable, 0x98);
@@ -1138,7 +1176,7 @@ typedef struct Rings {
   Actor base;               /* 0x000 */
   uint8_t pad_028[0x02C - 0x028];
   Body body;                /* 0x02C: the contacts' owner */
-  uint8_t pad_05c[0x068 - 0x05C];
+  Vec3 angle;               /* 0x05C: S18 b05: the rings' plane, about x, y, z (Ninja units, as floats) */
   Contacts contacts;        /* 0x068: radius 40, capacity 8 */
   int32_t contacts_word;    /* 0x0BC */
   uint8_t pad_0c0[0x0CC - 0x0C0];
@@ -1147,6 +1185,7 @@ typedef struct Rings {
   gaddr second_vtable;      /* 0x3EC */
 } Rings;
 HW_OFFSET(Rings, body, 0x02C);
+HW_OFFSET(Rings, angle, 0x05C);
 HW_OFFSET(Rings, contacts, 0x068);
 HW_OFFSET(Rings, contacts_word, 0x0BC);
 HW_OFFSET(Rings, sizes, 0x0CC);
@@ -1335,5 +1374,26 @@ void body_damping_none(gaddr body);
 gaddr actor_create(gaddr group, uint32_t type);
 /* S18 b02: game/trap_set_objects.c (the Actor flags word's getter, func_8C01F6AC) */
 uint32_t actor_flags(gaddr actor);
+/* S18 b02: game/actor_factory.c (declared for game/trap_set_objects.c, whose factory is a copy) */
+gaddr actor_create(gaddr group, uint32_t type);
+/* S18 b02: game/trap_set_objects.c (the Actor flags word's getter, func_8C01F6AC) */
+uint32_t actor_flags(gaddr actor);
+
+/* S18 b04: game/actor_type19_b04.c (they supersede the static CALL wrappers type19_step0/1/3 in actor_bodies.c) */
+void type19_step0(gaddr obj);
+void type19_step1(gaddr obj);
+void type19_step3(gaddr obj);
+
+/* S18 b04: game/actor_effect_b04.c (effect_burst supersedes the static CALL wrapper of that name in actor_effect.c) */
+void effect_free_blocks(gaddr obj);
+void effect_destroy(gaddr obj);
+gaddr effect_delete(gaddr obj, int32_t free_memory);
+gaddr effect_destroy_self(gaddr obj);
+void effect_draw(gaddr obj);
+void effect_draw_particles(gaddr obj);
+void effect_burst(gaddr obj, gaddr pos, f32 angle);
+/* S18 b04: game/actor_misc_b04.c */
+void burst_draw(gaddr obj);
+void material_set_ac6a(f32 r, f32 g, f32 b, f32 a);
 
 #endif

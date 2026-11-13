@@ -8,7 +8,7 @@ static int32_t gdFsChangeDir(gaddr name) { return (int32_t)CALL1(0x8C09E29Cu, na
 static int32_t gdFsDaStop(void) { return (int32_t)CALL0(0x8C09ECC4u); }
 static int32_t gdFsDaRelease(int32_t arg) { return (int32_t)CALL1(0x8C09ECE6u, arg); }
 /* func_8C01022C: the systems shut down (it masks the interrupts: stays translated) */
-static void system_shutdown(void) { CALL0(0x8C01022Cu); }
+#include "sb_system.h" /* sb_exit_system (func_8C01022C) */
 
 #define FILE_ERROR_PASS_A (-27) /* the two gdFs errors the handler lets pass (core/file.c: a missing file) */
 #define FILE_ERROR_PASS_B (-28)
@@ -41,7 +41,7 @@ HW_EXPORT(8c012d88, RET(cd_release((int32_t)ARG0)))
 void file_error(gaddr object, int32_t error) {
   if (error == FILE_ERROR_PASS_A || error == FILE_ERROR_PASS_B)
     return;
-  system_shutdown();
+  sb_exit_system();
   syBtExit();
 }
 HW_EXPORT(8c012da6, file_error(ARG0, (int32_t)ARG1))

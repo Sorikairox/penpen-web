@@ -44,7 +44,6 @@ static void course_reset(gaddr course) { CALL1(0x8C041350u, course); }
 /* func_8C044766: the scenery actors reset for another run */
 static void actor_group_reset(gaddr group) { CALL1(0x8C044766u, group); }
 /* func_8C041F70: start position i of the course into *pose */
-static void course_start_pose(gaddr course, int32_t i, gaddr pose) { CALL3(0x8C041F70u, course, i, pose); }
 
 /* the players of the set-up's mode (game/race_players.c; the original passes a second register the callees do
  * not read) */
@@ -99,7 +98,7 @@ void race_scene_build(gaddr scene) {
       if (*slot == 0)
         continue;
       f32 value = course_start_value(s->course);
-      course_start_pose(s->course, i, pose);
+      course_start_position(s->course, i, pose);
       player_place(*slot, pose, value);
     }
   } else {
@@ -114,7 +113,7 @@ void race_scene_build(gaddr scene) {
         continue;
       f32 value = race_scene_start_value(scene);
       method_self(pose); /* the pose's (empty) constructor */
-      course_start_pose(s->course, i, pose);
+      course_start_position(s->course, i, pose);
       player_place(*slot, pose, value);
     }
   }

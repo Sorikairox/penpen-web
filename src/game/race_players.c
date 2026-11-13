@@ -23,7 +23,6 @@
 static void race_scene_setup(gaddr scene) { CALL1(0x8C029BD0u, scene); }
 
 /* func_8C041F70 (game/course.c, still translated): start position i of the course */
-static void course_start_position(gaddr course, int32_t i, gaddr out) { CALL3(0x8C041F70u, course, i, out); }
 /* func_8C01AD42 (still translated): the set-up's range row for computer player i */
 static int32_t race_setup_range(gaddr setup, int32_t i) { return (int32_t)CALL2(0x8C01AD42u, setup, i); }
 

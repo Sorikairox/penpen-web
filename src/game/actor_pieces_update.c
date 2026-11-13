@@ -33,9 +33,6 @@
 enum { PIECE_WAIT = 0, PIECE_FALL = 1 };
 
 /* func_8C046BA4: the course cell under view i's camera (-1: the current view) */
-static int32_t race_scene_view_cell_at(gaddr scene, int32_t view) {
-  return (int32_t)CALL2(0x8C046BA4u, scene, view);
-}
 
 /* a falling piece's contacts sound in the views near the actor */
 static void piece_sound(gaddr obj, Piece *p) {
@@ -49,7 +46,7 @@ static void piece_sound(gaddr obj, Piece *p) {
   }
   for (int32_t view = 0; view < (int32_t)a->base.word0c; view++) {
     int32_t cell = a->base.cell;
-    int32_t d = cell - race_scene_view_cell_at(panel_get(), view);
+    int32_t d = cell - race_scene_view_cell(panel_get(), view);
     if (!fgt(f32_abs(f32_from_int(d)), F32(1.0f))) {
       race_scene_sound(panel_get(), view, 0, 8, racer ? SOUND_PIECE_RACER : SOUND_PIECE_OTHER);
       p->sound_timer = PIECE_SOUND_GAP;

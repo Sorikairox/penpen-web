@@ -21,10 +21,6 @@ void effect_update(gaddr fx); /* game/actor.c */
 #define EFFECT_BODY_CONSTRUCTOR 0x8C04AEEEu /* body_reset_set3 (game/actor.c) */
 
 /* func_8C04B78C: start a burst of particles at `pos`, turned by `angle` (still translated) */
-static void effect_burst(gaddr fx, gaddr pos, f32 angle) {
-  FARGS1(angle);
-  CALL2(0x8C04B78Cu, fx, pos);
-}
 
 static void body1_rest(Body1 *b) {
   b->value = F32(0.0f);

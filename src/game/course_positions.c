@@ -1,5 +1,5 @@
-/* Pen Pen port, S17 b05: the racers' positions at the course's finish (the start's counterpart, func_8C041F70,
- * shares the body below; it enters it in the middle and is left translated). */
+/* Pen Pen port, S17 b05: the racers' positions at the course's finish and (S18 b04) at its start (func_8C041F70
+ * enters the shared body below in its middle, with the start segment). */
 #include "hw.h"
 #include "sdk.h"
 #include "../core/vec.h"
@@ -39,6 +39,13 @@ void course_finish_position(gaddr course, int32_t i, gaddr out) {
   course_segment_position(course, i, course_at(course)->finish_segment, out);
 }
 HW_EXPORT(8c041f8c, course_finish_position(ARG0, (int32_t)ARG1, ARG2))
+
+/* was func_8C041F70: racer position i at the course's start segment into *out (S18 b04; it jumps into the shared
+ * body, func_8C041F9C, with the start segment) */
+void course_start_position(gaddr course, int32_t i, gaddr out) {
+  course_segment_position(course, i, course_at(course)->start_segment, out);
+}
+HW_EXPORT(8c041f70, course_start_position(ARG0, (int32_t)ARG1, ARG2))
 
 /* was func_8C03C670: the same for the race scene's course */
 void race_scene_finish_position(gaddr scene, int32_t i, gaddr out) {

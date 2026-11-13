@@ -1,11 +1,11 @@
 /* Pen Pen port, S11: the Game object and its modes (game/game.h). */
 #include "game.h"
+#include "../core/sb_system.h" /* sb_init_system / sb_exit_system (core/sb_system.c) */
 #include "../core/view.h"
 #include "sound.h"
 #include "sdk.h"
 
 /* still translated */
-static void sb_exit_system(void) { CALL0(0x8C01022Cu); }                     /* func_8C01022C: the SDK sample's exit */
 
 /* was func_8C019DBE: (re)start the game object: no mode yet, `first_mode` next. The root task keeps running when
  * the tree is paused (it is what un-pauses it). */
@@ -63,10 +63,20 @@ HW_EXPORT_RESUMABLE(8c01a1b8, game_start_mode_scene(0x8C01A1B8u, ARG0, 0, 0x88, 
 HW_EXPORT_RESUMABLE(8c01a1f2, game_start_mode_scene(0x8C01A1F2u, ARG0, 0, 0xA8, 0x8C01A8DEu, 2, ARG1))
 /* was func_8C01A248: the demo, the same scene as mode 7 with argument 5 */
 HW_EXPORT_RESUMABLE(8c01a248, game_start_mode_scene(0x8C01A248u, ARG0, 1, 0xA8, 0x8C01A8DEu, 2, 5))
+/* S18 b01: was func_8C01A120: mode 1, the same scene as mode 2 (func_8C01B77A) with argument 0 */
+HW_EXPORT_RESUMABLE(8c01a120, game_start_mode_scene(0x8C01A120u, ARG0, 1, 0x1C4, 0x8C01B77Au, 2, 0))
+/* S18 b01: was func_8C01A27C: mode 9, the staff roll (game/staff_roll_draw.c: staff_roll_construct) */
+HW_EXPORT_RESUMABLE(8c01a27c, game_start_mode_scene(0x8C01A27Cu, ARG0, 0, 0x90, 0x8C01E8DAu, 1, 0))
+/* S18 b01: was func_8C01A2AE: mode 11 (its scene's constructor func_8C021A10; the soft-reset flag left as it is) */
+/* not exported (S18): with it, the gallery route's whole run equals the pure one frame for frame, but the difftest
+ * sample of gallery_update in the mode's first frame differs in a gdFsRead's sector count (a stack out-parameter of
+ * the file load replayed at another depth): kept translated until that is understood */
+/* HW_EXPORT_RESUMABLE(8c01a2ae, game_start_mode_scene(0x8C01A2AEu, ARG0, -1, 0x60, 0x8C021A10u, 1, 0)) */
+/* S18 b01: was func_8C01A2D8: mode 12 (its scene's constructor func_8C021E0A; the soft-reset flag left as it is) */
+HW_EXPORT_RESUMABLE(8c01a2d8, game_start_mode_scene(0x8C01A2D8u, ARG0, -1, 0x8C, 0x8C021E0Au, 1, 0))
 
-/* the start routine of each mode (MODE_QUIT has none). Those of the modes the tested runs visit (0, 2, 3, 7, 8) are
- * the hand-written ones above; the others (modes 1, 4, 5, 6, 9, 11, 12: the same shape, modes 5 and 6 empty) stay
- * translated until a run reaches them. */
+/* the start routine of each mode (MODE_QUIT has none): the hand-written ones above (S18 b01: modes 1, 9, 11 and 12
+ * too; modes 5 and 6 are empty) */
 static const gaddr mode_start[MODE_COUNT] = {
   0x8C01A0D4u, 0x8C01A120u, 0x8C01A154u, 0x8C01A188u, 0x8C01A1B8u, 0x8C01A1EAu, 0x8C01A1EEu,
   0x8C01A1F2u, 0x8C01A248u, 0x8C01A27Cu, 0, 0x8C01A2AEu, 0x8C01A2D8u,

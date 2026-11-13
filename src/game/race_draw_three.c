@@ -17,7 +17,7 @@
 static void ending_draw_item(uint32_t item) { CALL1(0x8C0173E8u, item); }     /* func_8C0173E8 */
 static void ending_draw_result2(gaddr result) { CALL1(0x8C018774u, result); } /* func_8C018774 */
 /* func_8C016C44: the results' pulsing sprite (steps its counter, then draws by its sine) */
-static void results_pulse_draw_b(void) { CALL0(0x8C016C44u); }
+int32_t results_draw_banner_top(void); /* game/results_text_b.c (func_8C016C44) */
 
 /* ---- data ---- */
 #define PANEL_TEXLIST     0x8C096070u /* the scene sprite's textures */
@@ -112,7 +112,7 @@ void race_draw_view_three(gaddr scene) {
     race_results_draw_three(scene);
     race_ending_draw_three(scene);
   } else {
-    results_pulse_draw_b();
+    results_draw_banner_top();
   }
   memmove(hw_ptr(frame), hw_ptr(MODE2_POLYGON), sizeof(((Mode2Frame *)0)->polygon));
   njDrawPolygon(frame, 4, 0);

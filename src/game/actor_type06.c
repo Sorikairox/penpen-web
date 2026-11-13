@@ -7,6 +7,7 @@
 #include "actor.h"
 #include "race_scene.h"
 #include "actor_b06.h"
+#include "course.h"
 
 #define TYPE06_VTABLE        0x8C23DF54u
 #define TYPE06_SECOND_VTABLE 0x8C23DF74u
@@ -78,13 +79,10 @@ gaddr actor_type06_destroy_self(gaddr obj) {
 HW_EXPORT(8c04bc96, RET(actor_type06_destroy_self(ARG0)))
 
 /* func_8C0419DA: the course's ground below a position (still translated) */
-static int32_t course_ground_below(gaddr course, gaddr pos, int32_t cell, gaddr distance, int32_t flags) {
-  return (int32_t)CALL5(0x8C0419DAu, course, pos, cell, distance, flags);
-}
 
 /* was func_8C04BAD8: the ground query of the race scene's course (a thunk: the five arguments passed on, the scene
  * swapped for its course): non-zero when found, the distance in *distance */
 int32_t race_scene_course_ground(gaddr scene, gaddr pos, int32_t cell, gaddr distance, int32_t flags) {
-  return course_ground_below(race_scene_at(scene)->course, pos, cell, distance, flags);
+  return course_ground_below(race_scene_at(scene)->course, pos, cell, distance, (gaddr)flags); /* flags: the ground normal's Vec3 (an out pointer, S18 b04) */
 }
 HW_EXPORT(8c04bad8, RET(race_scene_course_ground(ARG0, ARG1, (int32_t)ARG2, ARG3, (int32_t)ARG4)))

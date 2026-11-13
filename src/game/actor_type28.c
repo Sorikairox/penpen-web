@@ -202,7 +202,6 @@ void actor_type28_step_particles(gaddr obj) {
 HW_EXPORT(8c04f29c, actor_type28_step_particles(ARG0))
 
 /* func_8C04F3A2: draw the spray's particles (still translated) */
-static void actor_type28_draw_particles(gaddr obj) { CALL1(0x8C04F3A2u, obj); }
 
 /* was func_8C04F0E0: draw it: its texture, its model at the body's position turned about x by the fifth pull's
  * value, about y and z by the first two turns' first values, scaled by the first three pulls' values, with the shape

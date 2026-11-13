@@ -86,4 +86,7 @@ void game_update(gaddr game);
 gaddr panel_get(void);
 void video_resume(void);
 void video_pause(void);
+/* S18 b01: game/game_shutdown.c (was func_8C016792; game/main.c's static game_shutdown called it) */
+void game_shutdown(void);
+
 #endif

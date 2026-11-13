@@ -61,7 +61,7 @@ HW_EXPORT(8c0553b8, flock_update(ARG0))
 
 /* ---- type 0x17: the turning gate ---- */
 
-#define GATE_RESPOND 0x8C055D78u      /* the gate's contact response (guest code) */
+#define GATE_RESPOND 0x8C055D78u      /* the gate's contact response (gate_respond, game/actor_mesh_respond.c) */
 #define DEG_1   F32_BITS(0x43360B60u) /* one degree in Ninja units (182.04) */
 #define DEG_30  F32_BITS(0x45AAAAAAu) /* 5461.33 */
 #define DEG_180 F32(32768.0f)

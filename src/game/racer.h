@@ -106,10 +106,13 @@ typedef struct CharacterParams {
   int32_t frames378; /* 0x378: its length (scaled by the item, func_8C03438C) */
   int32_t state4_hit_frames[2]; /* 0x37C: S17 b04: state 4's action 3 (hit): [0] for hit_strength 2 (and any
                                  * other than 0, 1), [1] for 0 and 1 */
-  uint8_t pad_384[0x3C0 - 0x384];
+  f32 swim_push[7];       /* 0x384: S18 b06: state 5's strokes (actions 1, 2): the push (z) per update by stroke_level */
+  f32 swim_turn[7];       /* 0x3A0: S18 b06: their turn rate (times stick_y) by stroke_level */
+  uint8_t pad_3bc[0x3C0 - 0x3BC];
   f32 swim4_push;         /* 0x3C0: S17 b04: state 5's action 4: the push (z) per update */
   f32 swim4_turn;         /* 0x3C4: its turn rate (times stick_y) */
-  uint8_t pad_3c8[0x3E4 - 0x3C8];
+  f32 swim_tilt_rate[7];  /* 0x3C8: S18 b06: the strokes' rate value33c / value34c are pulled at (to stick_x / stick_y
+                           * times swim4_tilt) by stroke_level */
   f32 swim4_tilt_rate;    /* 0x3E4: the rate value33c is pulled at (to stick_x times swim4_tilt) */
   f32 swim_damping_xy[7]; /* 0x3E8: S17 b04: state 5 under the surface: the moving body's x and y damping by
                            * stroke_level ([0] in action 4) */
@@ -148,6 +151,9 @@ HW_OFFSET(CharacterParams, run_damping, 0x204);
 HW_OFFSET(CharacterParams, f354, 0x354);
 HW_OFFSET(CharacterParams, hold_levels, 0x360);
 HW_OFFSET(CharacterParams, release_frames_max, 0x374);
+HW_OFFSET(CharacterParams, swim_push, 0x384);
+HW_OFFSET(CharacterParams, swim_turn, 0x3A0);
+HW_OFFSET(CharacterParams, swim_tilt_rate, 0x3C8);
 HW_SIZE(CharacterParams, 0x434);
 static inline CharacterParams *character_params_at(gaddr a) { return (CharacterParams *)hw_ptr(a); }
 
