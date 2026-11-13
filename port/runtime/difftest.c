@@ -228,7 +228,10 @@ static int draw_kind(uint32_t a) {
             !strncmp(n, "nj_Motion", 9) || !strncmp(n, "nj_ShapeMotion", 14) || !strcmp(n, "njCnkModDrawModel")))
     /* (njDrawPolygon takes no float: Ninja's is (points, n, trans); the HLE reads FR4 as its depth, whatever the
        caller left there: not compared) */
-    k = 1 | (!strcmp(n, "njDrawSprite2D") || !strncmp(n, "nj_Motion", 9) ||
+    /* S20: FR4 is compared for the draws whose HLE reads it (the motion drawers nj_MotionL*: not the stubs
+       nj_MotionSetup / nj_MotionEnd / the key steps, which read no float: what the caller's last SDK call left in
+       FR4 is not program state, and the SDK's own C leaves FR4 alone where the assembly used it as a scratch) */
+    k = 1 | (!strcmp(n, "njDrawSprite2D") || !strncmp(n, "nj_MotionL", 10) ||
              !strncmp(n, "nj_ShapeMotion", 14) ? 2 : 0) | (strncmp(n, "njDraw", 6) || !strcmp(n, "njDrawSprite3D") ? 4 : 0);
   if (cn < 64) { ca[cn] = a; ck[cn] = (uint32_t)k; cn++; }
   return k;
