@@ -85,8 +85,11 @@ typedef struct RaceScene {
   };
   Vec3 vec15c[64];              /* 0x15C */
   f32 values[8][8];             /* 0x45C: row 0 = the players' distances (the watched player's sound fades by it) */
-  Vec3 points[8][8];            /* 0x55C */
-  uint8_t pad_85c[0xA5C - 0x85C];
+  Vec3 points[8][8];            /* 0x55C: S17 r2: per pair of players, the unit vector from i toward j
+                                 * (vec15c[i * 8 + j] is that offset, values[i][j] its length, 1e7 for i == j) */
+  f32 headings[8][8];           /* 0x85C: S17 r2: that direction's heading (atan2 of x over z, angle units,
+                                 * truncated) */
+  f32 pitches[8][8];            /* 0x95C: S17 r2: its pitch (atan2 of -y over the length in x and z, angle units) */
   NjSprite sprite;              /* 0xA5C: the scene's own sprite (results, ending, pause cells) */
   int32_t music_cue;            /* 0xA7C: the next music cue */
   Vec3 vecA80[16];              /* 0xA80 */
@@ -102,12 +105,14 @@ typedef struct RaceScene {
   Body1 values1[5];             /* 0xC50 */
   f32 sprite_fade;              /* 0xCA0: the results' / ending's sprites' alpha (> 0: drawn) */
   int32_t pause_delay;          /* 0xCA4: frames before the pause menu reads the pad again (30 after a choice) */
-  int32_t word_ca8;             /* 0xCA8: S14 b11: the type-0x22 actor's mode 6 stops at 2 */
-  int32_t word_cac;             /* 0xCAC: S15 b04: 0 when a race starts */
-  gaddr marks_a;                /* 0xCB0: S15: a halfword per entry of g_race_mark_count, cleared at construction */
+  int32_t word_ca8;             /* 0xCA8: S14 b11: the type-0x22 actor's mode 6 stops at 2; S17 r2: the race's
+                                 * recording: 1 records it, 2 plays it back (RACE_RECORD_*) */
+  int32_t word_cac;             /* 0xCAC: S15 b04: 0 when a race starts; S17 r2: the recording's frame */
+  gaddr marks_a;                /* 0xCB0: S15: a halfword per entry of g_race_mark_count, cleared at construction;
+                                 * S17 r2: the recording's per-frame stick word of port 0 */
   gaddr marks_b;                /* 0xCB4: the same */
-  int32_t word_cb8;             /* 0xCB8: S15 b04: 0 when a race starts */
-  int32_t word_cbc;             /* 0xCBC: the same */
+  int32_t word_cb8;             /* 0xCB8: S15 b04: 0 when a race starts; S17 r2: frames since the last sample (0-7) */
+  int32_t word_cbc;             /* 0xCBC: the same; S17 r2: the recording's sample (one every 8 frames) */
   int16_t scores[RACE_PLAYERS]; /* 0xCC0: shown with the results */
   uint8_t pad_cc8[0xCCC - 0xCC8];
   gaddr vec_lists_a[RACE_RACERS]; /* 0xCCC: S15: per racer slot, g_race_mark_count / 8 + 1 Vec3s */
@@ -135,6 +140,8 @@ HW_OFFSET(RaceScene, watched, 0x11C);
 HW_OFFSET(RaceScene, vec15c, 0x15C);
 HW_OFFSET(RaceScene, values, 0x45C);
 HW_OFFSET(RaceScene, points, 0x55C);
+HW_OFFSET(RaceScene, headings, 0x85C);
+HW_OFFSET(RaceScene, pitches, 0x95C);
 HW_OFFSET(RaceScene, sprite, 0xA5C);
 HW_OFFSET(RaceScene, music_cue, 0xA7C);
 HW_OFFSET(RaceScene, pause_port, 0xB40);
@@ -233,6 +240,9 @@ int32_t race_scene_view_player(gaddr scene, int32_t view);
 f32 save_time_a(int32_t cup, int32_t course);
 /* game/race_scene_methods.c */
 void race_scene_course_camera(gaddr scene, uint32_t a, uint32_t b, uint32_t c, gaddr out);
+
+/* S17 r2: game/race_step.c (state 3's step, called by race_scene_update) */
+void race_scene_race_step(gaddr scene);
 
 /* S15 b04: game/race_draw.c (the scene's drawing over each view) */
 void race_draw_time(gaddr scene);

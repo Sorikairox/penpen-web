@@ -7,57 +7,13 @@
 #include "../core/inline.h"
 #include "../core/view.h"
 #include "../core/file.h"
+#include "title.h"            /* TitleScene (S17: shared with title_draw.c) */
 
 #define TITLE_VTABLE 0x8C23D96Cu /* {destroy = title_destroy, update, draw} */
 
 
-typedef struct TitleScene {
-  Task task;                  /* 0x000 */
-  Pad pad;                    /* 0x024: player one */
-  int32_t state;              /* 0x028: 0 fade in, 1 logo, 2 (variant 0's intro), 3 menu, 4 leaving */
-  int32_t unknown02c;         /* 0x02C */
-  int32_t choice;             /* 0x030: the menu's answer */
-  int32_t start, a, b;        /* 0x034: pressed this frame (a key repeat lock: 0x050) */
-  int32_t right, left, up, down; /* 0x040: pressed this frame */
-  int32_t key_lock;           /* 0x050: frames until Start / A / B count again */
-  uint8_t unknown054[0x5C - 0x54];
-  int32_t logo_phase;         /* 0x05C: 0, or 2 when the logo starts finished (variant 1) */
-  int32_t phase_frames;       /* 0x060: frames in the logo's phase */
-  int32_t unknown064;         /* 0x064 */
-  int32_t demo_countdown;     /* 0x068: frames left before the attract demo (1800) */
-  uint8_t unknown06c[0x74 - 0x6C];
-  f32 frame[4];               /* 0x074: motion frames (logo, star, back, ...) */
-  f32 scroll_a, scroll_b;     /* 0x084: two layers' scroll (0.002 per frame) */
-  f32 blend_a, blend_b;       /* 0x08C: their cross-fade (1 when the logo starts finished) */
-  f32 fade;                   /* 0x094: 0 to 1 over the fade-in (1/60 per frame) */
-  gaddr texlist;              /* 0x098: NJS_TEXLIST (a static one), released with njReleaseTexture */
-  gaddr model[3];             /* 0x09C: logo, star, back (chunk models read by nj_ReadChunkFile) */
-  gaddr motion[3];            /* 0x0A8: their motions */
-  gaddr logo_shape;           /* 0x0B4: the logo's shape motion */
-  gaddr data_b8;              /* 0x0B8 */
-  Body logo;                  /* 0x0BC: the logo (a screen position) */
-  Body eye;                   /* 0x0EC: the camera's position */
-  Body target;                /* 0x11C: what the camera looks at */
-  Body mover;                 /* 0x14C: pulled toward goal */
-  Body1 angle[3];             /* 0x17C: angles pulled toward goal_angle */
-  Vec3 goal;                  /* 0x1AC */
-  f32 goal_angle[3];          /* 0x1B8 */
-} TitleScene;
-HW_OFFSET(TitleScene, pad, 0x24);
-HW_OFFSET(TitleScene, key_lock, 0x50);
-HW_OFFSET(TitleScene, demo_countdown, 0x68);
-HW_OFFSET(TitleScene, frame, 0x74);
-HW_OFFSET(TitleScene, texlist, 0x98);
-HW_OFFSET(TitleScene, motion, 0xA8);
-HW_OFFSET(TitleScene, data_b8, 0xB8);
-HW_OFFSET(TitleScene, logo, 0xBC);
-HW_OFFSET(TitleScene, mover, 0x14C);
-HW_OFFSET(TitleScene, angle, 0x17C);
-HW_OFFSET(TitleScene, goal_angle, 0x1B8);
-HW_SIZE(TitleScene, 0x1C4);
 #define TITLE_ARRAY 3
 
-static inline TitleScene *title_at(gaddr a) { return (TitleScene *)hw_ptr(a); }
 #define FIELD(scene, field) ((scene) + (gaddr)__builtin_offsetof(TitleScene, field))
 
 /* data of the original */
@@ -181,7 +137,7 @@ gaddr title_init(gaddr scene, int32_t variant) {
   }
   t->phase_frames = 0;
   t->choice = 0;
-  t->unknown064 = 0;
+  t->menu_page = 0;
   t->fade = F32(0.0f);
   view_set_light_intensity(F32(1.0f), F32(1.0f), F32(1.0f), 0);
   view_set_light_dir(F32(0.0f), F32_BITS(0xBF3504F6u), F32_BITS(0xBF3504F6u), 0); /* down and away, 45 degrees */
@@ -209,7 +165,6 @@ HW_EXPORT_RESUMABLE(8c01b77a, RET(title_construct(ARG0, (int32_t)ARG1)))
 
 /* still translated: variant 0's intro (state 2), the save-file check of the VMU
  * (state 3: poll, then read the save; 1 when finished) */
-static void title_intro(gaddr scene) { CALL1(0x8C01BEF8u, scene); }    /* func_8C01BEF8 */
 static void save_poll(void) { CALL0(0x8C018E10u); }                    /* func_8C018E10 */
 static int32_t save_load(void) { return (int32_t)CALL0(0x8C018E7Cu); } /* func_8C018E7C */
 
@@ -238,37 +193,13 @@ static f32 title_wave(int32_t n) {
   return njSin(f32_to_int(fdiv(fmul(f32_from_int(n), F32(16384.0f)), F32(100.0f))));
 }
 
-/* was func_8C01BB70: state 1, the logo. Start skips ahead: during the logo's entry (phases 0-1) it jumps to its last
- * frame (sound 6 on port 1, the music again); once the logo stands (phase 2 on) it starts variant 0's intro (sound 7
- * on port 2, the camera goals). Otherwise the logo animates: phase 0 waits 300 frames, phase 1 plays the logo's
- * motion and fades it in over 50 frames, then phases 2-5 loop: a layer holds (16 frames), the two layers cross-fade
- * along a sine, the other holds, they cross-fade back. */
-void title_logo(gaddr scene) {
+/* the logo's animation, a frame (state 1 without Start, and variant 0's intro): phase 0 waits 300 frames, phase 1
+ * plays the logo's motion and fades it in over 50 frames, then phases 2-5 loop: a layer holds (16 frames), the two
+ * layers cross-fade along a sine, the other holds, they cross-fade back. The logo state starts the music again when
+ * the wait ends (restart_music); the intro does not. */
+static void title_logo_animate(gaddr scene, int restart_music) {
   TitleScene *t = title_at(scene);
   const f32 step = F32_AT(TITLE_FLOAT_0_002);
-  if (t->start) {
-    t->logo.force.x = fadd(t->logo.force.x, fneg(F32_AT(TITLE_FLOAT_8)));
-    if (t->logo_phase < 2) {
-      sound_play(1, 6, 0);
-      music_play(5, 0, 1);
-      t->frame[0] = title_last_frame(t);
-      t->logo_phase++;
-      t->phase_frames = 0;
-      t->blend_a = F32(1.0f);
-      t->demo_countdown = 1800;
-    } else {
-      sound_play(2, 7, 0);
-      game_at(task_at(scene)->owner)->reset_exits = 0;
-      t->state = 2;
-      t->unknown064 = 0;
-      t->frame[0] = F32(0.0f);
-      vec3_set(F32(-176.0f), F32(40.0f), F32(-6.0f), FIELD(scene, goal));
-      t->goal_angle[0] = F32(-122.5f);
-      t->goal_angle[1] = F32(8350.0f);
-      t->goal_angle[2] = F32(0.0f);
-    }
-    return;
-  }
   t->frame[1] = fadd(t->frame[1], F32(1.0f));
   t->frame[2] = fadd(t->frame[2], F32(1.0f));
   switch (t->logo_phase) {
@@ -278,7 +209,8 @@ void title_logo(gaddr scene) {
       t->logo_phase++;
       t->phase_frames = 0;
       t->frame[1] = F32(0.0f);
-      music_play(5, 0, 1);
+      if (restart_music)
+        music_play(5, 0, 1);
     }
     break;
   case 1: /* the logo's motion, fading in */
@@ -352,7 +284,180 @@ void title_logo(gaddr scene) {
     break;
   }
 }
+
+/* was func_8C01BB70: state 1, the logo. Start skips ahead: during the logo's entry (phases 0-1) it jumps to its last
+ * frame (sound 6 on port 1, the music again); once the logo stands (phase 2 on) it starts variant 0's intro (sound 7
+ * on port 2, the camera goals). Otherwise the logo animates (title_logo_animate). */
+void title_logo(gaddr scene) {
+  TitleScene *t = title_at(scene);
+  if (t->start) {
+    t->logo.force.x = fadd(t->logo.force.x, fneg(F32_AT(TITLE_FLOAT_8)));
+    if (t->logo_phase < 2) {
+      sound_play(1, 6, 0);
+      music_play(5, 0, 1);
+      t->frame[0] = title_last_frame(t);
+      t->logo_phase++;
+      t->phase_frames = 0;
+      t->blend_a = F32(1.0f);
+      t->demo_countdown = 1800;
+    } else {
+      sound_play(2, 7, 0);
+      game_at(task_at(scene)->owner)->reset_exits = 0;
+      t->state = 2;
+      t->menu_page = 0;
+      t->frame[0] = F32(0.0f);
+      vec3_set(F32(-176.0f), F32(40.0f), F32(-6.0f), FIELD(scene, goal));
+      t->goal_angle[0] = F32(-122.5f);
+      t->goal_angle[1] = F32(8350.0f);
+      t->goal_angle[2] = F32(0.0f);
+    }
+    return;
+  }
+  title_logo_animate(scene, 1);
+}
 HW_EXPORT(8c01bb70, title_logo(ARG0))
+
+/* ---- state 2: the intro's menu ---- */
+
+/* the menu's choices (title_update starts the mode each asks for after the save check): the first page's 0 (mode 7,
+ * argument 0), 1 (mode 7, argument 4), 2 (the players' page) and 3 (mode 12; no line of its own, the cursor never
+ * reaches it), and the players' page: 2, 3 or 4 players (mode 7, arguments 1-3; choice - 8 controllers needed) */
+enum {
+  TITLE_CHOICE_0 = 0,
+  TITLE_CHOICE_1 = 1,
+  TITLE_CHOICE_PLAYERS = 2, /* opens the players' page (needs two controllers) */
+  TITLE_CHOICE_3 = 3,
+  TITLE_CHOICE_2P = 10,
+  TITLE_CHOICE_3P = 11,
+  TITLE_CHOICE_4P = 12,
+};
+#define TITLE_PORTS 4
+
+/* the sounds of the menu (sound_play_port_sound's sound 5 + n on port n): 0 move, 1 into the players' page, 2 chosen,
+ * 3 refused / back */
+#define TITLE_SOUND_MOVE   0
+#define TITLE_SOUND_PAGE   1
+#define TITLE_SOUND_CHOSEN 2
+#define TITLE_SOUND_BACK   3
+
+/* the logo's push when the cursor moves (the force on its x), as for Start in the logo state */
+static void title_cursor_moved(gaddr scene) { f32_add_to(fneg(F32_AT(TITLE_FLOAT_8)), FIELD(scene, logo.force)); }
+
+/* a choice taken: the save check (state 3) follows */
+static void title_choose(gaddr scene) {
+  sound_play_port_sound(TITLE_SOUND_CHOSEN);
+  title_at(scene)->state = 3;
+}
+
+/* was func_8C01BEF8: state 2 (variant 0's intro): the logo keeps animating, the controllers are counted (ports 0, 1,
+ * ... up to the first one without a controller), up / down move the cursor (wrapping) on the menu's page, A takes
+ * the choice and B leaves the players' page; then the logo is pulled toward the cursor's line. */
+void title_intro(gaddr scene) {
+  TitleScene *t = title_at(scene);
+  title_logo_animate(scene, 0);
+
+  t->controllers = 0;
+  for (int32_t port = 0; port < TITLE_PORTS; port++) {
+    if (!port_has_controller(port))
+      break;
+    t->controllers++;
+  }
+
+  if (t->menu_page == 0) {
+    if (t->up) {
+      sound_play_port_sound(TITLE_SOUND_MOVE);
+      if (--t->choice < 0)
+        t->choice = TITLE_CHOICE_PLAYERS;
+      title_cursor_moved(scene);
+    }
+    if (t->down) {
+      sound_play_port_sound(TITLE_SOUND_MOVE);
+      if (++t->choice > TITLE_CHOICE_PLAYERS)
+        t->choice = TITLE_CHOICE_0;
+      title_cursor_moved(scene);
+    }
+    if (t->a) {
+      switch (t->choice) {
+      case TITLE_CHOICE_0:
+        title_choose(scene);
+        break;
+      case TITLE_CHOICE_PLAYERS:
+        if (t->controllers > 1) {
+          sound_play_port_sound(TITLE_SOUND_PAGE);
+          t->menu_page++;
+          t->choice = TITLE_CHOICE_2P;
+        } else {
+          sound_play_port_sound(TITLE_SOUND_BACK);
+        }
+        break;
+      case TITLE_CHOICE_1:
+        title_choose(scene);
+        break;
+      case TITLE_CHOICE_3:
+        title_choose(scene);
+        break;
+      }
+    }
+  } else if (t->menu_page == 1) {
+    if (t->up) {
+      sound_play_port_sound(TITLE_SOUND_MOVE);
+      if (--t->choice < TITLE_CHOICE_2P)
+        t->choice = TITLE_CHOICE_4P;
+      title_cursor_moved(scene);
+    }
+    if (t->down) {
+      sound_play_port_sound(TITLE_SOUND_MOVE);
+      if (++t->choice > TITLE_CHOICE_4P)
+        t->choice = TITLE_CHOICE_2P;
+      title_cursor_moved(scene);
+    }
+    if (t->a && (t->choice == TITLE_CHOICE_2P || t->choice == TITLE_CHOICE_3P || t->choice == TITLE_CHOICE_4P)) {
+      /* choice - 8 players: refused when fewer controllers are plugged in */
+      if (t->controllers + 8 >= t->choice)
+        title_choose(scene);
+      else
+        sound_play_port_sound(TITLE_SOUND_BACK);
+    }
+    if (t->b) {
+      sound_play_port_sound(TITLE_SOUND_BACK);
+      t->choice = TITLE_CHOICE_PLAYERS;
+      t->menu_page = 0;
+    }
+  }
+
+  /* the logo's goal: the cursor's line. The original's frame (its two saved registers and 0x18 bytes) is kept so
+   * that the point sits where the original's did: on a choice with no line it is not set, and the pull reads what
+   * the stack held there. */
+  gaddr frame = hw_stack_alloc(0x20);
+  gaddr goal = method_self(frame); /* Vec3's empty constructor */
+  switch (t->choice) {
+  case TITLE_CHOICE_0:
+    vec3_set(F32(328.0f), F32(260.0f), F32(0.0f), goal);
+    break;
+  case TITLE_CHOICE_1:
+    vec3_set(F32(328.0f), F32(316.0f), F32(0.0f), goal);
+    break;
+  case TITLE_CHOICE_PLAYERS:
+    vec3_set(F32(328.0f), F32(372.0f), F32(0.0f), goal);
+    break;
+  case TITLE_CHOICE_3: /* off the screen */
+    vec3_set(F32(328.0f), F32(11820.0f), F32(0.0f), goal);
+    break;
+  case TITLE_CHOICE_2P:
+    vec3_set(F32(430.0f), F32(298.0f), F32(0.0f), goal);
+    break;
+  case TITLE_CHOICE_3P:
+    vec3_set(F32(430.0f), F32(341.0f), F32(0.0f), goal);
+    break;
+  case TITLE_CHOICE_4P:
+    vec3_set(F32(430.0f), F32(384.0f), F32(0.0f), goal);
+    break;
+  }
+  body_pull(F32_BITS(0x3DCCCCCCu), FIELD(scene, logo), goal); /* 0.1 */
+  hw_stack_free(0x20);
+  body_step(FIELD(scene, logo));
+}
+HW_EXPORT(8c01bef8, title_intro(ARG0))
 
 /* was func_8C01B858: the buttons (Start, A and B with a 15-frame lock after one of them), the camera bodies pulled
  * toward their goals, then the state: fade in, logo (until the attract time-out: the demo or mode 3, in turn), the

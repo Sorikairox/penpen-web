@@ -53,5 +53,11 @@ int32_t pad_pressed(const Pad *pad, uint32_t buttons);
 int32_t port_held(int32_t port, uint32_t buttons);
 int32_t port_pressed(int32_t port, uint32_t buttons);
 int32_t port_has_controller(int32_t port);
+/* core/pad_analog.c */
+f32 stick_to_unit(int32_t value);
+uint32_t pad_stick_word(gaddr self, int32_t port);
+/* S17 b01: core/pad_axes.c */
+int32_t pad_released(const Pad *pad, uint32_t buttons);
+f32 pad_axis(const Pad *pad, int32_t axis);
 
 #endif

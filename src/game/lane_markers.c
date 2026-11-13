@@ -13,26 +13,8 @@
 #include "../core/inline.h"   /* racer_cell, race_scene_cell_point */
 #include "race_scene.h"       /* race_setup_get, RaceSetup */
 #include "racer.h"
+#include "lane_markers.h"   /* LaneMarker, LaneLook (S17: shared with lane_racer_steer.c) */
 
-/* a marker of a lane quad (0x1C bytes; a list ends with kind -1) */
-typedef struct LaneMarker {
-  int32_t kind;   /* 0x00: 0..20 (the switch below); -1 ends the list */
-  f32 a;          /* 0x04: a value (a priority, a side of the lane, an x, ... by kind) */
-  f32 b;          /* 0x08: a second one */
-  Vec3 position;  /* 0x0C */
-  f32 range;      /* 0x18: a distance the racer's is compared with */
-} LaneMarker;
-HW_OFFSET(LaneMarker, position, 0x0C);
-HW_SIZE(LaneMarker, 0x1C);
-
-/* what the look ahead found (the caller's, r5) */
-typedef struct LaneLook {
-  gaddr marker;   /* 0x00: the LaneMarker */
-  int32_t flag1;  /* 0x04: cleared first; kinds 1 and 7 set it */
-  int32_t flag2;  /* 0x08: cleared first; kinds 8, 17, 19, 20 set it */
-  int32_t closer; /* 0x0C: kind 13: 1 when the point (a, position.y, b) is nearer than the position */
-} LaneLook;
-HW_OFFSET(LaneLook, closer, 0x0C);
 
 #define LOOK_AHEAD_RATE F32_BITS(0x3E999999u) /* 0.29999998: quads looked ahead per unit of f434 */
 #define AHEAD_ENOUGH    F32(0.25f)            /* the marker is in front: dot(direction to it, course direction) */

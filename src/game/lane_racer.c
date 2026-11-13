@@ -34,9 +34,6 @@ static void lane_racer_state5(gaddr self) { CALL1(0x8C03F470u, self); }
 
 /* func_8C0317D4: the Racer's update (after the controls are made) */
 
-/* func_8C03E150 / func_8C03ED24: the computer player's step in racer states 3 and 4 */
-static void lane_racer_state3(gaddr self) { CALL1(0x8C03E150u, self); }
-static void lane_racer_state4(gaddr self) { CALL1(0x8C03ED24u, self); }
 
 /* func_8C0628E8 (C runtime, float): the angle of (y, x) in radians, atan2f by its use */
 static f32 rt_atan2f(f32 y, f32 x) {
@@ -243,8 +240,8 @@ void lane_racer_update(gaddr self) {
   int stepped = 0;
   if (on_lane_mark) {
     switch (r->state) {
-    case 3: lane_racer_state3(self); stepped = 1; break;
-    case 4: lane_racer_state4(self); stepped = 1; break;
+    case 3: lane_racer_drive(self); stepped = 1; break;
+    case 4: lane_racer_steer(self); stepped = 1; break;
     case 5: lane_racer_state5(self); stepped = 1; break;
     default: break;
     }

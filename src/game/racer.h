@@ -286,7 +286,11 @@ typedef struct Racer {
   };
   uint32_t word528;          /* 0x528 */
   gaddr child;               /* 0x52C: a 0x3C-byte child task (func_8C038C1C) */
-  uint32_t word530;          /* 0x530 */
+  union {
+    uint32_t word530;        /* 0x530 */
+    f32 effect_clock;        /* 0x530: S17 r1: f434 is added every update; an effect is emitted (and it is cleared)
+                              * once it passes 5 or 10 (racer_emit_effects) */
+  };
   Vec3 vec534;               /* 0x534 */
   Vec3 vec540;               /* 0x540 */
   uint8_t pad_54c[0x554 - 0x54C];
@@ -450,7 +454,11 @@ typedef struct LaneRacer {
   uint8_t racer[0x58C];      /* 0x000: the Racer part */
   gaddr lanes[4][2];         /* 0x58C: [lane][branch]: the vertex pairs */
   gaddr lane_extra[4][2];    /* 0x5AC: the model set's fourth word */
-  gaddr lane_motion[4][2];   /* 0x5CC */
+  union {
+    gaddr lane_motion[4][2]; /* 0x5CC */
+    gaddr lane_line[4][2];   /* 0x5CC: S17 r1: an f32 per row: where across the row the racing line runs (-0.5 = the
+                              * row's first vertex, 0.5 = its second; lane_racer_steer) */
+  };
   union {
     gaddr lane_texlist[4][2];  /* 0x5EC */
     gaddr lane_markers[4][2];  /* 0x5EC: S16 b05: per quad of the lane a LaneMarker list (-1-terminated) or 0
@@ -465,20 +473,52 @@ typedef struct LaneRacer {
   int32_t prev_lane;         /* 0x630 */
   int32_t quad;              /* 0x634: the quad of the lane the racer is on */
   int32_t prev_quad;         /* 0x638 */
-  int32_t word63c;           /* 0x63C: 0 when the lane changes */
-  int32_t word640;           /* 0x640 */
-  uint8_t pad_644[0x64C - 0x644];
+  union {
+    int32_t word63c;         /* 0x63C: 0 when the lane changes */
+    int32_t manoeuvre;       /* 0x63C: S17 r3: state 3's manoeuvre (lane_racer_drive): 0 racing, 1 working loose
+                              * (stuck), 2 holding back (character 7) */
+  };
+  union {
+    int32_t word640;         /* 0x640 */
+    int32_t holding_back;    /* 0x640: S17 r1: character 7 waits for player 0 (lane_racer_steer) */
+    int32_t manoeuvre_step;  /* 0x640: S17 r3: the manoeuvre's step (racing, character 7: 0 watching, 1 turned
+                              * round, 2 a dash soon, 3 a dash once the stick is near straight) */
+  };
+  union {
+    int32_t hold_timer;      /* 0x644: S17 r1: updates character 7 has raced since it last held back or dashed */
+    int32_t manoeuvre_frames; /* 0x644: S17 r3: updates in the manoeuvre's step (lane_racer_drive) */
+  };
+  uint8_t pad_648[0x64C - 0x648];
   int32_t range_index;       /* 0x64C: the constructor's last argument: a row of the range tables */
   f32 range1_min;            /* 0x650: from the first range table */
   f32 range1_max;            /* 0x654: min + the table's width (+ 10 for the characters 1, 4, 6) */
   f32 range2_min;            /* 0x658: the second table's */
   f32 range2_max;            /* 0x65C */
-  f32 f660;                  /* 0x660 */
-  int32_t word664;           /* 0x664 */
-  int32_t word668;           /* 0x668 */
-  Vec3 reset_position;       /* 0x66C: where the reset put it */
-  f32 f678;                  /* 0x678 */
-  int32_t word67c;           /* 0x67C */
+  union {
+    f32 f660;                /* 0x660 */
+    f32 glide_clock;         /* 0x660: S17 r1: updates the button has stayed released (lane_racer_steer) */
+  };
+  union {
+    int32_t word664;         /* 0x664 */
+    int32_t off_ground_frames; /* 0x664: S17 r1: updates in a row off special ground (0 on it) */
+  };
+  union {
+    int32_t word668;         /* 0x668 */
+    int32_t stuck_frames;    /* 0x668: S17 r3: updates since reset_position was last noted (every 130, while
+                              * mark_b_on; lane_racer_drive) */
+  };
+  Vec3 reset_position;       /* 0x66C: where the reset put it (S17 r3: then where state 3 last noted it, every
+                              * 130 updates while mark_b_on: lane_racer_drive) */
+  union {
+    f32 f678;                /* 0x678 */
+    f32 stroke_clock;        /* 0x678: S17 r1: counted up each update; the button is held from range1_min on, and
+                              * the stroke ends past range1_max (lane_racer_steer) */
+  };
+  union {
+    int32_t word67c;         /* 0x67C */
+    int32_t stroke_frames;   /* 0x67C: S17 r3: state 3: updates left of the strokes (button 0) a marker or the
+                              * ground asked for (lane_racer_drive) */
+  };
   int32_t word680;           /* 0x680 */
   int32_t word684;           /* 0x684 */
   union {
@@ -523,6 +563,18 @@ HW_OFFSET(LaneRacer, pending_kind, 0x688);
 HW_OFFSET(LaneRacer, pending_marker, 0x68C);
 HW_OFFSET(LaneRacer, pending_level, 0x690);
 HW_OFFSET(LaneRacer, second_base_at, 0x6A4);
+HW_OFFSET(Racer, effect_clock, 0x530);
+HW_OFFSET(LaneRacer, lane_line, 0x5CC);
+HW_OFFSET(LaneRacer, holding_back, 0x640);
+HW_OFFSET(LaneRacer, hold_timer, 0x644);
+HW_OFFSET(LaneRacer, glide_clock, 0x660);
+HW_OFFSET(LaneRacer, off_ground_frames, 0x664);
+HW_OFFSET(LaneRacer, stroke_clock, 0x678);
+HW_OFFSET(LaneRacer, manoeuvre, 0x63C);
+HW_OFFSET(LaneRacer, manoeuvre_step, 0x640);
+HW_OFFSET(LaneRacer, manoeuvre_frames, 0x644);
+HW_OFFSET(LaneRacer, stuck_frames, 0x668);
+HW_OFFSET(LaneRacer, stroke_frames, 0x67C);
 #define LANE_RACER_VTABLE 0x8C23DB34u
 static inline LaneRacer *lane_racer_at(gaddr a) { return (LaneRacer *)hw_ptr(a); }
 
@@ -558,6 +610,7 @@ gaddr lane_racer_construct(gaddr self, gaddr scene, uint32_t a, uint32_t b, uint
 void lane_racer_destroy(gaddr self);
 void lane_racer_reset(gaddr self, gaddr position, uint32_t word, f32 value);
 void lane_racer_update(gaddr self);
+void lane_racer_drive(gaddr self); /* S17 r3: game/lane_racer_drive.c */
 int32_t lane_racer_find_quad(gaddr self, gaddr point, int32_t near);
 f32 racer_x_fraction(gaddr racer);
 
@@ -609,5 +662,10 @@ void racer_base_update(gaddr racer);
 /* S15 b04: game/racer_base.c (was func_8C030BF4) */
 #define CHARACTER_PARAMS 0x8C085648u /* CharacterParams[], by character */
 gaddr racer_base_init(gaddr racer, uint32_t index, gaddr unused_b, int32_t character, f32 unused_f, int32_t costume);
+
+/* S17 r1: game/racer_effects_emit.c, game/racer_sounds.c, game/lane_racer_steer.c */
+void racer_emit_effects(gaddr self);
+void racer_play_sounds(gaddr self);
+void lane_racer_steer(gaddr self);
 
 #endif

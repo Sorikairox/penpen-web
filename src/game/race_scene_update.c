@@ -47,7 +47,6 @@ static int32_t setup_variant(gaddr setup) { return (int32_t)field_get(setup, (ui
 static int32_t setup_mode(gaddr setup) { return (int32_t)field_get(setup, (uint32_t)offsetof(RaceSetup, mode)); }
 /* still translated */
 static void race_scene_state1(gaddr scene) { CALL1(0x8C029ED2u, scene); } /* func_8C029ED2 */
-static void race_scene_results(gaddr scene) { CALL1(0x8C029EFAu, scene); } /* func_8C029EFA */
 static void race_scene_ending(gaddr scene) { CALL1(0x8C02AF9Cu, scene); } /* func_8C02AF9C */
 
 /* the end of the countdown: the scene's next music cue, the result sprites reset, then the results */
@@ -98,7 +97,7 @@ void race_scene_update(gaddr scene) {
     break;
   }
   case RACE_STATE_RESULTS_:
-    race_scene_results(scene);
+    race_scene_race_step(scene);
     break;
   case RACE_STATE_ENDING_:
     race_scene_ending(scene);

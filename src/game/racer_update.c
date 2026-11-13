@@ -36,10 +36,6 @@
 static void racer_update_state1(gaddr racer) { CALL1(0x8C032ABCu, racer); }
 /* func_8C034866: state 5's update (still translated) */
 static void racer_update_state5(gaddr racer) { CALL1(0x8C034866u, racer); }
-/* func_8C0351C8: the racer's effects of this update (still translated) */
-static void racer_effects_step(gaddr racer) { CALL1(0x8C0351C8u, racer); }
-/* func_8C035FA2: the racer's second effects step (still translated) */
-static void racer_effects_step2(gaddr racer) { CALL1(0x8C035FA2u, racer); }
 /* SDK pdVibMxStart (0x8C0A115E): start the vibration unit at port with the parameters at param */
 static inline void pdVibMxStart(int32_t port, gaddr param) { CALL2(0x8C0A115Eu, port, param); }
 /* SDK pdVibMxStop (0x8C0A118C): stop the vibration unit at port */
@@ -167,8 +163,8 @@ void racer_base_update(gaddr racer) {
   racer_squash_update(racer);
   motion_player_advance(member_addr(racer, Racer, second_base)); /* the character's MotionPlayer at racer + 0x24 */
   vec3_add(member_addr(racer, Racer, vec534), member_addr(racer, Racer, body.body.position));
-  racer_effects_step(racer);
-  racer_effects_step2(racer);
+  racer_emit_effects(racer);
+  racer_play_sounds(racer);
   racer_watch_backwards(racer);
   racer_pick_variant(racer);
 }
