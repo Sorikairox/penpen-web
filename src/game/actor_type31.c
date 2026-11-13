@@ -225,8 +225,8 @@ HW_OFFSET(HoldFrame, at, 0x0C);
 HW_SIZE(HoldFrame, 0x20);
 
 /* was func_8C05F7B0: hold its player for a step (returns 1), or (the player touched another: 0) pass to that one
- * when its stick is free (phase 11 again for 480 steps, the first let go), else let go. Holding: the Body put at the
- * player's position (its cell found) and the player's stick damped with id + 1 */
+ * when its stick is free (phase 11 again for 480 steps, the first let go), else let go. Holding: its wander centre
+ * (v164) put at the player's position, its cell found from its Body, and the player's stick damped with id + 1 */
 int32_t actor_type31_hold(gaddr obj) {
   ActorType31 *a = type31_at(obj);
   if (player_had_contacts(a->scene, a->player) != 0) {
@@ -245,7 +245,9 @@ int32_t actor_type31_hold(gaddr obj) {
   gaddr frame = hw_stack_alloc(sizeof(HoldFrame));
   gaddr at = member_addr(frame, HoldFrame, at);
   vec3_copy(at, race_player_body(a->scene, a->player)); /* func_8C05EA1C */
-  memmove(&a->body.position, hw_ptr(at), sizeof(Vec3));
+  /* S21: the player's position goes to v164 (the point its wander circles: the original's block copy targets
+     this + 0x164), not to the Body (S18 wrote 0xA4: a synthetic sample with a held player caught it) */
+  memmove(&a->v164, hw_ptr(at), sizeof(Vec3));
   int32_t cell = (int32_t)a->base.cell;
   actor_set_cell(obj, method_self(member_addr(obj, ActorType31, body)), cell);
   player_set_stick_damped(a->scene, a->player, a->id + 1);
