@@ -1,0 +1,155 @@
+# type 0x31 with its items turned (S21's open survivors: on CSD no racer comes near, so the item angles and the
+# actor's b74 / b84 / b94 rest at zero and a dropped rotation shows nothing): the angles set, then place_item for
+# the items that pull others (7, 8) and the ones turned by their own angles (10 and on), and step_items
+job 8c05fa30 8c05fc22 498 1500 10 101 0 400 40
+base /corpus/c8/cup4b/s000569.smp
+base /corpus/c8/cup4b/s000438.smp
+set 8cb1f314 c5000000
+set 8cb1f324 46000000
+set 8cb1f334 c6200000
+set [8cb1f394]+a0 44800000
+set [8cb1f398]+a0 46c00000
+set [8cb1f39c]+a0 45800000
+set [8cb1f394]+b0 46c00000
+set [8cb1f398]+b0 45800000
+set [8cb1f39c]+b0 c5000000
+set [8cb1f394]+c0 45800000
+set [8cb1f398]+c0 c5000000
+set [8cb1f39c]+c0 46000000
+set [8cb1f394]+d0 c5000000
+set [8cb1f398]+d0 46000000
+set [8cb1f39c]+d0 c6200000
+set 8cb20634 c5000000
+set 8cb20644 46000000
+set 8cb20654 c6200000
+set [8cb206b4]+a0 44800000
+set [8cb206b8]+a0 46c00000
+set [8cb206bc]+a0 45800000
+set [8cb206b4]+b0 46c00000
+set [8cb206b8]+b0 45800000
+set [8cb206bc]+b0 c5000000
+set [8cb206b4]+c0 45800000
+set [8cb206b8]+c0 c5000000
+set [8cb206bc]+c0 46000000
+set [8cb206b4]+d0 c5000000
+set [8cb206b8]+d0 46000000
+set [8cb206bc]+d0 c6200000
+set 8cb21954 c5000000
+set 8cb21964 46000000
+set 8cb21974 c6200000
+set [8cb219d4]+a0 44800000
+set [8cb219d8]+a0 46c00000
+set [8cb219dc]+a0 45800000
+set [8cb219d4]+b0 46c00000
+set [8cb219d8]+b0 45800000
+set [8cb219dc]+b0 c5000000
+set [8cb219d4]+c0 45800000
+set [8cb219d8]+c0 c5000000
+set [8cb219dc]+c0 46000000
+set [8cb219d4]+d0 c5000000
+set [8cb219d8]+d0 46000000
+set [8cb219dc]+d0 c6200000
+arg 0 8cb1f2a0 8cb205c0 8cb218e0
+arg 1 7 8 a b c d
+end
+job 8c05fa30 8c05fc22 498 1500 10 102 0 400 40
+base /corpus/c8/cup4b/s000569.smp
+base /corpus/c8/cup4b/s000438.smp
+set 8cb1f314 c5000000
+set 8cb1f324 46000000
+set 8cb1f334 c6200000
+set [8cb1f394]+a0 44800000
+set [8cb1f398]+a0 46c00000
+set [8cb1f39c]+a0 45800000
+set [8cb1f394]+b0 46c00000
+set [8cb1f398]+b0 45800000
+set [8cb1f39c]+b0 c5000000
+set [8cb1f394]+c0 45800000
+set [8cb1f398]+c0 c5000000
+set [8cb1f39c]+c0 46000000
+set [8cb1f394]+d0 c5000000
+set [8cb1f398]+d0 46000000
+set [8cb1f39c]+d0 c6200000
+set 8cb20634 c5000000
+set 8cb20644 46000000
+set 8cb20654 c6200000
+set [8cb206b4]+a0 44800000
+set [8cb206b8]+a0 46c00000
+set [8cb206bc]+a0 45800000
+set [8cb206b4]+b0 46c00000
+set [8cb206b8]+b0 45800000
+set [8cb206bc]+b0 c5000000
+set [8cb206b4]+c0 45800000
+set [8cb206b8]+c0 c5000000
+set [8cb206bc]+c0 46000000
+set [8cb206b4]+d0 c5000000
+set [8cb206b8]+d0 46000000
+set [8cb206bc]+d0 c6200000
+set 8cb21954 c5000000
+set 8cb21964 46000000
+set 8cb21974 c6200000
+set [8cb219d4]+a0 44800000
+set [8cb219d8]+a0 46c00000
+set [8cb219dc]+a0 45800000
+set [8cb219d4]+b0 46c00000
+set [8cb219d8]+b0 45800000
+set [8cb219dc]+b0 c5000000
+set [8cb219d4]+c0 45800000
+set [8cb219d8]+c0 c5000000
+set [8cb219dc]+c0 46000000
+set [8cb219d4]+d0 c5000000
+set [8cb219d8]+d0 46000000
+set [8cb219dc]+d0 c6200000
+arg 0 8cb1f2a0 8cb205c0 8cb218e0
+arg 1 7 8 a b c d
+end
+job 8c05f91c 8c05fa0c 240 1500 10 103 0 400 40
+base /corpus/c8/cup4b/s000569.smp
+base /corpus/c8/cup4b/s000438.smp
+set 8cb1f314 c5000000
+set 8cb1f324 46000000
+set 8cb1f334 c6200000
+set [8cb1f394]+a0 44800000
+set [8cb1f398]+a0 46c00000
+set [8cb1f39c]+a0 45800000
+set [8cb1f394]+b0 46c00000
+set [8cb1f398]+b0 45800000
+set [8cb1f39c]+b0 c5000000
+set [8cb1f394]+c0 45800000
+set [8cb1f398]+c0 c5000000
+set [8cb1f39c]+c0 46000000
+set [8cb1f394]+d0 c5000000
+set [8cb1f398]+d0 46000000
+set [8cb1f39c]+d0 c6200000
+set 8cb20634 c5000000
+set 8cb20644 46000000
+set 8cb20654 c6200000
+set [8cb206b4]+a0 44800000
+set [8cb206b8]+a0 46c00000
+set [8cb206bc]+a0 45800000
+set [8cb206b4]+b0 46c00000
+set [8cb206b8]+b0 45800000
+set [8cb206bc]+b0 c5000000
+set [8cb206b4]+c0 45800000
+set [8cb206b8]+c0 c5000000
+set [8cb206bc]+c0 46000000
+set [8cb206b4]+d0 c5000000
+set [8cb206b8]+d0 46000000
+set [8cb206bc]+d0 c6200000
+set 8cb21954 c5000000
+set 8cb21964 46000000
+set 8cb21974 c6200000
+set [8cb219d4]+a0 44800000
+set [8cb219d8]+a0 46c00000
+set [8cb219dc]+a0 45800000
+set [8cb219d4]+b0 46c00000
+set [8cb219d8]+b0 45800000
+set [8cb219dc]+b0 c5000000
+set [8cb219d4]+c0 45800000
+set [8cb219d8]+c0 c5000000
+set [8cb219dc]+c0 46000000
+set [8cb219d4]+d0 c5000000
+set [8cb219d8]+d0 46000000
+set [8cb219dc]+d0 c6200000
+arg 0 8cb1f2a0 8cb205c0 8cb218e0
+end
