@@ -124,14 +124,26 @@ void hwt_hle_wrote(uint32_t addr, uint32_t len) {
   if (!hwt_recording || rt_hle_depth != rec_depth + 1) return; /* only the sampled call's own HLE calls */
   uint32_t off = addr & 0xFFFFFFu;
   if (((addr >> 24) & 0x1Fu) != 0x0Cu) return; /* not main RAM (the sandboxes compare main RAM only) */
+  /* S17: an out-parameter in the caller's frame: kept as a stack word (relative to r15 at the call), even when the
+     value written is the one already there (the frame diff of hwt_record_hle misses those; a replay side whose
+     frame sits elsewhere would read its own stale word) */
+  if (off >= STK_AREA_LO && off + len <= STK_AREA_HI && (stk_r15 & 0xFFFFFFu) <= off) {
+    for (uint32_t o = off & ~3u; o < off + len && stk_n < STK_MAX; o += 4) {
+      uint32_t w; memcpy(&w, sh4_ram + o, 4);
+      stk[stk_n][0] = o - (stk_r15 & 0xFFFFFFu); stk[stk_n][1] = w; stk_n++;
+    }
+    return;
+  }
   if (off + len > (16u << 20) || memrec_n >= MEMREC_MAX || mempool_n + len > MEMPOOL_MAX) { mem_lost++; return; }
   memrec[memrec_n].addr = off; memrec[memrec_n].len = len; memrec[memrec_n].pool = mempool_n;
   memcpy(mempool + mempool_n, sh4_ram + off, len);
   mempool_n += len; memrec_n++;
 }
+static uint32_t stk_call_first;
 void hwt_before_hle(SH4 *c) {
   if (rt_hle_depth != rec_depth) return;
   mem_call_first = memrec_n;
+  stk_call_first = stk_n;
   stk_r15 = c->r[15];
   memcpy(stk_before, sh4_ram + STK_AREA_LO, sizeof stk_before);
 }
@@ -141,7 +153,7 @@ void hwt_record_hle(SH4 *c, uint32_t a) {
     hle_rec *r = &rec[rec_n];
     r->t = a; r->r0 = c->r[0]; r->f0 = c->fr.u[0]; r->f1 = c->fr.u[1];
     r->args = hle_arg_mask;
-    r->stk_first = stk_n; r->stk_n = 0;
+    r->stk_first = stk_call_first; r->stk_n = stk_n - stk_call_first; /* S17: the words hwt_hle_wrote kept first */
     r->mem_first = mem_call_first; r->mem_n = memrec_n - mem_call_first;
     uint32_t live_lo = (stk_r15 & 0xFFFFFFu) > STK_AREA_LO ? (stk_r15 & 0xFFFFFCu) : STK_AREA_LO;
     if (memcmp(stk_before + (live_lo - STK_AREA_LO), sh4_ram + live_lo, STK_AREA_HI - live_lo))
@@ -791,6 +803,7 @@ int hwt_synth_live;
 typedef struct { int base; uint32_t a[4], f[4]; int np; uint32_t pa[SY_POKES], pv[SY_POKES]; } sy_input;
 static struct {
   uint32_t fn, end, insn, iters, keep, seed, steps, stale, secs; /* S17: stale / secs: 0 = 600 / 20 */
+  int diverse;                     /* `diverse N`: keep up to N passing inputs even without new code (values for arithmetic) */
   int nopoke;                      /* `nopoke`: the arguments only (the objects they point to stay as the base has them) */
   int nbase;
   char base[SY_BASES][512];
@@ -1137,7 +1150,7 @@ static void sy_job(void) {
     rets++;
     int fresh = 0;
     for (uint32_t i = 0; i < nh; i++) if (sy_cov_it[i] && !sy_cov[i]) fresh++;
-    if (!fresh) continue;
+    if (!fresh && !(sj.diverse && (int)kept < sj.diverse && sy_rnd() % 4 == 0)) continue;
     /* new code of the original ran: judge this input like a live sample */
     sy_apply(&in, buf_s, &snap);
     cur->why[0] = 0;
@@ -1220,15 +1233,17 @@ int hwt_synth(const char *spec) {
       if (n > 8) sj.stale = (uint32_t)strtoul(tok[8], 0, 10);
       if (n > 9) sj.secs = (uint32_t)strtoul(tok[9], 0, 10);
       sj.fn = RT_NORM(sj.fn); sj.end = RT_NORM(sj.end);
+    } else if (!strcmp(tok[0], "diverse") && n == 2) {
+      sj.diverse = atoi(tok[1]);
     } else if (!strcmp(tok[0], "nopoke")) {
       sj.nopoke = 1;
     } else if (!strcmp(tok[0], "hw")) {
       hwt_synth_hw = 1;
     } else if (!strcmp(tok[0], "base") && n == 2 && sj.nbase < SY_BASES) {
       snprintf(sj.base[sj.nbase++], sizeof sj.base[0], "%s", tok[1]);
-    } else if (!strcmp(tok[0], "pre") && n == 6 && sj.npre < SY_PRE) {
+    } else if (!strcmp(tok[0], "pre") && n >= 2 && n <= 6 && sj.npre < SY_PRE) {
       sj.pre[sj.npre][0] = (uint32_t)strtoul(tok[1], 0, 16);
-      for (int i = 0; i < 4; i++) snprintf(sy_pretext[sj.npre][i], 24, "%s", tok[2 + i]);
+      for (int i = 0; i < 4; i++) snprintf(sy_pretext[sj.npre][i], 24, "%s", 2 + i < n ? tok[2 + i] : "0"); /* missing: 0 */
       sj.npre++;
     } else if (!strcmp(tok[0], "arg") && n >= 3) {
       int i = atoi(tok[1]) & 3;

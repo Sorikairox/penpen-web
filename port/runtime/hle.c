@@ -557,7 +557,7 @@ static void vblank(SH4 *c) {
   R(0) = 0;
 }
 static void h_syBtExit(SH4 *c) { logcall(c, ""); rt_stop("the game asked to exit to the BIOS"); }
-static void h_syCfgGetSoundMode(SH4 *c) { logcall(c, ""); if (R(4)) wr32(R(4), 0); R(0) = 0; }
+static void h_syCfgGetSoundMode(SH4 *c) { logcall(c, ""); if (R(4)) { wr32(R(4), 0); hwt_hle_wrote(R(4), 4); } R(0) = 0; } /* S17: the out-parameter reported (difftest) */
 
 static const struct { const char *name; hle_fn fn; } impl[] = {
   {"gdFsInit", h_gdFsInit}, {"gdFsOpen", h_gdFsOpen}, {"gdFsGetFileSize", h_gdFsGetFileSize},
