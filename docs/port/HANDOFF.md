@@ -2,6 +2,40 @@
 
 Newest session first. Read `docs/port/PLAN.md` (disc facts, survey, approach, phases, rules) before working.
 
+## S22 — 2026-11-14: the motion reader as C, the owner scene routed, a deterministic draw HLE, types 0x30 / 0x32 drawn
+
+All guest code ran in `--network none --read-only --cap-drop ALL --security-opt no-new-privileges --tmpfs /tmp`
+containers; `git log --all -- port/gen` stays empty; corpora only in the volume `penpen-corpus` (new: `/corpus/c9`
+owner / owner_nested / owner_setup / csd30 / csd30_nested, `/corpus/syn/s22*`). Design and numbers: `docs/port/DECOMP.md` 23.
+
+1. **nj_MotionSetup / StepA / B / C / End are C** (`src/lib/ninja/motion.c`, 23.1; HLE stubs before): the reader's
+   state, the binary key search, the linear and Catmull-Rom interpolators of the step tables; on the hle.c guest list
+   (the original runs on the difftest's side A and in the pure build). **ninjatest motion: 200 000 cases, 2 206 814
+   calls, 0 differ.** The pure translation now keeps a function a call runs on into (the interpolators' split parts);
+   genlib's C-root scan skips the reader's stored entries: **0 translated functions** in genlib.
+2. **The owner-scene hang was a poke artefact** (23.2): with no race run the set-up's penguin slots are -1, the model
+   name is read before its table and the loader retries the missing file for ever (**the pure build too**). Route
+   **owner** pokes the slots and characters as well: construct / init pass inside race_setup_update's sample, the draw
+   25 samples pass.
+3. **The draw HLE's powf / sinf / cosf are our own code** (`port/render/det_math.h`, 23.3): **native = wasm for both
+   digests on all 21 routes**, pure and hand (boot's frames 3998 / 4102 agree).
+4. **Types 0x30 / 0x32** (23.4): only CSD / CSD3 place them (6 + 11, cells 200-203: built on cup4b, never seen).
+   Synthetic draws and posed nodes pass (s22t30*, s22t32); route **csd30** moves one type 0x30 actor in front of the
+   start: woken, drawn with its motion keys, pure = genlib, 18 live draw samples; screenshots look right (the actor
+   rises with its parts posed, puffs beside it).
+5. **Mutants** (23.5): the S22 files **1 670 mutants, 1 384 killed, 49 equivalent, 104 unreached, 133 survived (each
+   with a reason): 85.4 %, reach 91.2 %** (motion.c: 41 of its 42 survivors killed by ninjatest outside Mull); cheap
+   kills: type 0x31 open 49 -> 27, the owner draw 50 -> 11; combined **24 318 mutants, 18 369 killed: 76.2 %, reach
+   91.3 %** (S21 74.5 %).
+
+Tests (end of S22): pure vs genlib **21 / 21 native and wasm, both digests; native = wasm everywhere**; difftest (20
+routes) **72 151 samples, 0 FAIL**, csd30 **2 033, 0 FAIL**; replay c8 + c9 + syn **17 945, 0 FAIL, 37 excluded**; sh4
+257 / 0; fpu 9 249 782 / 0; mixer 26 / 0; ninjatest motion 200 000 / 0; rtw build (1 274 540 bytes) + check OK; e2e
+done, **58.8 game frames/s** in the race; screenshots right.
+
+Not verified: genhand compares after the last translation change; the synthetic jobs' first-job failure cause
+(self-check, not traced); csd30 is a poked state; the owner scene on other courses / variants. Next: DECOMP 23.6.
+
 ## S21 — 2026-11-14: a draw-list digest, the stale samples proven, genlib as the module, samples for what had none
 
 All guest code ran in `--network none --read-only --cap-drop ALL --security-opt no-new-privileges --tmpfs /tmp`
