@@ -16,6 +16,10 @@
 #define FOG_MANTISSA_BITS 7
 
 
+/* an entry of the table: the table may be RAM or the PowerVR's own fog table (its registers): through the I/O
+ * model, as the original's stores */
+static void table_set(gaddr table, int32_t i, f32 v) { hw_write32(table + 4u * (uint32_t)i, f32_bits(v)); }
+
 /* the depth of fog table entry i, as the generator computes it */
 static f32 fog_depth(int32_t i) {
   f32 scale = f32_from_int(1 << (i >> 4));
@@ -26,7 +30,6 @@ static f32 fog_depth(int32_t i) {
 /* was func_8C0C6CF0 (njGenerateFogTable3): builds the fog table at `table` (128 floats) for the planes n and f
  * (negative, view space looks down -z) and sets the fog density register from f */
 void nj_generate_fog_table3(gaddr table, f32 n, f32 f) {
-  f32 *t = (f32 *)hw_ptr(table);
   f32 neg_f = fneg(f);
   uint32_t density;
 
@@ -62,7 +65,7 @@ void nj_generate_fog_table3(gaddr table, f32 n, f32 f) {
     /* the near plane is within the first 1/256 of the far one: each entry is 1 / its depth */
     for (int32_t i = 0; i < FOG_TABLE_N; i++) {
       int32_t depth16 = (16 + (i & 15)) * (1 << (i >> 4)); /* 16 * the depth, an integer */
-      t[i] = fdiv(F32(1.0f), fdiv(f32_from_int(depth16), F32(16.0f)));
+      table_set(table, i, fdiv(F32(1.0f), fdiv(f32_from_int(depth16), F32(16.0f))));
     }
     return;
   }
@@ -74,10 +77,10 @@ void nj_generate_fog_table3(gaddr table, f32 n, f32 f) {
   f32 span = fsub(fneg(fdiv(neg_f, fog_depth(count))), f);
   for (int32_t i = 0; i < count; i++) {
     f32 z = fdiv(neg_f, fog_depth(i));
-    t[i] = fsub(F32(1.0f), fdiv(fsub(neg_f, z), span));
+    table_set(table, i, fsub(F32(1.0f), fdiv(fsub(neg_f, z), span)));
   }
   /* ... and the rest are 0 */
-  for (gaddr p = table + (uint32_t)count * 4u; p < table + FOG_TABLE_BYTES; p += 4) F32_AT(p) = F32(0.0f);
+  for (int32_t i = count; i < FOG_TABLE_N; i++) table_set(table, i, F32(0.0f));
 }
 HW_EXPORT(8c0c6cf0, nj_generate_fog_table3(ARG0, FARG0, FARG1))
 

@@ -31,7 +31,8 @@ LINE = re.compile(r'^(hw |rt crash|boot stop)[ -~]*$')
 # the bases: (route, frame): the first corpus sample of c5 at or after the frame
 BASES = [('boot', 600), ('route', 1300), ('route', 1750), ('route', 3000), ('vs4', 3000), ('cup3', 2700),
          ('explore', 3700), ('goodnight', 1500)]
-CORPUS = os.environ.get('SYNTH_CORPUS', '/corpus/c5')  # S19: SYNTH_CORPUS=/corpus/c6 (the 19 routes)
+CORPUS = os.environ.get('SYNTH_CORPUS', '/corpus/c5')
+BIN = os.environ.get('SYNTH_BIN', '/build/native-genhand/penpen')  # S20: another build of the hand build  # S19: SYNTH_CORPUS=/corpus/c6 (the 19 routes)
 # S17: a job's end: inputs in a row without new code (after the first kept), seconds (--deep: 4000 / 90)
 STALE, SECS = 600, 20
 
@@ -198,8 +199,8 @@ def run(name, funcs, iters=400, keep=8, par=2, extra=None, bases=None):
             cmd = BOX[:]
             for v in ['penpen-corpus:/corpus:rw', 'penpen-disc:/disc:ro', 'penpen-build:/build:ro', WORK + ':/work:ro']:
                 cmd += ['-v', v]
-            cmd += [IMG, 'sh', '-c', 'rm -rf %s; /build/native-genhand/penpen --disc /disc --verbose 0 --frame-log 0 '
-                    '--hwcorpus %s:16 --hwsynth /work/%s' % (d, d, os.path.basename(spec))]
+            cmd += [IMG, 'sh', '-c', 'rm -rf %s; %s --disc /disc --verbose 0 --frame-log 0 '
+                    '--hwcorpus %s:16 --hwsynth /work/%s' % (d, BIN, d, os.path.basename(spec))]
             out = []
             # streamed: a stopped run keeps what it printed (NAME_k.part)
             with subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, errors='replace') as p, \

@@ -40,8 +40,11 @@ HW_OFFSET(G2Dma, fifo_write_drains, 0x110);
 #define G2_FIELD(f) (g_g2_dma + offsetof(G2Dma, f))
 static uint32_t dma_read(gaddr field) { return hw_read32(field); }
 static void dma_write(gaddr field, uint32_t v) { hw_write32(field, v); }
+/* a channel's register: its index read first, then the block's register pointer (the original's order: the reads
+ * of hardware are replayed in order by the difftest) */
 static gaddr channel_reg(gaddr channel, uint32_t reg) {
-  return dma_read(G2_FIELD(regs)) + dma_read(channel + offsetof(G2DmaChannel, index)) * 0x20u + reg;
+  uint32_t index = dma_read(channel + offsetof(G2DmaChannel, index));
+  return dma_read(G2_FIELD(regs)) + index * 0x20u + reg;
 }
 
 /* was func_8C065538: whether a DMA channel is enabled (*enabled = its enable register's bit 0); returns 0 */

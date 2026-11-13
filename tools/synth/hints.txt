@@ -4203,72 +4203,72 @@ for 8c05b4b4
 # 3-float vector (or 16-float block), angles in Ninja units (0x10000 = one turn).
 for 8c0c3168
 # njCalcPoint(m, src, dst): m 0 = XMTRX
-arg 0 0 M
+arg 0 0 8c200000
 for 8c0c31c4
 # njCalcVector(m, src, dst); the normalise branch follows g 0x8C1EFD30 (njInitMatrix's third argument)
-arg 0 0 M
+arg 0 0 8c200000
 for 8c0c3d90
 # njPushMatrix(m): 0 copies XMTRX into the new top slot; a full stack (depth >= size) returns 0
-arg 0 0 M
+arg 0 0 8c200000
 for 8c0c3d4c
 # njPopMatrix(n): refused only when depth - n == 0 (unsigned compare)
 arg 0 0 1 2 3
 for 8c0c3328
 # njInvertMatrix(m): a singular matrix (all zero) takes the fill branch
-arg 0 0 M
+arg 0 0 8c200000
 for 8c10c750
 # njInvertMatrix's determinant helper (m 0 = XMTRX)
-arg 0 0 M
+arg 0 0 8c200000
 for 8c0c3b30
 # njMultiMatrix(m, m2)
-arg 0 0 M
+arg 0 0 8c200000
 for 8c0c3fe8
 # njRotateX(m, angle)
-arg 0 0 M
+arg 0 0 8c200000
 arg 1 0 4000 8000 c000 10000 ffffc000 12345
 for 8c0c407c
-arg 0 0 M
+arg 0 0 8c200000
 arg 1 0 4000 8000 c000 10000 ffffc000 12345
 for 8c0c42ec
-arg 0 0 M
+arg 0 0 8c200000
 arg 1 0 4000 8000 c000 10000 ffffc000 12345
 for 8c0c3e14
 # njRotateXYZ(m, x, y, z): each zero angle skips its rotation
-arg 0 0 M
+arg 0 0 8c200000
 arg 1 0 4000 8000 c000 10000 ffffc000 12345
 arg 2 0 4000 8000 c000 10000 ffffc000 12345
 arg 3 0 4000 8000 c000 10000 ffffc000 12345
 for 8c0c4118
 # njRotateZXY(m, x, y, z)
-arg 0 0 M
+arg 0 0 8c200000
 arg 1 0 4000 8000 c000 10000 ffffc000 12345
 arg 2 0 4000 8000 c000 10000 ffffc000 12345
 arg 3 0 4000 8000 c000 10000 ffffc000 12345
 for 8c0c4388
 # njRotate(m, axis vector, angle): axes with zero y / z / x components reach the sign branches
-arg 0 0 M
+arg 0 0 8c200000
 arg 2 0 4000 8000 c000 10000 ffffc000 12345
 for 8c0c47bc
 # njScale(m, x, y, z)
-arg 0 0 M
+arg 0 0 8c200000
 farg 0 0.5 1 -2
 farg 1 0.5 1 -2
 farg 2 0.5 1 -2
 for 8c0c470c
-arg 0 0 M
+arg 0 0 8c200000
 for 8c0c4978
 # njTranslate(m, x, y, z)
-arg 0 0 M
+arg 0 0 8c200000
 farg 0 0 1 -10
 farg 1 0 1 -10
 farg 2 0 1 -10
 for 8c0c4904
-arg 0 0 M
+arg 0 0 8c200000
 for 8c0c4890
 # njSetMatrix(m, src)
-arg 0 0 M
+arg 0 0 8c200000
 for 8c0c49e0
-arg 0 0 M
+arg 0 0 8c200000
 for 8c0c4bc4
 # njSin(angle): Ninja angle units, only the low 16 bits count
 arg 0 0 4000 8000 c000 10000 -4000 12345 2aaa
@@ -4291,14 +4291,14 @@ farg 0 0 1.5 -2.75 0.25 1000000 -0.5
 
 for 8c0c4a80
 # Bezier: r4 = 12 floats (4 points), r5 = 3-float output (both: a RAM matrix scratch), fr4 = t
-arg 0 M
-arg 1 M
+arg 0 8c200000
+arg 1 8c200000
 farg 0 0 0.25 0.5 0.75 1
 
 for 8c0c4b28
 # Hermite: r4 = 12 floats (P0, P1, T0, T1), r5 = 3-float output, fr4 = t
-arg 0 M
-arg 1 M
+arg 0 8c200000
+arg 1 8c200000
 farg 0 0 0.25 0.5 0.75 1
 
 for 8c0c6cf0
@@ -4314,25 +4314,25 @@ farg 1 -100 -60000 -70000 -0.5 0
 
 for 8c0cf4ac
 # njInitView(view): r4 = a 64-byte NJS_VIEW
-arg 0 M
+arg 0 8c200000
 
 for 8c0cf4ec
 # njSetView(view): r4 = a 64-byte NJS_VIEW (best initialised by the original njInitView 8c0cf4ac, then fields poked:
 # vx/vy/vz with vx = vz = 0 reaches the "vertical direction" skip; vy < 0 and vx < 0 the angle-sign branches)
-arg 0 M
+arg 0 8c200000
 
 for 8c0d1a10
 # nj_InitCamera(camera): r4 needs a 0x78-byte scratch (larger than a matrix)
-arg 0 M
+arg 0 8c200000
 
 for 8c0d1a94
 # nj_SetCamera(camera): r4 = a 0x78-byte camera (initialised by the original 8c0d1a10, then position / direction /
 # roll poked); writes g_nj_camera and resets the matrix stack
-arg 0 M
+arg 0 8c200000
 
 for 8c0a4540
 # njSetTexture(texlist): 0 returns -1 without storing
-arg 0 0 M
+arg 0 0 8c200000
 
 for 8c0a4488
 # njInitTextureBuffer(buffer, size): size rounded down to 2 KB
@@ -4340,14 +4340,14 @@ arg 1 0 7ff 800 1c0000 1c07ff
 
 for 8c0a1264
 # nj_MemCopy4(dst, src, words): words 0 would copy 2^32 words (never pass it)
-arg 0 M
-arg 1 M
+arg 0 8c200000
+arg 1 8c200000
 arg 2 1 2 4 10
 
 for 8c0a1284
 # byte copy(dst, src, bytes): bytes 0 would copy 2^32 bytes (never pass it)
-arg 0 M
-arg 1 M
+arg 0 8c200000
+arg 1 8c200000
 arg 2 1 3 4 40
 
 for 8c0cf76a
@@ -4475,3 +4475,41 @@ arg 2 1 2 4 3
 arg 3 0 1 2 9 11
 stk 0 0 1 2
 stk 1 0 1 2
+
+# S20: the jobs whose code touches hardware registers (G2, Holly) or SR: `hw` lets the synthetic sample through
+for 8c062b70
+hw
+for 8c062e80
+hw
+for 8c0639e4
+hw
+for 8c063c58
+hw
+for 8c063cd4
+hw
+for 8c063d18
+hw
+for 8c064bf8
+hw
+for 8c064c9c
+hw
+for 8c065538
+hw
+for 8c064be4
+hw
+for 8c064d84
+hw
+for 8c11d138
+hw
+for 8c141ac4
+hw
+for 8c09cc20
+hw
+for 8c09cc92
+hw
+for 8c09cdf6
+hw
+for 8c09cd78
+hw
+for 8c0c6cf0
+hw
