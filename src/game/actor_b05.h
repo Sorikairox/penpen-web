@@ -25,12 +25,35 @@ HW_OFFSET(ActorType00, contacts, 0x64);
 HW_OFFSET(ActorType00, second_vtable, 0xBC);
 HW_SIZE(ActorType00, 0xC0);
 
-/* placement type 0x1B (constructor func_8C04928A, 0x90 bytes; its destructor body is empty) */
+/* placement type 0x1B (constructor func_8C04928A, 0x90 bytes; its destructor body is empty). S20 W3: the same
+ * layout as type 0x1C (ActorType1C, game/actor.h): a model of the group file's model set with one of its motions
+ * (its init func_8C049308, game/actor_type1b_init.c) */
 typedef struct ActorType1B {
   Actor base;               /* 0x00 */
-  uint8_t pad_28[0x8C - 0x28];
+  uint8_t pad_28[0x2C - 0x28];
+  int32_t kind;             /* 0x2C: S20 W3: the placement's param bits 8-11: which model of the model set */
+  uint8_t pad_30[0x34 - 0x30];
+  int32_t motion;           /* 0x34: S20 W3: the entry of the motion table (the param's bits 0-3) */
+  f32 frame;                /* 0x38: S20 W3: the motion's frame (0 at init) */
+  f32 last_frame;           /* 0x3C: S20 W3: the motion's frame count - 1 (when the entry has a motion) */
+  uint8_t pad_40[0x48 - 0x40];
+  Vec3 angle;               /* 0x48: S20 W3: the placement's angle */
+  gaddr object;             /* 0x54: S20 W3: NJS_OBJECT (the kind's model of the model set) */
+  gaddr texlist;            /* 0x58: S20 W3 */
+  gaddr motions;            /* 0x5C: S20 W3: MotionEntry table */
+  uint8_t pad_60[0x80 - 0x60];
+  Vec3 position;            /* 0x80: S20 W3: the placement's position */
   gaddr second_vtable;      /* 0x8C */
 } ActorType1B;
+HW_OFFSET(ActorType1B, kind, 0x2C);
+HW_OFFSET(ActorType1B, motion, 0x34);
+HW_OFFSET(ActorType1B, frame, 0x38);
+HW_OFFSET(ActorType1B, last_frame, 0x3C);
+HW_OFFSET(ActorType1B, angle, 0x48);
+HW_OFFSET(ActorType1B, object, 0x54);
+HW_OFFSET(ActorType1B, texlist, 0x58);
+HW_OFFSET(ActorType1B, motions, 0x5C);
+HW_OFFSET(ActorType1B, position, 0x80);
 HW_OFFSET(ActorType1B, second_vtable, 0x8C);
 HW_SIZE(ActorType1B, 0x90);
 

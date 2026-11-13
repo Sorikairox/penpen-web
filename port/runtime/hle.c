@@ -518,6 +518,27 @@ static void frame_log_line(void) {
   char d[20] = "-";
   if (hle_digest_every > 0 && frame % (uint32_t)hle_digest_every == 0) {
     uint64_t h = ram_digest();
+    { /* S20: PENPEN_DIGEST_MAP=FRAME:LO:HI:STEP (hex addresses, step in bytes): a digest per block of that range
+         at that frame (stack area left out as above), to find where two builds' RAM differs (hashes only) */
+      const char *m = getenv("PENPEN_DIGEST_MAP");
+      char *e;
+      if (m && strtoul(m, &e, 10) == frame && *e == ':') {
+        uint32_t lo = (uint32_t)strtoul(e + 1, &e, 16) & 0xFFFFFF, hi = (uint32_t)strtoul(e + 1, &e, 16) & 0xFFFFFF;
+        uint32_t step = (uint32_t)strtoul(e + 1, 0, 10);
+        for (uint32_t b = lo; step && b < hi && b < (16u << 20); b += step) {
+          uint64_t g = 0x9E3779B97F4A7C15ull, v;
+          for (uint32_t i = b; i < b + step && i < (16u << 20); i += 8) {
+            if (i >= (STACK_AREA_LO & 0xFFFFFF) && i < (STACK_AREA_HI & 0xFFFFFF)) continue;
+            uint32_t w[2];
+            memcpy(w, sh4_ram + i, 8);
+            w[0] = stack_token(w[0]); w[1] = stack_token(w[1]);
+            memcpy(&v, w, 8);
+            g ^= v; g *= 0x100000001B3ull; g ^= g >> 29;
+          }
+          rt_log("rt dmap %08x %08x%08x", 0x8C000000u | b, (uint32_t)(g >> 32), (uint32_t)g);
+        }
+      }
+    }
     for (int i = 0; i < 16; i++) d[i] = "0123456789abcdef"[(h >> (60 - 4 * i)) & 15];
     d[16] = 0;
   }

@@ -4197,3 +4197,266 @@ for 8c057810
 
 for 8c05b4b4
 # this = Ornament (type 0x14, constructor func_8C05B194, 0x10C bytes); style (0x2C) 0..4 picks the path (5+ = none); subkind (0x30) 0 or not; word3c (0x3C) 0..3 and word38 (0x38) around 0x95 for style 3; style 0 needs base.models[model] (0x20, 0x34) with a child that has a sibling; style 3 needs base.scene a RaceScene
+
+# ---- S20: the library C (src/lib: batches N1 / N2, the lead) and the gap functions (W3) ----
+# N1 (Ninja matrix / vector). M = a RAM matrix (the lead substitutes a scratch matrix address), V = a scratch
+# 3-float vector (or 16-float block), angles in Ninja units (0x10000 = one turn).
+for 8c0c3168
+# njCalcPoint(m, src, dst): m 0 = XMTRX
+arg 0 0 M
+for 8c0c31c4
+# njCalcVector(m, src, dst); the normalise branch follows g 0x8C1EFD30 (njInitMatrix's third argument)
+arg 0 0 M
+for 8c0c3d90
+# njPushMatrix(m): 0 copies XMTRX into the new top slot; a full stack (depth >= size) returns 0
+arg 0 0 M
+for 8c0c3d4c
+# njPopMatrix(n): refused only when depth - n == 0 (unsigned compare)
+arg 0 0 1 2 3
+for 8c0c3328
+# njInvertMatrix(m): a singular matrix (all zero) takes the fill branch
+arg 0 0 M
+for 8c10c750
+# njInvertMatrix's determinant helper (m 0 = XMTRX)
+arg 0 0 M
+for 8c0c3b30
+# njMultiMatrix(m, m2)
+arg 0 0 M
+for 8c0c3fe8
+# njRotateX(m, angle)
+arg 0 0 M
+arg 1 0 4000 8000 c000 10000 ffffc000 12345
+for 8c0c407c
+arg 0 0 M
+arg 1 0 4000 8000 c000 10000 ffffc000 12345
+for 8c0c42ec
+arg 0 0 M
+arg 1 0 4000 8000 c000 10000 ffffc000 12345
+for 8c0c3e14
+# njRotateXYZ(m, x, y, z): each zero angle skips its rotation
+arg 0 0 M
+arg 1 0 4000 8000 c000 10000 ffffc000 12345
+arg 2 0 4000 8000 c000 10000 ffffc000 12345
+arg 3 0 4000 8000 c000 10000 ffffc000 12345
+for 8c0c4118
+# njRotateZXY(m, x, y, z)
+arg 0 0 M
+arg 1 0 4000 8000 c000 10000 ffffc000 12345
+arg 2 0 4000 8000 c000 10000 ffffc000 12345
+arg 3 0 4000 8000 c000 10000 ffffc000 12345
+for 8c0c4388
+# njRotate(m, axis vector, angle): axes with zero y / z / x components reach the sign branches
+arg 0 0 M
+arg 2 0 4000 8000 c000 10000 ffffc000 12345
+for 8c0c47bc
+# njScale(m, x, y, z)
+arg 0 0 M
+farg 0 0.5 1 -2
+farg 1 0.5 1 -2
+farg 2 0.5 1 -2
+for 8c0c470c
+arg 0 0 M
+for 8c0c4978
+# njTranslate(m, x, y, z)
+arg 0 0 M
+farg 0 0 1 -10
+farg 1 0 1 -10
+farg 2 0 1 -10
+for 8c0c4904
+arg 0 0 M
+for 8c0c4890
+# njSetMatrix(m, src)
+arg 0 0 M
+for 8c0c49e0
+arg 0 0 M
+for 8c0c4bc4
+# njSin(angle): Ninja angle units, only the low 16 bits count
+arg 0 0 4000 8000 c000 10000 -4000 12345 2aaa
+
+for 8c0c4a70
+# njCos(angle)
+arg 0 0 4000 8000 c000 10000 -4000 12345 2aaa
+
+for 8c0c4c00
+# njTan(angle): 4000 / c000 divide by a zero cosine
+arg 0 0 4000 8000 c000 10000 -4000 12345 1555
+
+for 8c0c4bd0
+# njSqrt(x): negative x takes the -sqrt(|x|) branch
+farg 0 0 1 2 0.5 -4 -0.25 100
+
+for 8c0c4b14
+# census njRandom = modff(fr4) thunk (fraction returned, whole part to a scratch word)
+farg 0 0 1.5 -2.75 0.25 1000000 -0.5
+
+for 8c0c4a80
+# Bezier: r4 = 12 floats (4 points), r5 = 3-float output (both: a RAM matrix scratch), fr4 = t
+arg 0 M
+arg 1 M
+farg 0 0 0.25 0.5 0.75 1
+
+for 8c0c4b28
+# Hermite: r4 = 12 floats (P0, P1, T0, T1), r5 = 3-float output, fr4 = t
+arg 0 M
+arg 1 M
+farg 0 0 0.25 0.5 0.75 1
+
+for 8c0c6cf0
+# njGenerateFogTable3(table, fr4 = near, fr5 = far): r4 needs a 0x200-byte scratch (128 floats), NOT a 64-byte matrix.
+# near < -65535 takes the fixed-density path; -near <= -far/256 the 1/depth path; otherwise the linear fade
+farg 0 -1 -10 -100 -70000 0
+farg 1 -1000 -60000 -500 -100 -1
+
+for 8c0d19cc
+# census njSetAspect = njClipZ(fr4 = near, fr5 = far): clamps to [-65535, -1]
+farg 0 -0.5 -1 -10 -70000 0 5
+farg 1 -100 -60000 -70000 -0.5 0
+
+for 8c0cf4ac
+# njInitView(view): r4 = a 64-byte NJS_VIEW
+arg 0 M
+
+for 8c0cf4ec
+# njSetView(view): r4 = a 64-byte NJS_VIEW (best initialised by the original njInitView 8c0cf4ac, then fields poked:
+# vx/vy/vz with vx = vz = 0 reaches the "vertical direction" skip; vy < 0 and vx < 0 the angle-sign branches)
+arg 0 M
+
+for 8c0d1a10
+# nj_InitCamera(camera): r4 needs a 0x78-byte scratch (larger than a matrix)
+arg 0 M
+
+for 8c0d1a94
+# nj_SetCamera(camera): r4 = a 0x78-byte camera (initialised by the original 8c0d1a10, then position / direction /
+# roll poked); writes g_nj_camera and resets the matrix stack
+arg 0 M
+
+for 8c0a4540
+# njSetTexture(texlist): 0 returns -1 without storing
+arg 0 0 M
+
+for 8c0a4488
+# njInitTextureBuffer(buffer, size): size rounded down to 2 KB
+arg 1 0 7ff 800 1c0000 1c07ff
+
+for 8c0a1264
+# nj_MemCopy4(dst, src, words): words 0 would copy 2^32 words (never pass it)
+arg 0 M
+arg 1 M
+arg 2 1 2 4 10
+
+for 8c0a1284
+# byte copy(dst, src, bytes): bytes 0 would copy 2^32 bytes (never pass it)
+arg 0 M
+arg 1 M
+arg 2 1 3 4 40
+
+for 8c0cf76a
+# byte swap
+arg 0 0 12345678 4e4a434d ff000000 ff
+
+for 8c141ac4
+# Kamui: write a Holly register (offset, value): keep the offset to FOG_DENSITY (b8)
+arg 0 b8
+arg 1 0 8010 ff07 1234
+
+for 8c11d138
+# Kamui: set FOG_DENSITY
+arg 0 0 8010 ff07 c105
+# S20 lead: the C runtime, sy, the registry
+for 8c062464
+# SHC signed division: r1 / r0 (0: errno), -2^31 / -1
+reg 1 0 1 7 -7 64 -64 7fffffff 80000000 12345 -12345
+reg 0 0 1 -1 2 -2 3 7 -7 ffffffff 10000
+for 8c0625e0
+# block copy, even entry: r0 bytes (an even number of words), r2 -> r1
+reg 0 8 10 18 20 28 30 38 40
+reg 1 8c200000 8c200010
+reg 2 8c200100 8c200104
+for 8c0625ec
+reg 0 4 c 14 1c 24 2c 34 3c
+reg 1 8c200000 8c200010
+reg 2 8c200100 8c200104
+for 8c06365c
+farg 0 0 0.5 -0.5 1 -1 3.14159 -3.14159 100 -1000 1e30 inf nan 0.785398 2.35619 5.5
+for 8c06374c
+farg 0 0 0.5 -0.5 1 -1 3.14159 -3.14159 100 -1000 1e30 inf nan 0.785398 2.35619 5.5
+for 8c062938
+farg 0 0 0.5 -1 3.14159 inf nan 100
+for 8c062adc
+farg 0 0 0.5 -1 3.14159 inf nan 100
+for 8c063da4
+farg 0 0 0.1 -0.5 0.785398 -0.785398
+for 8c063dc4
+farg 0 0 0.1 -0.5 0.785398 -0.785398
+for 8c06384c
+# frexpf(x, &e)
+arg 0 8c200000
+farg 0 0 1 -1 0.75 3 -1000 1e-39 inf nan 1e38
+for 8c0638f4
+arg 0 8c200000
+farg 0 0 1.5 -2.75 0.25 1e10 -0.5 inf nan 4294967296 2147483648 -3e9
+for 8c064b58
+arg 0 8c200000
+farg 0 0 1.5 -2.75 0.25 1e10 -0.5 inf nan 4294967296 2147483648 -3e9
+for 8c0629d8
+# memmove(dst, src, n): every alignment class, overlap both ways
+arg 0 8c200000 8c200001 8c200002 8c200004 8c200010
+arg 1 8c200000 8c200001 8c200002 8c200004 8c200010
+arg 2 0 1 2 3 4 6 8 10 22 40
+for 8c062a98
+arg 0 8c200000 8c200001
+arg 1 0 20 ff 1234
+arg 2 0 1 7 40
+for 8c0638c0
+arg 0 8c200000 8c200001
+arg 1 8c200000 8c200002 8c200100
+arg 2 0 1 2 10 40
+for 8c062ab0
+for 8c062b2c
+arg 0 0 1 12345678 ffffffff
+for 8c062754
+# destruction of a member array: count, size, array, destructor (sy_Nop1: does nothing)
+arg 0 0 1 2 3
+arg 1 4 10 20
+arg 2 8c200000
+arg 3 8c09fc94
+for 8c062800
+arg 0 0 1 2 3
+arg 1 4 10 20
+arg 2 8c200000
+arg 3 8c09fc94
+for 8c062790
+arg 0 0 1 2 3
+arg 1 4 10 20
+arg 2 8c200010
+arg 3 0 8c09fc94
+for 8c09f4d6
+arg 0 0 1 1f 20 21 100 1000 100000 4000000
+for 8c09f4d2
+arg 0 0 20 1000
+for 8c09f588
+arg 0 0
+for 8c09ca30
+arg 0 0 8c00fc08 8c010020 8c010040
+for 8c09cab2
+arg 0 8c179dc8 8c179dd8 8c010050
+for 8c09cc92
+arg 0 0 8c010040 8c010060
+for 8c09cdf6
+arg 0 8c010000 0
+for 8c09cc20
+arg 0 8c010040 8c010060
+for 8c0a0e38
+arg 0 8c200000 8c010000
+arg 1 0 1 10 80 200
+for 8c02fe38
+# this: OwnerScene (game/owner_scene.h; constructor 8c02fc12 -> 8c02f850 is resumable and loads files: take a live
+# scene of the owner screen, or poke one). Fields that steer it: state (0x2C) 0..2 (1 draws the panel), course
+# (0xF0) 0..3 (4 = no tint; also indexes the camera / caption tables: keep 0..4), penguin_count (0xF8) 2 or 3,
+# penguin_character[i] (0x4C) 0..7, penguins[i] (0x40) MotionPlayers; the game's language (save) indexes captions.
+
+for 8c049308
+# this: ActorType1B (constructor 8c04928a, 0x90 bytes, no allocation: needs memory) with base.model_set / texlist /
+# word1c (0x14 / 0x18 / 0x1C) set from the group file's entries (param bit 16); r5 = an ActorPlacement of type 0x1B:
+# param bits 8-11 index the model set, bits 0-3 the motion table (keep small). Same code as type 0x1C's 8c04956c:
+# its samples (a type-0x1C actor and placement) fit this function too.

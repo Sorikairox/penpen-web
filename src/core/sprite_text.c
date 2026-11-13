@@ -51,6 +51,8 @@ void text_style_reset(void) {
   g_text_style_30 = F32(0.0f);
 }
 HW_EXPORT(8c022a78, text_style_reset())
+/* S20: func_8C02F79E, an identical copy in the owner scene's unit (a gap functions.tsv missed: S20 21.3) */
+HW_EXPORT(8c02f79e, text_style_reset())
 
 static void sprite_init(gaddr sprite, gaddr tanim) {
   NjSprite *s = sprite_at(sprite);

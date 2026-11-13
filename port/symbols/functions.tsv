@@ -1095,6 +1095,7 @@
 8c02f78a	6	6	j_8c037f86_8c02f78a	game	-	layout
 8c02f790	6	6	j_8c0381c4_8c02f790	game	-	layout
 8c02f796	8	8	FUN_8c02f796	game	-	layout
+8c02f79e	54	54	FUN_8c02f79e	game	-	s20-gap
 8c02f7d4	6	6	j_8c016036_8c02f7d4	game	-	layout
 8c02f7da	6	6	j_8c01604e_8c02f7da	game	-	layout
 8c02f83c	20	20	FUN_8c02f83c	game	-	layout
@@ -1104,6 +1105,7 @@
 8c02fcd0	36	36	FUN_8c02fcd0	game	-	layout
 8c02fcf4	18	18	FUN_8c02fcf4	game	-	layout
 8c02fd06	300	288	FUN_8c02fd06	game	-	layout
+8c02fe38	768	768	FUN_8c02fe38	game	-	s20-gap
 8c030138	124	124	FUN_8c030138	game	-	layout
 8c0301b4	120	120	FUN_8c0301b4	game	-	layout
 8c030244	86	86	FUN_8c030244	game	-	layout
@@ -2203,6 +2205,7 @@
 8c0492a6	4	4	FUN_8c0492a6	game	-	layout
 8c0492aa	36	36	FUN_8c0492aa	game	-	layout
 8c0492ce	18	18	FUN_8c0492ce	game	-	layout
+8c049308	200	200	FUN_8c049308	game	-	s20-gap
 8c0493d0	12	12	FUN_8c0493d0	game	-	layout
 8c0493dc	262	218	FUN_8c0493dc	game	-	layout
 8c0494e2	20	20	FUN_8c0494e2	game	-	layout

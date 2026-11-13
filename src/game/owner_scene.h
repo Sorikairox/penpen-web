@@ -84,4 +84,6 @@ gaddr owner_scene_construct(gaddr scene, gaddr setup); /* game/owner_scene_const
 gaddr owner_scene_init(gaddr scene, gaddr setup);      /* game/owner_scene_init.c (func_8C02F850, resumable) */
 gaddr owner_penguin_construct(gaddr penguin, int32_t character, int32_t variant, gaddr container); /* owner_scene.c */
 void owner_scene_reset_owner(gaddr scene);             /* game/owner_scene.c (func_8C030138) */
+void owner_scene_draw_owner(gaddr scene);              /* game/owner_scene.c (func_8C030244) */
+void owner_scene_draw(gaddr scene);                    /* game/owner_scene_draw.c (func_8C02FE38, S20 W3: the draw method) */
 #endif

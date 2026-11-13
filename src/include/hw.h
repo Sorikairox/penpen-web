@@ -43,6 +43,10 @@ static inline uint32_t hw_read32(gaddr a) { return rd32(a); }
 static inline void hw_write32(gaddr a, uint32_t v) { wr32(a, v); }
 /* S16: a byte that may lie outside main RAM (a structure the BIOS HLE places at address 0, ...) */
 static inline uint8_t hw_read8(gaddr a) { return rd8(a); }
+/* S20: the other widths (the C runtime's G2-bus copy, the cable-type port: library code that reads hardware) */
+static inline uint16_t hw_read16(gaddr a) { return rd16(a); }
+static inline void hw_write16(gaddr a, uint16_t v) { wr16(a, v); }
+static inline void hw_write8(gaddr a, uint8_t v) { wr8(a, v); }
 
 /* layout checks: a struct shared with translated code must keep the original's offsets */
 #define HW_OFFSET(type, field, off) _Static_assert(__builtin_offsetof(type, field) == (off), #type "." #field)
@@ -103,6 +107,8 @@ extern int hw_ret_set; /* RET was used: the difftest compares r0 */
 #define ARG4 rd32(hw_e_.c->r[15])
 #define ARG5 rd32(hw_e_.c->r[15] + 4)
 #define ARG6 rd32(hw_e_.c->r[15] + 8)
+/* S20: a register by number at entry and on return (the C runtime's helpers take operands in r0 / r1) */
+#define REG(n) (hw_e_.c->r[(n)])
 #define RET(v) do { uint32_t hw_r_ = (uint32_t)(v); if (!rt_unw) { hw_e_.c->r[0] = hw_r_; hw_ret_set |= 1; } } while (0)
 /* S13: float arguments at entry (FR4, FR5, ...) and a float result (FR0: the difftest compares it) */
 #define FARG0 F32_BITS(hw_e_.c->fr.u[4])

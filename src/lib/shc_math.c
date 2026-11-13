@@ -196,3 +196,110 @@ f32 rt_acosf_checked(f32 x) { return rt_check(rt_acosf(x)); }
 HW_EXPORT(8c062848, RETF(rt_acosf_checked(FARG0)))
 f32 rt_floorf_checked(f32 x) { return rt_check(rt_floorf(x)); }
 HW_EXPORT(8c062988, RETF(rt_floorf_checked(FARG0)))
+
+/* S20 */
+/* was func_8C06384C: frexpf: x = m * 2^e with 0.5 <= |m| < 1. Zero (and a denormal, which the FPU reads as zero):
+ * *e = 0 and x itself; an infinity or NaN: x itself, *e left alone, errno ERANGE / EDOM; otherwise m is x's sign and
+ * mantissa under the exponent of 0.5 */
+f32 rt_frexpf(f32 x, int32_t *e) {
+  uint32_t b = f32_bits(x);
+  if (feq(x, F32(0.0f))) {
+    *e = 0;
+    return x;
+  }
+  if ((b & EXP_MASK) == EXP_MASK) {
+    g_errno = (b & MANT_MASK) != 0 ? EDOM : ERANGE;
+    return x;
+  }
+  *e = (int32_t)((b & EXP_MASK) >> 23) - 0x7E;
+  return F32_BITS((b & SIGN_BIT) | (b & MANT_MASK) | 0x3F000000u);
+}
+HW_EXPORT(8c06384c, RETF(rt_frexpf(FARG0, (int32_t *)hw_ptr(ARG0))))
+
+/* was func_8C064B58: modff's kernel: the whole part (below 2^32 in size the fraction is dropped toward zero, the sign
+ * kept) into *whole, the fraction x - whole returned */
+f32 rt_modf_kernel(f32 x, f32 *whole) {
+  uint32_t sign = f32_bits(x) & SIGN_BIT;
+  f32 t = x;
+  if ((int32_t)(f32_bits(x) & EXP_MASK) < (int32_t)0x4F800000u) t = f32_from_int(f32_to_int(x));
+  t = F32_BITS(f32_bits(t) | sign);
+  *whole = t;
+  return fsub(x, t);
+}
+HW_EXPORT(8c064b58, RETF(rt_modf_kernel(FARG0, (f32 *)hw_ptr(ARG0))))
+
+/* was func_8C0638F4: modff: the kernel, with errno set on the fraction as the float wrappers do */
+f32 rt_modff(f32 x, f32 *whole) {
+  f32 w;
+  f32 frac = rt_modf_kernel(x, &w);
+  *whole = w;
+  return rt_check(frac);
+}
+HW_EXPORT(8c0638f4, RETF(rt_modff(FARG0, (f32 *)hw_ptr(ARG0))))
+
+/* ---- S20: sinf and cosf (reached from the C: no route runs them) ---- */
+#define g_cos_poly ((const f32 *)hw_ptr(0x8C08A44Cu)) /* seven coefficients in x^2, highest power first */
+#define g_sin_poly ((const f32 *)hw_ptr(0x8C08A468u))
+#define TRIG_POLY_N 7
+#define RT_MINUS_QUARTER_PI F32_BITS(0xBF490FDBu)
+
+/* a polynomial in x2 by Horner's rule, each step one fmac */
+static f32 poly_x2(const f32 *c, f32 x2) {
+  f32 p = c[0];
+  for (int k = 1; k < TRIG_POLY_N; k++) p = fmac(x2, p, c[k]);
+  return p;
+}
+/* was func_8C063DA4: cos(x) on [-pi/4, pi/4]: its polynomial in x^2 */
+f32 rt_cos_kernel(f32 x) { return poly_x2(g_cos_poly, fmul(x, x)); }
+HW_EXPORT(8c063da4, RETF(rt_cos_kernel(FARG0)))
+/* was func_8C063DC4: sin(x) on [-pi/4, pi/4]: x times its polynomial in x^2 */
+f32 rt_sin_kernel(f32 x) { return fmul(x, poly_x2(g_sin_poly, fmul(x, x))); }
+HW_EXPORT(8c063dc4, RETF(rt_sin_kernel(FARG0)))
+
+/* the argument reduction both share: |x| (negative tells whether x was), reduced to [-pi/4, pi/4] by whole
+ * quarter turns; returns the octant (0-7) and the reduced value in *r. 1 when x is an infinity or NaN. */
+static int trig_reduce(f32 x, int *negative, int *octant, f32 *r) {
+  uint32_t b = f32_bits(x);
+  *negative = (b & SIGN_BIT) != 0;
+  if (!feq(x, F32(0.0f)) && ((b & 0x7FFFFFFFu) == EXP_MASK || !feq(x, x))) return 1;
+  if (*negative) x = fneg(x);
+  int32_t n;
+  f32 t = fdivstep(x, RT_QUARTER_PI, &n);
+  n &= 7;
+  if (n & 1) t = fadd(RT_MINUS_QUARTER_PI, t);
+  *octant = n;
+  *r = t;
+  return 0;
+}
+/* was func_8C06365C: cosf (the library's NaN for an infinity or NaN) */
+f32 rt_cosf(f32 x) {
+  int negative, octant;
+  f32 r;
+  if (trig_reduce(x, &negative, &octant, &r)) return RT_NAN;
+  switch (octant) {
+  case 0: case 7: return rt_cos_kernel(r);
+  case 1: case 2: return fneg(rt_sin_kernel(r));
+  case 3: case 4: return fneg(rt_cos_kernel(r));
+  default: return rt_sin_kernel(r); /* 5, 6 */
+  }
+}
+HW_EXPORT(8c06365c, RETF(rt_cosf(FARG0)))
+/* was func_8C06374C: sinf (odd: the sign of x applied at the end) */
+f32 rt_sinf(f32 x) {
+  int negative, octant;
+  f32 r, s;
+  if (trig_reduce(x, &negative, &octant, &r)) return RT_NAN;
+  switch (octant) {
+  case 0: case 7: s = rt_sin_kernel(r); break;
+  case 1: case 2: s = rt_cos_kernel(r); break;
+  case 3: case 4: s = fneg(rt_sin_kernel(r)); break;
+  default: s = fneg(rt_cos_kernel(r)); break; /* 5, 6 */
+  }
+  return negative ? fneg(s) : s;
+}
+HW_EXPORT(8c06374c, RETF(rt_sinf(FARG0)))
+/* was func_8C062938 / func_8C062ADC: cosf and sinf with errno set as the float wrappers do */
+f32 rt_cosf_checked(f32 x) { return rt_check(rt_cosf(x)); }
+HW_EXPORT(8c062938, RETF(rt_cosf_checked(FARG0)))
+f32 rt_sinf_checked(f32 x) { return rt_check(rt_sinf(x)); }
+HW_EXPORT(8c062adc, RETF(rt_sinf_checked(FARG0)))
