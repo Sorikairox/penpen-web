@@ -2,6 +2,61 @@
 
 Newest session first. Read `docs/port/PLAN.md` (disc facts, survey, approach, phases, rules) before working.
 
+## S19 — 2026-11-13: cup4b's root cause (fresh frames read as zero), the game region's last functions and its missed ones, the code outside it measured and begun
+
+The user's goal: "Don't stop until all the code is ported". All guest code ran in `--network none --read-only
+--cap-drop ALL --security-opt no-new-privileges --tmpfs /tmp` containers; `git log --all -- port/gen` stays empty;
+corpora (guest RAM) only in the Docker volume `penpen-corpus` (new: `/corpus/c6`, the 19 routes). Design and numbers:
+`docs/port/DECOMP.md` 20.
+
+1. **cup4b** (20.1): the original race_scene_nearest_player (func_8C02C922) copies out a never-written stack Vec3
+   when no racer is within 10000 (CSD's type 0x31 actors, most of the race): stack garbage that hand-written C (no
+   guest frames) cannot reproduce. Found with the difftest sampling every outermost call of frame 1764
+   (`PENPEN_HWT_FRAMES`, `PENPEN_HWT_SKIP`) and a `-DPENPEN_DBG` build's PC / write watches. Fixed by defining it:
+   lowering r15 clears the uncovered words (sh4_ops.h `sh4_stack_lowered`, hw_stack_alloc), on both builds.
+   cup4b is route 19; pure = hand on all 19.
+2. **Game region** (20.2): S18's five exceptions exported (type 0x31 x3, mode 11's start, func_8C042000 as a
+   fragment): 4 010 / 4 010. functions.tsv missed 36 game functions the routes run (vtable-only init / draw methods,
+   out-of-line setters; 10 of them ran in the interpreter): added (4 046), all 36 written by two delegated batches (u: 30, u2: 6), merged and tested by the lead: **4 046 / 4 046 game functions, 0 exceptions**. Never executed by a test: 13 own (the same 13 as S18: the cast viewer's and owner scene's construction, the contacts' posed builders, effect_trails_push, four contact responses, types 0x30 / 0x32's draws) + 0 copies without an executed group member.
+3. **Outside the game region** (20.3, 20.4): measured (`tools/outside_measure.py`, `docs/progress/outside*.tsv`);
+   begun with the C runtime's float maths (`src/lib/shc_math.c`: atan2f, asinf, acosf, floorf, their kernels and
+   errno wrappers: 12 functions).
+4. **Mull** (20.5): PLACEHOLDER_MULL
+
+5. **Bugs found**: the cup4b divergence (the original's uninitialised read; the run time now defines fresh frames);
+   a build race of S19's own making (the rtw build and the wasm comparison shared /build/wasm-genhand: one route's
+   hand run linked against half the objects; re-run). No hand-written function was found wrong: every difference
+   S19 hunted came from the undefined stack.
+6. **Tests and tools**: difftest `PENPEN_HWT_FRAMES` / `PENPEN_HWT_SKIP`; `-DPENPEN_DBG` builds
+   (`PENPEN_DBG_PC`, `PENPEN_DBG_W`); `FNCOVER_HAND`, `tools/outside_measure.py`, `tools/gaps.py`;
+   `SYNTH_CORPUS`; corpora c6 / c7 (the 19 routes).
+
+**Progress: 4 046 of 4 046 game functions (100 %), 312 174 of 312 174 bytes**: functions.tsv's 4 010 (S18: 4 005)
+and the 36 game functions it missed (S19, evidence `s19-gap`); 0 exceptions; 51 fragments. Outside the game: 12
+hand-written (the C runtime's float maths). Routes: 19 (S18: 18).
+
+Tests (end of S19): difftest over the **19 routes, 57 489 samples: 0 FAIL** (the c7 corpus run, 4 058 exports);
+corpora replay (c7 + syn, 15 819 samples): **c7 0 FAIL**; the old synthetic corpus syn: 14 of its S17 / S18 samples (5 functions:
+the intro / start / finish cameras, the title intro, type 0x30's pose) FAIL under the defined stack (recorded when
+the stack was undefined); fresh synthetic samples of the same five functions pass (s19re), and Mull leaves the 14 out
+as failing without a mutant; pure vs hand **identical frame lines on all 19 routes, native and wasm; native = wasm**;
+sh4 **257 / 0**; fpu 8 999 782 / 0; mixer **26 / 0**; harness **5 953 functions: 5 747 pass, 0 fail, 206 untested** (it crashed on the fresh-frame clearing until that went through its memory hooks: fixed);
+`GEN=genhand tools/rtw.sh build` + `check` **OK**; browser e2e **passed** (4 058 hand-written functions: logos,
+title, menu, house, selection, course, race start and race, the VMU save found after the reload; 49.7 game frames/s
+in the race); the e2e screenshots (title, PenPen House, race) look right. Never executed by a test: 13 own (as S18).
+Translated code the routes still run: 96 library functions (12 KB), the interpreter entered nowhere.
+
+Not verified: the 14 stale synthetic samples (why they fail under the defined stack was not traced: a dbg replay
+was not run); the open Mull survivors (20.5: classified by reason, not killed); the 54 translated gap entries no
+route runs and the gaps tools/gaps.py flags without an entry (not confirmed as code); the 13 never-executed
+functions; the hold of type 0x31 beyond its 104 of 204 bytes.
+
+Next (DECOMP 20.6): (1) the outside region by the plan of 20.4: the C runtime's rest (division, copies, rand, the
+stream helpers), then Ninja's 49 executed functions (matrix stack, transforms, trig: an ftrv helper in fpu.h), sy
+(heap), sy_start, bu, Kamui / thunks; (2) the 54 unexecuted gap entries confirmed and written; (3) the open survivors
+by input class (synthetic hints at the boundaries); (4) re-record or retire the 14 stale synthetic samples with the
+user's say.
+
 ## S18 — 2026-11-13: the last functions (six delegated batches), fragments, routes for modes 9 / 11 / 12 and the first courses, frame-passing preludes, test gaps closed
 
 The user's goal: "Don't stop until all the code is ported". All guest code ran in `--network none --read-only
