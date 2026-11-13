@@ -1,0 +1,12 @@
+# S17: synthetic FAILs judged outside the function's domain (tools/synth.py; DECOMP.md 18.2): the input is no state the
+# game can give the function; the hand-written C and the original differ only there. address	function	why
+8c0285ca	mascot_update	pokes of SetupMenu.course / motion past their tables (0-3): the original reads a motion pointer from beyond motion_tables, the C too but through hw_ptr's 16 MiB wrap (the stray pointer differs)
+8c0512a4	type19_step2	`this` not an ActorType19 (a generic heap object or a global block taken by the class search's offset guess): its phase / delay fields are another class's
+8c044eea	race_scene_env_push	`scene` no RaceScene (a texture-list global, a menu): its "course" word is any value, so the CourseEnv lands anywhere and overlaps `v` (an aliased add: one ulp or a word apart); with i a pointer value the address leaves the Course (C pointer arithmetic vs the original's masked address). On the race scene (the routes' calls) it passes
+8c061f10	rtc_date_to_seconds	before the hint: a "date" that is no RtcDate (year below 1950: the C's unsigned year count vs the original's); with dates made by the original seconds-to-date it passes
+8c0622f4	rtc_moon_age	the same (it calls the date's seconds)
+8c01370e	fix_texlists	the container fix-ups walk relocated pointers through the data: with arbitrary RAM as the "container" the structures alias each other and the base (a field relocated twice, a walk through words another fix changed): real files are trees without such aliasing (the S12 fix-ups pass every route's file); synthetic passes only where nothing aliases
+8c013746	fix_action	the same (container fix-ups on arbitrary RAM)
+8c0137d0	fix_action_list	the same
+8c013856	fix_motion_pairs	the same
+8c0139d6	fix_cnk_actions	the same

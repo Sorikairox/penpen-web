@@ -32,6 +32,8 @@ LINE = re.compile(r'^(hw |rt crash|boot stop)[ -~]*$')
 BASES = [('boot', 600), ('route', 1300), ('route', 1750), ('route', 3000), ('vs4', 3000), ('cup3', 2700),
          ('explore', 3700), ('goodnight', 1500)]
 CORPUS = '/corpus/c5'
+# S17: a job's end: inputs in a row without new code (after the first kept), seconds (--deep: 4000 / 90)
+STALE, SECS = 600, 20
 
 
 def box(args, vols, inp=None):
@@ -180,7 +182,7 @@ def run(name, funcs, iters=400, keep=8, par=2, extra=None, bases=None):
                 for a in todo:
                     size, insn = fns[a]
                     end = int(a, 16) + size
-                    f.write('job %s %08x %d %d %d 1\n' % (a, end, insn, iters, keep))
+                    f.write('job %s %08x %d %d %d 1 0 %d %d\n' % (a, end, insn, iters, keep, STALE, SECS))
                     rel = related(a, idx, calls)
                     for b in rel + bp[:12 - len(rel)]:
                         f.write('base %s\n' % b)
@@ -229,7 +231,7 @@ def tabulate(name, allines, fns):
     hd = hand()
     tab = []
     for l in allines:
-        m = re.match(r'^hw synth ([0-9a-f]{8}) bases (\d+) iters \d+ returned (\d+) odd \d+ judged (\d+) kept (\d+) pass (\d+) '
+        m = re.match(r'^hw synth ([0-9a-f]{8}) bases (\d+) iters \d+ returned (\d+) odd \d+ (?:domain \d+ )?judged (\d+) kept (\d+) pass (\d+) '
                      r'fail (\d+) cover (\d+)/(\d+)(?:: (.*))?$', l)
         if m:
             a = m.group(1)
@@ -290,6 +292,9 @@ def main():
             else:
                 pos.append(a[i])
                 i += 1
+        global STALE, SECS
+        if '--deep' in opts:
+            STALE, SECS = 4000, int(opts['--deep'])
         run(pos[0], pos[1], int(opts.get('--iters', 400)), int(opts.get('--keep', 8)), int(opts.get('--par', 2)),
             opts.get('--spec-extra'), opts.get('--bases'))
     elif a[0] == 'parts':  # a stopped run: its table from the streamed NAME_k.part files

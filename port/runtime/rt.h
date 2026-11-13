@@ -75,6 +75,7 @@ int hwt_corpus(const char *opt); /* S16: --hwcorpus DIR:K */
 int hwt_replay(const char *list); /* S16: --hwreplay LIST */
 int hwt_synth(const char *spec); /* S17: --hwsynth SPEC (with --hwcorpus DIR:K): synthetic samples */
 extern int hwt_synth_hw;          /* S17: the job lets the function write hardware registers */
+void hwt_synth_odd_note(const char *kind, uint32_t a); /* S17: counts it (PENPEN_SYNTH_DEBUG: logs the first) */
 extern int hwt_synth_odd;         /* S17: the recording pass touched memory no real pointer does */
 extern int hwt_synth_live;        /* S17: a synthetic sample's recording pass runs (rt_stop ends the sample) */
 extern int hle_digest_nostack;

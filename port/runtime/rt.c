@@ -89,11 +89,17 @@ static uint32_t io_read_live(uint32_t a) {
  * register but through the SDK; a job may allow it: hwt_synth_hw) */
 static int io_odd(uint32_t a) {
   uint32_t p = a & 0x1FFFFFFFu;
-  if (a >= 0xE0000000u) return 0;                                   /* store queues, the SH-4's own registers */
+  if (a >= 0xE0000000u && a < 0xE4000000u) return 0;                /* the store queues */
+  if ((a >> 24) == 0xFF) {                                           /* the SH-4's register blocks only */
+    uint32_t blk = (a >> 16) & 0xFF;
+    return !(blk == 0x00 || blk == 0x20 || blk == 0x80 || blk == 0xA0 || blk == 0xC0 || blk == 0xC8 || blk == 0xD0 ||
+             blk == 0xD8 || blk == 0xE0 || blk == 0xE8);
+  }
+  if (a >= 0xE0000000u) return 1;
   return !((p >= 0x005F0000u && p < 0x00720000u) || (p >= 0x00800000u && p < 0x00A00000u)); /* Holly, G2, AICA, RTC */
 }
 static uint32_t io_read(uint32_t a) {
-  if (hwt_synth_live && io_odd(a)) hwt_synth_odd++;
+  if (hwt_synth_live && !rt_hle_depth && !hwt_synth_hw && io_odd(a)) hwt_synth_odd_note("read", a); /* the guest code's own accesses (not an HLE's) */
   if (rt_sandbox) return hwt_io_read(a & ~3u);
   uint32_t v = io_read_live(a);
   if (hwt_recording) hwt_record_io(a & ~3u, v);
@@ -108,7 +114,7 @@ static void io_write(uint32_t a, uint32_t v, int size) {
 }
 /* S11: in a difftest sandbox (difftest.c) hardware accesses touch nothing real: reads replay the live call's (else
  * a fixed value per address), writes are logged per side and compared */
-#define SBX_IO_W(a, v, n) if (hwt_synth_live && !hwt_synth_hw) hwt_synth_odd++; if (rt_sandbox) { hwt_io_write(a, v, n); return; }
+#define SBX_IO_W(a, v, n) if (hwt_synth_live && !rt_hle_depth && !hwt_synth_hw) hwt_synth_odd_note("write", a); if (rt_sandbox) { hwt_io_write(a, v, n); return; }
 uint32_t sh4_io_r32(uint32_t a) { return io_read(a); }
 uint16_t sh4_io_r16(uint32_t a) { return (uint16_t)(io_read(a) >> ((a & 2) * 8)); }
 uint8_t sh4_io_r8(uint32_t a) { return (uint8_t)(io_read(a) >> ((a & 3) * 8)); }

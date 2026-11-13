@@ -7,3 +7,1355 @@ arg 2 ffffffff 0 1 2 3 4 5 6 7 8 9 a f 10 20 3f
 for name:race_scene_view_focus
 # a view index: 0-7 (RaceScene.focus has RACE_RACERS entries)
 arg 1 0 1 2 3 4 5 6 7
+# the RTC's date functions take an RtcDate the clock filled (a year from 1950, a month 1-12): the dates are made by the
+# original seconds-to-date (func_8C061FA4) into free RAM at the top of main RAM, and nothing is poked
+for name:rtc_date_to_seconds
+pre 8c061fa4 0 8cfff000 0 0
+pre 8c061fa4 5e7b6a00 8cfff010 0 0
+pre 8c061fa4 3b9aca00 8cfff020 0 0
+pre 8c061fa4 12345678 8cfff030 0 0
+pre 8c061fa4 7fffffff 8cfff040 0 0
+pre 8c061fa4 1e1338c0 8cfff050 0 0
+arg 0 8cfff000 8cfff010 8cfff020 8cfff030 8cfff040 8cfff050
+arg 1 8cfff100
+nopoke
+for name:rtc_moon_age
+pre 8c061fa4 0 8cfff000 0 0
+pre 8c061fa4 5e7b6a00 8cfff010 0 0
+pre 8c061fa4 3b9aca00 8cfff020 0 0
+pre 8c061fa4 12345678 8cfff030 0 0
+pre 8c061fa4 7fffffff 8cfff040 0 0
+pre 8c061fa4 1e1338c0 8cfff050 0 0
+arg 0 8cfff000 8cfff010 8cfff020 8cfff030 8cfff040 8cfff050
+nopoke
+for name:race_scene_env_push
+# i: one of the course's CourseEnvs (COURSE_ENVS: 4)
+arg 1 0 1 2 3
+# ---- S17 b01 writer's hints
+for 8c0102e2
+# r4 = a live Task (any task of the scene's tree), r5 = a Task to insert after it (best a leaf whose next is 0)
+for 8c010442
+# r4 = a writable block of 0x2C bytes (TaskTree followed by its root Task); no allocator in the original
+for 8c010470
+# r4 = a TaskTree (root pointer + updates per frame), e.g. the game's tree; destroys every task below the root
+for 8c01049c
+# r4 = a TaskTree (as 8c010470); r5 = free the tree's memory
+arg 1 0 1
+for 8c0104c0
+# r4 = a TaskTree (as 8c010470)
+for 8c0104fc
+# r4 = a TaskTree (its root's pause word is flipped)
+for 8c010a98
+# r4 = a Pad (one word: the port, 0..3), r5 = button mask
+arg 1 1 2 4 8 10 20 40 80 ff
+for 8c010aae
+# r4 = a Pad (one word: the port, 0..3: index into the port table at 0x8C066934), r5 = axis 0..5 (6+ = no case)
+arg 1 0 1 2 3 4 5 6
+for 8c010f1c
+# r4 = NJS_OBJECT, r5 = NJS_MOTION, r6 = -> a float frame number, r7 = loop flag (same hint for 8c010fe0 8c011086 8c01112c 8c01128a 8c0113e8)
+arg 3 0 1
+farg 0 0 1 10
+for 8c010fe0
+arg 3 0 1
+for 8c011086
+arg 3 0 1
+for 8c01112c
+arg 3 0 1
+for 8c01128a
+arg 3 0 1
+for 8c0113e8
+arg 3 0 1
+for 8c01148e
+# r4 = NJS_OBJECT, r5 = NJS_MOTION, r6 = shape motion, r7 = -> float frame; the loop flag is the 5th argument (@r15: 0 or 1)
+for 8c011a00
+# r4 = 2 NJS_POINT2 (16 bytes), r5 = 2 NJS_COLOR or 0 (white); fr4 = priority
+arg 1 0
+farg 0 0 -1
+for 8c011a44
+# r4 = 3 NJS_POINT2, r5 = 3 NJS_COLOR or 0 (white); fr4 = priority
+arg 1 0
+farg 0 0 -1
+for 8c011a94
+# r4 = {Vec3 centre, f32 radius} (16 bytes)
+for 8c012054
+# r4 = a View: the view table at 0x8C1B34B8, 0x18C bytes each (views 0..3); its word 0xF0 = fog on
+arg 0 8c1b34b8 8c1b3644 8c1b37d0 8c1b395c
+for 8c0122d2
+# r4 = a Plane out (Vec3 point, Vec3 normal: 24 bytes), r5 = a triangle (3 Vec3)
+for 8c0128dc
+# r4 = a point (Vec3), r5 = a Plane (Vec3 point, Vec3 unit normal), r6 = Vec3 out
+for 8c012a62
+# r4 = a point (Vec3), r5 = a Plane (Vec3 point, Vec3 unit normal), r6 = Vec3 out
+for 8c012d88
+arg 0 f
+for 8c012da6
+# gdFs error callback (object, error): other errors than -27/-28 shut the systems down and exit to the boot menu
+arg 1 ffffffe5 ffffffe4
+for 8c013696
+# r4 = array of `count` NJS_OBJECT offsets (0 = none) in a loaded container, r5 = the container's base, r6 = count
+arg 2 0 1 2
+for 8c01370e
+# r4 = array of `count` NJS_TEXLIST offsets, r5 = base, r6 = count
+arg 2 0 1 2
+for 8c013746
+# r4 = an NjAction {object, motion} with offsets, r5 = base, r6 = node count of the motion
+arg 2 1 2 4
+for 8c013790
+# r4 = array of action offsets, r5 = base, r6 = count, r7 = node count
+arg 2 0 1 2
+arg 3 1 2 4
+for 8c0137d0
+# r4 = array of {action offset, node count} pairs, r5 = base, r6 = count
+arg 2 0 1 2
+for 8c01380a
+# r4 = {motion, motion} offsets, r5 = base, r6 = node count
+arg 2 1 2 4
+for 8c013856
+# r4 = array of motion-pair offsets, r5 = base, r6 = count, r7 = node count
+arg 2 0 1 2
+arg 3 1 2 4
+for 8c01398c
+# r4 = chunk action {object, motion} offsets, r5 = base, r6 = node count
+arg 2 1 2 4
+for 8c0139d6
+# r4 = array of chunk-action offsets, r5 = base, r6 unused, r7 = count and node count
+arg 3 0 1 2
+for 8c0144bc
+# r4 = a Contacts set (core/contact.c), r5 = a basic NJS_OBJECT tree
+for 8c01509a
+# r4 = an NJS_MODEL with meshsets allocated (model_alloc_meshsets), r5 = meshset index (< nb_meshsets), r6 = type, r7 = material; stack: n, with_uv, with_colors
+arg 1 0 1
+arg 2 0 4000
+arg 3 0 1
+for 8c0156da
+# r4 = x, r5 = y, r6 = a 0-terminated Shift-JIS string of full-width digits
+arg 0 0 40 100
+arg 1 0 40 100
+for 8c0159ea
+arg 0 0 40 100
+arg 1 0 40 100
+for 8c0165e8
+# r4 = the race scene's CourseEnv (game/course.h; its Vec3 at 0x140 is written), r5 = a Vec3
+for 8c016b7a
+# r4 = x, r5 = y, r6 = a 0-terminated Shift-JIS string
+arg 0 0 20
+arg 1 0 20
+# ---- S17 b05 writer's hints
+for 8c04241e
+# r4: a view index (g_views[4])
+arg 0 0 1 2 3
+
+for 8c045840
+# r4: the RaceScene (g_panel); r5: a view index, -1 = the current view
+arg 1 ffffffff 0 1 2 3
+
+for 8c041848
+# r4: the race scene's Course (RaceScene.course); r5: a course cell (0 .. Course.cell_count - 1)
+arg 1 0 1 2 8 20 40 64
+
+for 8c041dd0
+# r4: the race scene's Course; r5: a course cell (0 .. Course.cell_count - 1); r6, r7: Vec3 out-buffers (12 bytes each)
+arg 1 0 1 5 20 40
+
+for 8c041f8c
+# r4: the race scene's Course; r5: a racer slot 0..3 (bit 0 picks the side); r6: a Vec3 out-buffer
+arg 1 0 1 2 3
+
+for 8c03c670
+# r4: the RaceScene (g_panel); r5: a racer slot 0..3; r6: a Vec3 out-buffer
+arg 1 0 1 2 3
+
+for 8c0417c0
+# r4: the race scene's Course; r5: a bit of the current view's row bits (0..319)
+arg 1 0 1 1f 40 13f
+
+for 8c044b52
+# r4: a type-0x00 actor (ActorType00, made by the factory func_8C043D4C type 0); r5: an ActorPlacement (32 bytes)
+pre 8c043d4c 0 0 0 0
+arg 0 $0
+
+for 8c044bd6
+# r4: a type-0x00 actor (factory func_8C043D4C type 0); needs the race scene in g_panel
+pre 8c043d4c 0 0 0 0
+arg 0 $0
+
+for 8c044c60
+# r4: a type-0x00 actor (factory func_8C043D4C type 0)
+pre 8c043d4c 0 0 0 0
+arg 0 $0
+
+for 8c044b1c
+# r4: a type-0x00 actor (factory type 0); r5: free the memory (0 / 1)
+pre 8c043d4c 0 0 0 0
+arg 0 $0
+arg 1 0 1
+
+for 8c048ce8
+# r4: a type-0x2F actor (ActorType2F, factory func_8C043D4C type 0x2F); r5: an ActorPlacement (32 bytes)
+pre 8c043d4c 0 2f 0 0
+arg 0 $0
+
+for 8c04913a
+# r4: a type-0x2F actor (factory type 0x2F); its state at 0x2C (draws below 5)
+pre 8c043d4c 0 2f 0 0
+arg 0 $0
+
+for 8c048c88
+# r4: a type-0x2F actor (factory type 0x2F); r5: free the memory (0 / 1)
+pre 8c043d4c 0 2f 0 0
+arg 0 $0
+arg 1 0 1
+
+for 8c04764e
+# r4: the turning actor (Spinner; by its address type 0x0E, factory func_8C043D4C type 0x0E)
+pre 8c043d4c 0 e 0 0
+arg 0 $0
+
+for 8c049ce2
+# r4: a type-0x2B actor (ActorType2B, factory type 0x2B); r5: free the memory (0 / 1)
+pre 8c043d4c 0 2b 0 0
+arg 0 $0
+arg 1 0 1
+
+for 8c0492aa
+# r4: a type-0x1B actor (factory type 0x1B, constructor func_8C04928A); r5: free the memory (0 / 1)
+pre 8c043d4c 0 1b 0 0
+arg 0 $0
+arg 1 0 1
+
+for 8c0487e2
+# r4: an actor whose destructor body is empty (type 0x23, turner); r5: free the memory (0 / 1)
+arg 1 0 1
+
+for 8c037f50
+# r4: a MotionPlayer (a racer's at Racer+0x24, or a menu penguin); r5: free the memory (0 / 1)
+arg 1 0 1
+
+for 8c048222
+# r4: a Burst (0x78 bytes, constructor func_8C047EB6) whose bodies (0x10) and alive (0x0C) arrays are allocated
+# (state 1: after its trigger); with bodies = 0 it writes at the bottom of RAM
+
+for 8c044766
+# r4: the race scene's ActorGroup (a Task at RaceScene+0x48 is its pointer; constructor func_8C0445B0)
+
+for 8c045788
+# r4: a Burst (e.g. at 0xD8 of a type-2 actor: factory func_8C043D4C type 2); r5: a Vec3
+pre 8c043d4c 0 2 0 0
+arg 0 $0+d8
+# ---- S17 b02 writer's hints
+for 8c0197c4
+# n: a bit of the progress record's 6-byte set at 0x8C1B7F50 (0..47)
+arg 0 0 1 7 8 13 20 31 40 47
+for 8c0197fc
+# n: a bit of the 6-byte set at 0x8C1B7F50 (0..47)
+arg 0 0 1 7 8 13 20 31 40 47
+for 8c019830
+# n: a bit of the byte at 0x8C1B7F56 (0..7)
+arg 0 0 1 2 3 4 5 6 7
+for 8c019842
+# n: a bit of the byte at 0x8C1B7F56 (0..7)
+arg 0 0 1 2 3 4 5 6 7
+for 8c019850
+# n: a bit of the byte at 0x8C1B7F56 (0..7)
+arg 0 0 1 2 3 4 5 6 7
+for 8c01944a
+# (cup, course, item): cup -1 (picks 0 or 1), 0..2; course 0..3; item 0..4 (bit cup*20+course*5+item of 64)
+arg 0 ffffffff 0 1 2
+arg 1 0 1 2 3
+arg 2 0 1 2 3 4
+for 8c0195f0
+# i: a score table entry (0..7)
+arg 0 0 1 2 3 4 5 6 7
+for 8c01961a
+# i: a score table entry (0..7)
+arg 0 0 1 2 3 4 5 6 7
+for 8c019644
+# i: a score table entry (0..7)
+arg 0 0 1 2 3 4 5 6 7
+for 8c019700
+# (cup 0..3, course 0..4, time)
+arg 0 0 1 2 3
+arg 1 0 1 2 3 4
+farg 0 0 61.5 480
+for 8c019716
+# (cup 0..3, course 0..4)
+arg 0 0 1 2 3
+arg 1 0 1 2 3 4
+for 8c019740
+# (cup 0..3, course 0..4, time)
+arg 0 0 1 2 3
+arg 1 0 1 2 3 4
+farg 0 0 120 600
+for 8c019766
+# (cup 0..3, course 0..4, rank 1..8)
+arg 0 0 1 2 3
+arg 1 0 1 2 3 4
+arg 2 1 3 8
+for 8c01986a
+# drive: the backup library's drive number (0..7; records of 0x5C bytes at 0x8C1B81D0)
+arg 0 0 1 2 3 4 5 6 7
+for 8c019928
+# (drive 0..7, op, count, max): the backup library's progress callback
+arg 0 0 1 2 3
+arg 1 1 2 12
+arg 2 0 5 c8
+arg 3 c8 100
+for 8c018980
+# alpha of the fading line
+farg 0 0 0.5 1
+for 8c019b30
+# n: a memory card screen (0..7) of the language's table at 0x8C08C5F4
+arg 0 0 1 2 3 4 5 6 7
+for 8c01d23c
+# this: a MotionPlayer (a menus' penguin, menu_penguin_construct func_8C01D178 / func_8C02295E); its character
+# (0x80) must be 0..7 (it indexes the save's byte table)
+for 8c01f714
+# this: a MotionPlayer (a menus' penguin, constructor func_8C01D178); set: an index into its motion table
+arg 1 0 1 2
+for 8c01f71a
+# this: a MotionPlayer (a menus' penguin, constructor func_8C01D178)
+farg 0 0 0.5 1 2
+for 8c01f720
+# this: a MotionPlayer; (i 0..3, look)
+arg 1 0 1 2 3
+arg 2 0 1 2 1a
+for 8c01f72c
+# this: a MotionPlayer; i 0..3
+arg 1 0 1 2 3
+for 8c01f738
+# this: a MotionPlayer (a menus' penguin, constructor func_8C01D178)
+for 8c01f742
+# this: a MotionPlayer (a menus' penguin, constructor func_8C01D178)
+for 8c01f746
+# this: a MotionPlayer (a menus' penguin, constructor func_8C01D178)
+for 8c01bb52
+# this: the title scene (TitleScene, 0x1C4 bytes, func_8C01B77A: resumable, no pre); fade at 0x94
+for 8c01c5e8
+# this: the title scene (TitleScene, func_8C01B77A); the flag 0x8C1BAAB0 picks the one-time set-up
+for 8c01b812
+# this: the title scene (TitleScene, func_8C01B77A)
+for 8c01d53e
+# this: the good-night scene (GoodNightScene, 0x88 bytes, func_8C01D4CA)
+for 8c01a436
+# this: mode 0's scene (0x38 bytes, func_8C01A3EE)
+for 8c01a920
+# this: the race set-up (mode 7's scene, 0xA8 bytes, func_8C01A8DE)
+for 8c01e970
+# this: mode 9's scene (StaffRoll, 0x90 bytes, func_8C01E8DA: it loads files, no pre); phase (0x34) -1..4, line
+# (0x44) -1..47 (it indexes a 49-entry table), the fades' frame counts (0x40, 0x50) non-zero
+for 8c01e900
+# this: mode 9's scene (StaffRoll, func_8C01E8DA)
+for 8c01e93a
+# this: mode 9's scene (StaffRoll, func_8C01E8DA); free flag
+arg 1 0 1
+for 8c01e95e
+# this: mode 9's scene (StaffRoll, func_8C01E8DA)
+for 8c01e410
+# this: mode 9's penguin (RollPenguin, a MotionPlayer subclass of 0x1A4+ bytes, func_8C01E364); free flag
+arg 1 0 1
+for 8c01e48c
+# this: a TextLabel (0x28 bytes: rgba, x, y, size x/y, spacing, string), e.g. an entry of a memory card screen
+# (the arrays the table at 0x8C08C5F4 points at)
+for 8c019e32
+# this: a TaskTree (the Game, g_game at 0x8C08C488); free flag
+arg 1 0 1
+for 8c019e56
+# this: a TaskTree (the Game, g_game at 0x8C08C488)
+for 8c019e2c
+# this: a TaskTree (the Game, g_game at 0x8C08C488)
+for 8c01b072
+# the material's (r, g, b, a)
+farg 0 0 0.5 1
+farg 1 0 1
+farg 2 0 1
+farg 3 0 0.25 1
+for 8c01e258
+# the material's (r, g, b, a)
+farg 0 0 0.5 1
+farg 1 0 1
+farg 2 0 1
+farg 3 0 0.25 1
+# ---- S17 b03 writer's hints
+for 8c029168
+# this = Racer (lane_racer_construct / racer_init_base); arg 1 indexes times298[5]
+arg 1 0 1 2 3 4
+for 8c029074
+# this = RaceSetup (the mode-7 scene, func_8C01A8DE); arg 1 indexes words44[8]
+arg 1 0 1 2 3 7
+for 8c0229ee
+# this = RaceSetup; arg 1 indexes words68[8]
+arg 1 0 1 2 3 7
+for 8c0229fa
+# this = RaceSetup; arg 1 indexes words88[8]
+arg 1 0 1 2 3 7
+for 8c029288
+# this = RaceScene (its course at 0x38)
+for 8c029ed2
+# this = RaceScene (race_scene_build runs on it: needs a full scene)
+for 8c0219a0
+# this = a 0x60-byte GalleryScene (mode 11): raw memory, the body fills it (allocate with syMalloc 0x60)
+pre 8c09f4d6 60 0 0 0
+arg 0 $0
+for 8c021a10
+# this = GalleryScene: raw 0x60 bytes
+pre 8c09f4d6 60 0 0 0
+arg 0 $0
+for 8c021a78
+# this = GalleryScene built by func_8C021A10 on fresh memory; its owner (0x1C) must be the Game for step 2
+pre 8c09f4d6 60 0 0 0
+pre 8c021a10 $0 0 0 0
+arg 0 $1
+for 8c021c10
+# this = GalleryScene built by func_8C021A10
+pre 8c09f4d6 60 0 0 0
+pre 8c021a10 $0 0 0 0
+arg 0 $1
+for 8c021a26
+# this = GalleryScene built by func_8C021A10
+pre 8c09f4d6 60 0 0 0
+pre 8c021a10 $0 0 0 0
+arg 0 $1
+for 8c021a42
+# this = GalleryScene built by func_8C021A10; arg 1 free_memory
+pre 8c09f4d6 60 0 0 0
+pre 8c021a10 $0 0 0 0
+arg 0 $1
+arg 1 0 1
+for 8c021d6e
+# this = a 0x8C-byte ConfigScene (mode 12): raw memory
+pre 8c09f4d6 8c 0 0 0
+arg 0 $0
+for 8c021e0a
+# this = ConfigScene: raw 0x8C bytes
+pre 8c09f4d6 8c 0 0 0
+arg 0 $0
+for 8c021e9e
+# this = ConfigScene built by func_8C021E0A; shown (0x7C) should be 1-8 (it indexes the move table by shown - 1)
+pre 8c09f4d6 8c 0 0 0
+pre 8c021e0a $0 0 0 0
+arg 0 $1
+for 8c022058
+# this = ConfigScene built by func_8C021E0A; shown (0x7C) 1-8, language (0x80) 0-6
+pre 8c09f4d6 8c 0 0 0
+pre 8c021e0a $0 0 0 0
+arg 0 $1
+for 8c021e20
+# this = ConfigScene built by func_8C021E0A
+pre 8c09f4d6 8c 0 0 0
+pre 8c021e0a $0 0 0 0
+arg 0 $1
+for 8c021e68
+# this = ConfigScene built by func_8C021E0A; arg 1 free_memory
+pre 8c09f4d6 8c 0 0 0
+pre 8c021e0a $0 0 0 0
+arg 0 $1
+arg 1 0 1
+for 8c0215c4
+# this = a 0x558-byte TrapSet: raw memory (loads the layout-1 OBJTRAP container from disc)
+pre 8c09f4d6 558 0 0 0
+arg 0 $0
+for 8c021614
+# this = TrapSet: raw 0x558 bytes
+pre 8c09f4d6 558 0 0 0
+arg 0 $0
+for 8c02162a
+# this = TrapSet built by func_8C021614
+pre 8c09f4d6 558 0 0 0
+pre 8c021614 $0 0 0 0
+arg 0 $1
+for 8c021658
+# this = TrapSet built by func_8C021614; arg 1 free_memory
+pre 8c09f4d6 558 0 0 0
+pre 8c021614 $0 0 0 0
+arg 0 $1
+arg 1 0 1
+for 8c020062
+# this = the CastScene (constructor func_8C02004C, at least 0x98 bytes; its body yields): its 0x5C..0x78 are MenuPenguins or 0
+for 8c0200a6
+# this = CastScene (as 8c020062); arg 1 free_memory
+arg 1 0 1
+for 8c022c70
+# this = a MenuPenguin (MotionPlayer, 0xF8 bytes, func_8C02295E); character (0x80) 0-7, variant (0x84) 0 or 1
+# ---- S17 b06 writer's hints
+for 8c04bafc
+# race_scene_view_cell copy: r4 = the RaceScene (g_panel 0x8C096230), r5 = the view (0-3, -1 = the current view)
+arg 1 ffffffff 0 1 2 3
+
+for 8c04e328
+# race_scene_view_cell copy: r4 = the RaceScene (g_panel 0x8C096230), r5 = the view (0-3, -1 = the current view)
+arg 1 ffffffff 0 1 2 3
+
+for 8c050466
+# race_scene_view_cell copy: r4 = the RaceScene (g_panel 0x8C096230), r5 = the view (0-3, -1 = the current view)
+arg 1 ffffffff 0 1 2 3
+
+for 8c04bc38
+# this = a type-0x06 actor from the factory func_8C043D4C(0, 0x6)
+pre 8c043d4c 0 6 0 0
+arg 0 $0
+
+for 8c04bc72
+# this = a type-0x06 actor from the factory func_8C043D4C(0, 0x6) (r5 = free_memory)
+pre 8c043d4c 0 6 0 0
+arg 0 $0
+arg 1 0 1
+
+for 8c04bc96
+# this = a type-0x06 actor from the factory func_8C043D4C(0, 0x6)
+pre 8c043d4c 0 6 0 0
+arg 0 $0
+
+for 8c04cdf0
+# this = a type-0x09 actor from the factory func_8C043D4C(0, 0x9)
+pre 8c043d4c 0 9 0 0
+arg 0 $0
+
+for 8c04ce28
+# this = a type-0x09 actor from the factory func_8C043D4C(0, 0x9) (r5 = free_memory)
+pre 8c043d4c 0 9 0 0
+arg 0 $0
+arg 1 0 1
+
+for 8c04ce4c
+# this = a type-0x09 actor from the factory func_8C043D4C(0, 0x9)
+pre 8c043d4c 0 9 0 0
+arg 0 $0
+
+for 8c04cf08
+# this = a type-0x09 actor from the factory func_8C043D4C(0, 0x9)
+pre 8c043d4c 0 9 0 0
+arg 0 $0
+
+for 8c04cfdc
+# this = a type-0x09 actor from the factory func_8C043D4C(0, 0x9)
+pre 8c043d4c 0 9 0 0
+arg 0 $0
+
+for 8c04c46e
+# this = a type-0x07 actor from the factory func_8C043D4C(0, 0x7)
+pre 8c043d4c 0 7 0 0
+arg 0 $0
+
+for 8c04cb44
+# this = a type-0x08 actor from the factory func_8C043D4C(0, 0x8)
+pre 8c043d4c 0 8 0 0
+arg 0 $0
+
+for 8c04cb90
+# this = a type-0x08 actor from the factory func_8C043D4C(0, 0x8) (r5 = free_memory)
+pre 8c043d4c 0 8 0 0
+arg 0 $0
+arg 1 0 1
+
+for 8c04cbb4
+# this = a type-0x08 actor from the factory func_8C043D4C(0, 0x8)
+pre 8c043d4c 0 8 0 0
+arg 0 $0
+
+for 8c04cc5e
+# this = a type-0x08 actor from the factory func_8C043D4C(0, 0x8)
+pre 8c043d4c 0 8 0 0
+arg 0 $0
+
+for 8c04d23c
+# this = a type-0x2E actor from the factory func_8C043D4C(0, 0x2E)
+pre 8c043d4c 0 2e 0 0
+arg 0 $0
+
+for 8c04d250
+# this = a type-0x2E actor from the factory func_8C043D4C(0, 0x2E) (r5 = free_memory)
+pre 8c043d4c 0 2e 0 0
+arg 0 $0
+arg 1 0 1
+
+for 8c04d274
+# this = a type-0x2E actor from the factory func_8C043D4C(0, 0x2E)
+pre 8c043d4c 0 2e 0 0
+arg 0 $0
+
+for 8c04d3d2
+# this = a type-0x2E actor from the factory func_8C043D4C(0, 0x2E)
+pre 8c043d4c 0 2e 0 0
+arg 0 $0
+
+for 8c04d940
+# this = a type-0x1E actor from the factory func_8C043D4C(0, 0x1E)
+pre 8c043d4c 0 1e 0 0
+arg 0 $0
+
+for 8c04d966
+# this = a type-0x1E actor from the factory func_8C043D4C(0, 0x1E) (r5 = free_memory)
+pre 8c043d4c 0 1e 0 0
+arg 0 $0
+arg 1 0 1
+
+for 8c04d98a
+# this = a type-0x1E actor from the factory func_8C043D4C(0, 0x1E)
+pre 8c043d4c 0 1e 0 0
+arg 0 $0
+
+for 8c04dd36
+# this = a type-0x1E actor from the factory func_8C043D4C(0, 0x1E)
+pre 8c043d4c 0 1e 0 0
+arg 0 $0
+
+for 8c04e544
+# this = a type-0x28 actor from the factory func_8C043D4C(0, 0x28)
+pre 8c043d4c 0 28 0 0
+arg 0 $0
+
+for 8c04e562
+# this = a type-0x28 actor from the factory func_8C043D4C(0, 0x28) (r5 = free_memory)
+pre 8c043d4c 0 28 0 0
+arg 0 $0
+arg 1 0 1
+
+for 8c04e586
+# this = a type-0x28 actor from the factory func_8C043D4C(0, 0x28)
+pre 8c043d4c 0 28 0 0
+arg 0 $0
+
+for 8c04f198
+# this = a type-0x28 actor from the factory func_8C043D4C(0, 0x28)
+pre 8c043d4c 0 28 0 0
+arg 0 $0
+
+for 8c04f21c
+# this = a type-0x28 actor from the factory func_8C043D4C(0, 0x28)
+pre 8c043d4c 0 28 0 0
+arg 0 $0
+
+for 8c04f29c
+# this = a type-0x28 actor from the factory func_8C043D4C(0, 0x28)
+pre 8c043d4c 0 28 0 0
+arg 0 $0
+
+for 8c04f0e0
+# this = a type-0x28 actor from the factory func_8C043D4C(0, 0x28)
+pre 8c043d4c 0 28 0 0
+arg 0 $0
+
+for 8c04fad0
+# this = a type-0x33 actor from the factory func_8C043D4C(0, 0x33)
+pre 8c043d4c 0 33 0 0
+arg 0 $0
+
+for 8c04fae6
+# this = a type-0x33 actor from the factory func_8C043D4C(0, 0x33) (r5 = free_memory)
+pre 8c043d4c 0 33 0 0
+arg 0 $0
+arg 1 0 1
+
+for 8c04ff80
+# this = a type-0x33 actor from the factory func_8C043D4C(0, 0x33)
+pre 8c043d4c 0 33 0 0
+arg 0 $0
+
+for 8c050558
+# this = a type-0x19 actor from the factory func_8C043D4C(0, 0x19)
+pre 8c043d4c 0 19 0 0
+arg 0 $0
+
+for 8c05056e
+# this = a type-0x19 actor from the factory func_8C043D4C(0, 0x19) (r5 = free_memory)
+pre 8c043d4c 0 19 0 0
+arg 0 $0
+arg 1 0 1
+
+for 8c050592
+# this = a type-0x19 actor from the factory func_8C043D4C(0, 0x19)
+pre 8c043d4c 0 19 0 0
+arg 0 $0
+
+for 8c050b18
+# this = a type-0x19 actor from the factory func_8C043D4C(0, 0x19)
+pre 8c043d4c 0 19 0 0
+arg 0 $0
+
+for 8c051a42
+# this = a type-0x19 actor from the factory func_8C043D4C(0, 0x19)
+pre 8c043d4c 0 19 0 0
+arg 0 $0
+
+for 8c051adc
+# this = a type-0x19 actor from the factory func_8C043D4C(0, 0x19)
+pre 8c043d4c 0 19 0 0
+arg 0 $0
+
+for 8c051ffc
+# this = a type-0x24 actor from the factory func_8C043D4C(0, 0x24)
+pre 8c043d4c 0 24 0 0
+arg 0 $0
+
+for 8c052012
+# this = a type-0x24 actor from the factory func_8C043D4C(0, 0x24) (r5 = free_memory)
+pre 8c043d4c 0 24 0 0
+arg 0 $0
+arg 1 0 1
+
+for 8c052036
+# this = a type-0x24 actor from the factory func_8C043D4C(0, 0x24)
+pre 8c043d4c 0 24 0 0
+arg 0 $0
+
+for 8c052668
+# this = a type-0x24 actor from the factory func_8C043D4C(0, 0x24)
+pre 8c043d4c 0 24 0 0
+arg 0 $0
+
+for 8c04ca86
+# this = the type-8 spring's mote set (MemberArray at 0x3C of a factory type-8 actor)
+pre 8c043d4c 0 8 0 0
+arg 0 $0+3c
+
+for 8c04c7a6
+# this = the type-8 spring's mote set (MemberArray at 0x3C of a factory type-8 actor); r5 = free_memory
+pre 8c043d4c 0 8 0 0
+arg 0 $0+3c
+arg 1 0 1
+
+for 8c04ce5e
+# this = a factory type-9 actor; r5 = an ActorPlacement (no route builds one: any 0x20 readable bytes)
+pre 8c043d4c 0 9 0 0
+arg 0 $0
+
+for 8c050164
+# a / b (floats)
+farg 0 0 1 2.5 -3
+farg 1 1 2 0.5 -4
+
+for 8c04e028
+# njSetConstantMaterial(r, g, b, a) from fr4..fr7
+farg 0 0 0.5 1
+farg 1 0 0.5 1
+farg 2 0 0.5 1
+farg 3 0 0.5 1
+# ---- S17 b04 writer's hints
+for 8c02c7b0
+# this = the RaceScene (g_race_scene); r5 = a player slot holding a Racer (0..player_count-1)
+arg 1 0 1 2 3
+for 8c02c7e0
+# RaceScene, player slot
+arg 1 0 1 2 3
+for 8c02c7f8
+# RaceScene, player slot
+arg 1 0 1 2 3
+for 8c02c828
+# RaceScene, player slot
+arg 1 0 1 2 3
+for 8c02c840
+# RaceScene, player slot
+arg 1 0 1 2 3
+for 8c02c870
+# RaceScene, player slot
+arg 1 0 1 2 3
+for 8c02c888
+# RaceScene, player slot
+arg 1 0 1 2 3
+for 8c02c8a0
+# RaceScene, player slot
+arg 1 0 1 2 3
+for 8c02c8b8
+# RaceScene, player slot, a flag value
+arg 1 0 1 2 3
+arg 2 0 1 4
+for 8c02c8d4
+# RaceScene, player slot; fr4 any float
+arg 1 0 1 2 3
+farg 0 0 0.5 1
+for 8c02c90a
+# RaceScene, player slot
+arg 1 0 1 2 3
+for 8c02c922
+# RaceScene; r5 = a Vec3 (e.g. a Racer's body position: Racer + 0x2B8); r6 = a 12-byte buffer or 0; r7 = a float out or 0
+arg 2 0
+arg 3 0
+for 8c02c9c0
+# RaceScene; r5 = a course cell index (thresholds 0x4F 0x52 0x67 / 0x57 0x5B 0x65 0x81 0x8C 0xA0); RaceSetup.course 0..3
+arg 1 0 4e 4f 51 52 66 67 56 57 5a 5b 64 65 80 81 8b 8c 9f a0
+for 8c02cb28
+# RaceScene; r5 = a 24-byte buffer or 0
+arg 1 0
+for 8c02e7c6
+# RaceScene (its state 3 = results)
+for 8c02e8f0
+# r4 = a MIDI port index 0..7
+arg 0 0 1 2 3 4 5 6 7
+for 8c02edaa
+# RaceScene; r5 = player 0..4; r6 = channel 0..3; r7 = priority; stack = sound number
+arg 1 0 1 2 3 4
+arg 2 0 1 2 3
+arg 3 0 1 5
+for 8c02ee6a
+# RaceScene; r5 = player 0..4; r6 = channel 0..3
+arg 1 0 1 2 3 4
+arg 2 0 1 2 3
+for 8c02efec
+# RaceScene; r5 = player; r6 = channel; r7 = priority; stack = sequence
+arg 1 0 1 2 3
+arg 2 0 1 2 3
+arg 3 0 1 5
+for 8c02f076
+# RaceScene; r5 = player; r6 = channel
+arg 1 0 1 2 3
+arg 2 0 1 2 3
+for 8c02f186
+# RaceScene; r5 = player slot 0..7; r6 = port 0..1 (port + 2 is used); r7 = priority
+arg 1 0 1 2 3
+arg 2 0 1
+arg 3 0 1 5
+for 8c02f1e8
+# RaceScene; r5 = player 0..4; r6 = port 0 or 1
+arg 1 0 1 2 3 4
+arg 2 0 1
+for 8c02f244
+# RaceScene; r5 = player slot 0..7; r6 = port 0..1
+arg 1 0 1 2 3
+arg 2 0 1
+for 8c02f272
+# RaceScene; r5 = player slot; r6 = port 0..1
+arg 1 0 1 2 3
+arg 2 0 1
+for 8c02f2a2
+# RaceScene; r5 = player 0..4; r6 = port 0..1
+arg 1 0 1 2 3 4
+arg 2 0 1
+for 8c02ef88
+# RaceScene; r5 = player slot; r6 = port 0..1
+arg 1 0 1 2 3
+arg 2 0 1
+for 8c02de52
+# RaceScene; r5 = player slot 0..7 (player_item index)
+arg 1 0 1 2 3
+for 8c02d724
+# RaceScene (draws only in state 3 with sprite_fade > 0)
+for 8c02db94
+# RaceScene (state 4, substate 1 or 3)
+for 8c02baee
+# RaceScene in mode 2 (draw pass over a view)
+for 8c02d150
+# RaceScene (the after-race menu; RaceScene.menu_line at 0xB4C must be a line index 0..3)
+for 8c0329ac
+# this = a Racer (RaceScene.players[i])
+for 8c033efe
+# Racer
+for 8c03390c
+# Racer
+for 8c03379c
+# Racer (reads RaceScene.player_item[Racer.index] as an index into a float table: item 0..5)
+for 8c033810
+# Racer; Racer.action_step (0x284) 0 or 1
+for 8c0344d6
+# Racer
+for 8c0344f4
+# Racer
+for 8c034512
+# Racer
+for 8c0345a8
+# Racer; action_step 0/1; hit_strength (0x278) 0..2; Racer.ground (0x23C) 0..6 indexes ground_damping
+for 8c03481a
+# Racer
+for 8c0349e8
+# Racer
+for 8c034d96
+# Racer (item index as 8c03379c)
+for 8c034de2
+# Racer; action_step 0/1
+for 8c034eb4
+# Racer
+for 8c034ed6
+# Racer
+for 8c034ef8
+# Racer
+for 8c034f1e
+# Racer; action_step 0/1; hit_strength 0..3
+for 8c034866
+# Racer in state 5; Racer.action (0x27C) 0..4; Racer.stroke_level (0x288) 0..6
+for 8c035014
+# Racer (iterates its contacts at 0x1B8)
+for 8c032a3a
+# Racer (its contacts.cell must be a valid course cell)
+for 8c03138e
+# Racer; r5 = a Vec3 (e.g. the Racer's own body position, Racer + 0x2B8); fr4 = a heading
+farg 0 0 16384 32768
+for 8c0375b0
+# Racer (destructor body: frees its model file; better left to the race's own teardown)
+for 8c037878
+# a Racer (any racer layout works; reads RaceScene.marks_a[RaceScene.word_cac], valid while the race records)
+for 8c037cd6
+# r4 = a node pointer (one of the four in the array g_attach_nodes points to, or any other)
+for 8c037cae
+# r4 = 64 bytes of writable memory
+for 8c030b16
+# r4 = a Racer's effects task (Racer.child, 0x52C); r5 = a matrix (Racer + 0x3A8); r6 = a cell; fr4-fr6 floats
+for 8c030750
+# r4 = a Body (e.g. Racer + 0x2B8); fr4 any float
+farg 0 0 1
+for 8c02f53e
+# r4 = a Body (48 bytes)
+for 8c0301b4
+# this = the owner scene (constructor 8c02fc12, RaceSetup.requested 2); pair (0xA4) 0..3, course (0xF0) 0..3
+for 8c030138
+# owner scene
+for 8c030244
+# owner scene (draw)
+for 8c02fd06
+# owner scene; state (0x2C) 0..2
+for 8c02fc28
+# owner scene (release: frees its file and penguins)
+# ---- S17 b07 writer's hints
+for 8c052906
+# race_scene_view_cell copy: r4 the RaceScene (g_panel), r5 a view index (-1 = the current view)
+arg 1 ffffffff 0 1 2 3
+
+for 8c05351e
+# race_scene_view_cell copy: r4 the RaceScene (g_panel), r5 a view index (-1 = the current view)
+arg 1 ffffffff 0 1 2 3
+
+for 8c054826
+# race_scene_view_cell copy: r4 the RaceScene (g_panel), r5 a view index (-1 = the current view)
+arg 1 ffffffff 0 1 2 3
+
+for 8c056038
+# race_scene_view_cell copy: r4 the RaceScene (g_panel), r5 a view index (-1 = the current view)
+arg 1 ffffffff 0 1 2 3
+
+for 8c059baa
+# race_scene_view_cell copy: r4 the RaceScene (g_panel), r5 a view index (-1 = the current view)
+arg 1 ffffffff 0 1 2 3
+
+for 8c05293c
+# this: raw memory for type 0x0B (syMalloc 0x13C), as the factory hands it
+pre 8c09f4d6 13c 0 0 0
+arg 0 $0
+
+for 8c0529b2
+# this: raw memory for type 0x0B (syMalloc 0x13C), as the factory hands it
+pre 8c09f4d6 13c 0 0 0
+arg 0 $0
+
+for 8c0529ce
+# this: ActorType0B (the factory func_8C043D4C, type 0xB)
+pre 8c043d4c 0 b 0 0
+arg 0 $0
+
+for 8c052a10
+# this: ActorType0B (the factory func_8C043D4C, type 0xB)
+pre 8c043d4c 0 b 0 0
+arg 0 $0
+
+for 8c052bf4
+# this: ActorType0B (the factory func_8C043D4C, type 0xB)
+pre 8c043d4c 0 b 0 0
+arg 0 $0
+
+for 8c052c70
+# this: ActorType0B (the factory func_8C043D4C, type 0xB)
+pre 8c043d4c 0 b 0 0
+arg 0 $0
+
+for 8c0529ec
+# this: ActorType0B (the factory func_8C043D4C, type 0xB)
+pre 8c043d4c 0 b 0 0
+arg 0 $0
+arg 1 0 1
+
+for 8c052a50
+# this: ActorType0B (the factory func_8C043D4C, type 0xB)
+pre 8c043d4c 0 b 0 0
+arg 0 $0
+# r5: an ActorPlacement (any 32-byte record of the course's placement list)
+
+for 8c053064
+# this: Bumper (the factory func_8C043D4C, type 0xC)
+pre 8c043d4c 0 c 0 0
+arg 0 $0
+arg 1 0 1
+
+for 8c053088
+# this: Bumper (the factory func_8C043D4C, type 0xC)
+pre 8c043d4c 0 c 0 0
+arg 0 $0
+
+for 8c053216
+# this: Bumper (the factory func_8C043D4C, type 0xC)
+pre 8c043d4c 0 c 0 0
+arg 0 $0
+
+for 8c053648
+# this: Flap (the factory func_8C043D4C, type 0xD)
+pre 8c043d4c 0 d 0 0
+arg 0 $0
+
+for 8c05365e
+# this: Flap (the factory func_8C043D4C, type 0xD)
+pre 8c043d4c 0 d 0 0
+arg 0 $0
+arg 1 0 1
+
+for 8c053682
+# this: Flap (the factory func_8C043D4C, type 0xD)
+pre 8c043d4c 0 d 0 0
+arg 0 $0
+
+for 8c0539b4
+# this: Flap (the factory func_8C043D4C, type 0xD)
+pre 8c043d4c 0 d 0 0
+arg 0 $0
+
+for 8c053d62
+# this: raw memory for type 0x0F (syMalloc 0x154), as the factory hands it
+pre 8c09f4d6 154 0 0 0
+arg 0 $0
+
+for 8c053e26
+# this: raw memory for type 0x0F (syMalloc 0x154), as the factory hands it
+pre 8c09f4d6 154 0 0 0
+arg 0 $0
+
+for 8c053e42
+# this: ActorType0F (the factory func_8C043D4C, type 0xF)
+pre 8c043d4c 0 f 0 0
+arg 0 $0
+
+for 8c053e8c
+# this: ActorType0F (the factory func_8C043D4C, type 0xF)
+pre 8c043d4c 0 f 0 0
+arg 0 $0
+arg 1 0 1
+
+for 8c053eb0
+# this: ActorType0F (the factory func_8C043D4C, type 0xF)
+pre 8c043d4c 0 f 0 0
+arg 0 $0
+
+for 8c0545b8
+# this: ActorType0F (the factory func_8C043D4C, type 0xF)
+pre 8c043d4c 0 f 0 0
+arg 0 $0
+# the draw only draws when ActorType0F.shown (0xF4) is not 0
+
+for 8c05485c
+# this: raw memory for type 0x10 (syMalloc 0x13C), as the factory hands it
+pre 8c09f4d6 13c 0 0 0
+arg 0 $0
+
+for 8c0548e0
+# this: raw memory for type 0x10 (syMalloc 0x13C), as the factory hands it
+pre 8c09f4d6 13c 0 0 0
+arg 0 $0
+
+for 8c0548fc
+# this: ActorType10 (the factory func_8C043D4C, type 0x10)
+pre 8c043d4c 0 10 0 0
+arg 0 $0
+
+for 8c054912
+# this: ActorType10 (the factory func_8C043D4C, type 0x10)
+pre 8c043d4c 0 10 0 0
+arg 0 $0
+arg 1 0 1
+
+for 8c054964
+# this: ActorType10 (the factory func_8C043D4C, type 0x10)
+pre 8c043d4c 0 10 0 0
+arg 0 $0
+
+for 8c055150
+# this: Flock (the factory func_8C043D4C, type 0x29)
+pre 8c043d4c 0 29 0 0
+arg 0 $0
+
+for 8c055198
+# this: Flock (the factory func_8C043D4C, type 0x29)
+pre 8c043d4c 0 29 0 0
+arg 0 $0
+arg 1 0 1
+
+for 8c0551bc
+# this: Flock (the factory func_8C043D4C, type 0x29)
+pre 8c043d4c 0 29 0 0
+arg 0 $0
+
+for 8c0554ae
+# this: Flock (the factory func_8C043D4C, type 0x29)
+pre 8c043d4c 0 29 0 0
+arg 0 $0
+# Flock.count (0x2C) bodies at Flock.bodies (0x40): small counts (0-4) only
+
+for 8c055650
+# this: raw memory for type 0x0A (syMalloc 0x60), as the factory hands it
+pre 8c09f4d6 60 0 0 0
+arg 0 $0
+
+for 8c05568a
+# this: raw memory for type 0x0A (syMalloc 0x60), as the factory hands it
+pre 8c09f4d6 60 0 0 0
+arg 0 $0
+
+for 8c0556d8
+# this: ActorType0A (the factory func_8C043D4C, type 0xA)
+pre 8c043d4c 0 a 0 0
+arg 0 $0
+arg 1 0 1
+
+for 8c0556fc
+# this: ActorType0A (the factory func_8C043D4C, type 0xA)
+pre 8c043d4c 0 a 0 0
+arg 0 $0
+
+for 8c05570e
+# this: ActorType0A (the factory func_8C043D4C, type 0xA)
+pre 8c043d4c 0 a 0 0
+arg 0 $0
+# reads model 11 of Actor.models unless flags (0x08) bit 1 is set: needs an attached actor (the group's)
+
+for 8c0557c4
+# this: ActorType0A (the factory func_8C043D4C, type 0xA)
+pre 8c043d4c 0 a 0 0
+arg 0 $0
+# ActorType0A.groups (0x58) groups of five vertices at heights (0x50): set by its init
+
+for 8c055864
+# this: ActorType0A (the factory func_8C043D4C, type 0xA)
+pre 8c043d4c 0 a 0 0
+arg 0 $0
+
+for 8c055afe
+# this: TurningGate (the factory func_8C043D4C, type 0x17)
+pre 8c043d4c 0 17 0 0
+arg 0 $0
+
+for 8c055b12
+# this: TurningGate (the factory func_8C043D4C, type 0x17)
+pre 8c043d4c 0 17 0 0
+arg 0 $0
+arg 1 0 1
+
+for 8c055b36
+# this: TurningGate (the factory func_8C043D4C, type 0x17)
+pre 8c043d4c 0 17 0 0
+arg 0 $0
+
+for 8c055d38
+# this: TurningGate (the factory func_8C043D4C, type 0x17)
+pre 8c043d4c 0 17 0 0
+arg 0 $0
+
+for 8c0560fe
+# this: Geyser (the factory func_8C043D4C, type 0x18)
+pre 8c043d4c 0 18 0 0
+arg 0 $0
+
+for 8c056114
+# this: Geyser (the factory func_8C043D4C, type 0x18)
+pre 8c043d4c 0 18 0 0
+arg 0 $0
+arg 1 0 1
+
+for 8c056138
+# this: Geyser (the factory func_8C043D4C, type 0x18)
+pre 8c043d4c 0 18 0 0
+arg 0 $0
+
+for 8c0568d0
+# this: Swimmer (the factory func_8C043D4C, type 0x21)
+pre 8c043d4c 0 21 0 0
+arg 0 $0
+
+for 8c05690a
+# this: Swimmer (the factory func_8C043D4C, type 0x21)
+pre 8c043d4c 0 21 0 0
+arg 0 $0
+arg 1 0 1
+
+for 8c05692e
+# this: Swimmer (the factory func_8C043D4C, type 0x21)
+pre 8c043d4c 0 21 0 0
+arg 0 $0
+
+for 8c0577e4
+# this: Sign (the factory func_8C043D4C, type 0x22)
+pre 8c043d4c 0 22 0 0
+arg 0 $0
+
+for 8c058554
+# this: Buoy (the factory func_8C043D4C, type 0x2A)
+pre 8c043d4c 0 2a 0 0
+arg 0 $0
+
+for 8c05856a
+# this: Buoy (the factory func_8C043D4C, type 0x2A)
+pre 8c043d4c 0 2a 0 0
+arg 0 $0
+arg 1 0 1
+
+for 8c05858e
+# this: Buoy (the factory func_8C043D4C, type 0x2A)
+pre 8c043d4c 0 2a 0 0
+arg 0 $0
+
+for 8c058b84
+# this: raw memory for type 0x26 (syMalloc 0x11C), as the factory hands it
+pre 8c09f4d6 11c 0 0 0
+arg 0 $0
+
+for 8c058c2a
+# this: raw memory for type 0x26 (syMalloc 0x11C), as the factory hands it
+pre 8c09f4d6 11c 0 0 0
+arg 0 $0
+
+for 8c058c80
+# this: ActorType26 (the factory func_8C043D4C, type 0x26)
+pre 8c043d4c 0 26 0 0
+arg 0 $0
+
+for 8c058c9a
+# this: ActorType26 (the factory func_8C043D4C, type 0x26)
+pre 8c043d4c 0 26 0 0
+arg 0 $0
+arg 1 0 1
+
+for 8c058cbe
+# this: ActorType26 (the factory func_8C043D4C, type 0x26)
+pre 8c043d4c 0 26 0 0
+arg 0 $0
+
+for 8c05900e
+# this: ActorType26 (the factory func_8C043D4C, type 0x26)
+pre 8c043d4c 0 26 0 0
+arg 0 $0
+
+for 8c05905c
+# this: ActorType26 (the factory func_8C043D4C, type 0x26)
+pre 8c043d4c 0 26 0 0
+arg 0 $0
+
+for 8c058b44
+# a Body (0x30 bytes) to set at rest: raw memory
+pre 8c09f4d6 30 0 0 0
+arg 0 $0
+
+for 8c059f88
+# a Body (0x30 bytes) to set at rest: raw memory
+pre 8c09f4d6 30 0 0 0
+arg 0 $0
+
+for 8c059614
+# this: ActorType25 (the factory func_8C043D4C, type 0x25)
+pre 8c043d4c 0 25 0 0
+arg 0 $0
+arg 1 0 1
+
+for 8c059638
+# this: ActorType25 (the factory func_8C043D4C, type 0x25)
+pre 8c043d4c 0 25 0 0
+arg 0 $0
+
+for 8c059c52
+# this: Flyer (the factory func_8C043D4C, type 0x11)
+pre 8c043d4c 0 11 0 0
+arg 0 $0
+arg 1 0 1
+
+for 8c059c76
+# this: Flyer (the factory func_8C043D4C, type 0x11)
+pre 8c043d4c 0 11 0 0
+arg 0 $0
+
+for 8c05a018
+# this: raw memory for type 0x27 (syMalloc 0x69C), as the factory hands it
+pre 8c09f4d6 69c 0 0 0
+arg 0 $0
+
+for 8c05a0a8
+# this: raw memory for type 0x27 (syMalloc 0x69C), as the factory hands it
+pre 8c09f4d6 69c 0 0 0
+arg 0 $0
+
+for 8c05a0cc
+# this: ActorType27 (the factory func_8C043D4C, type 0x27)
+pre 8c043d4c 0 27 0 0
+arg 0 $0
+
+for 8c05a0e0
+# this: ActorType27 (the factory func_8C043D4C, type 0x27)
+pre 8c043d4c 0 27 0 0
+arg 0 $0
+arg 1 0 1
+
+for 8c05a104
+# this: ActorType27 (the factory func_8C043D4C, type 0x27)
+pre 8c043d4c 0 27 0 0
+arg 0 $0
+
+for 8c0589b8
+# material_set_89b8(r, g, b, a): four floats in fr4-fr7
+farg 0 0 0.5 1
+farg 1 0 0.5 1
+farg 2 0 1
+farg 3 0.5 1
+# ---- S17 lead: the racer's actions take a Racer: the race scene's players (g_panel 0x8C096230, RaceScene.players at 0x4C)
+for 8c0329ac
+arg 0 [[8c096230]+4c] [[8c096230]+50] [[8c096230]+54] [[8c096230]+58]
+for 8c033efe
+arg 0 [[8c096230]+4c] [[8c096230]+50] [[8c096230]+54] [[8c096230]+58]
+for 8c03390c
+arg 0 [[8c096230]+4c] [[8c096230]+50] [[8c096230]+54] [[8c096230]+58]
+for 8c03379c
+arg 0 [[8c096230]+4c] [[8c096230]+50] [[8c096230]+54] [[8c096230]+58]
+for 8c033810
+arg 0 [[8c096230]+4c] [[8c096230]+50] [[8c096230]+54] [[8c096230]+58]
+for 8c0344d6
+arg 0 [[8c096230]+4c] [[8c096230]+50] [[8c096230]+54] [[8c096230]+58]
+for 8c0344f4
+arg 0 [[8c096230]+4c] [[8c096230]+50] [[8c096230]+54] [[8c096230]+58]
+for 8c034512
+arg 0 [[8c096230]+4c] [[8c096230]+50] [[8c096230]+54] [[8c096230]+58]
+for 8c0345a8
+arg 0 [[8c096230]+4c] [[8c096230]+50] [[8c096230]+54] [[8c096230]+58]
+for 8c03481a
+arg 0 [[8c096230]+4c] [[8c096230]+50] [[8c096230]+54] [[8c096230]+58]
+for 8c0349e8
+arg 0 [[8c096230]+4c] [[8c096230]+50] [[8c096230]+54] [[8c096230]+58]
+for 8c034d96
+arg 0 [[8c096230]+4c] [[8c096230]+50] [[8c096230]+54] [[8c096230]+58]
+for 8c034de2
+arg 0 [[8c096230]+4c] [[8c096230]+50] [[8c096230]+54] [[8c096230]+58]
+for 8c034eb4
+arg 0 [[8c096230]+4c] [[8c096230]+50] [[8c096230]+54] [[8c096230]+58]
+for 8c034ed6
+arg 0 [[8c096230]+4c] [[8c096230]+50] [[8c096230]+54] [[8c096230]+58]
+for 8c034ef8
+arg 0 [[8c096230]+4c] [[8c096230]+50] [[8c096230]+54] [[8c096230]+58]
+for 8c034f1e
+arg 0 [[8c096230]+4c] [[8c096230]+50] [[8c096230]+54] [[8c096230]+58]
+for 8c035014
+arg 0 [[8c096230]+4c] [[8c096230]+50] [[8c096230]+54] [[8c096230]+58]
+for 8c032a3a
+arg 0 [[8c096230]+4c] [[8c096230]+50] [[8c096230]+54] [[8c096230]+58]
+for 8c03138e
+arg 0 [[8c096230]+4c] [[8c096230]+50] [[8c096230]+54] [[8c096230]+58]
+for 8c034866
+arg 0 [[8c096230]+4c] [[8c096230]+50] [[8c096230]+54] [[8c096230]+58]
+# the RTC reads the clock and the BIOS's block at address 0 (system.c): hardware accesses allowed
+for name:rtc_read_seconds
+hw
+# its out-pointer: free RAM at the top of main RAM (with hardware allowed, a stray pointer would write a register)
+arg 0 8cfff100
+for name:rtc_read_checked
+hw
+# its out-pointer: free RAM at the top of main RAM (with hardware allowed, a stray pointer would write a register)
+arg 0 8cfff100
+for name:rtc_read_stable
+hw
+for name:rtc_vblank
+hw
+for name:rtc_init
+hw
+for name:rtc_get_date
+hw
+# its out-pointer: free RAM at the top of main RAM (with hardware allowed, a stray pointer would write a register)
+arg 0 8cfff100
+for name:system_language
+hw

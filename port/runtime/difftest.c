@@ -35,6 +35,7 @@ void hwt_abandon(void) {}
 int hwt_replay(const char *list) { (void)list; return 2; }
 int hwt_synth(const char *spec) { (void)spec; return 2; }
 int hwt_synth_odd, hwt_synth_hw;
+void hwt_synth_odd_note(const char *kind, uint32_t a) { (void)kind; (void)a; hwt_synth_odd++; }
 int hwt_synth_live;
 int hwt_corpus(const char *opt) { (void)opt; return -1; }
 void hwt_summary(void) {}
@@ -208,7 +209,9 @@ static int draw_kind(uint32_t a) {
   int k = 0;
   if (n && (!strncmp(n, "njDraw", 6) || !strncmp(n, "nj_Model", 8) || !strncmp(n, "nj_Object", 9) ||
             !strncmp(n, "nj_Motion", 9) || !strncmp(n, "nj_ShapeMotion", 14) || !strcmp(n, "njCnkModDrawModel")))
-    k = 1 | (!strcmp(n, "njDrawSprite2D") || !strcmp(n, "njDrawPolygon") || !strncmp(n, "nj_Motion", 9) ||
+    /* (njDrawPolygon takes no float: Ninja's is (points, n, trans); the HLE reads FR4 as its depth, whatever the
+       caller left there: not compared) */
+    k = 1 | (!strcmp(n, "njDrawSprite2D") || !strncmp(n, "nj_Motion", 9) ||
              !strncmp(n, "nj_ShapeMotion", 14) ? 2 : 0) | (strncmp(n, "njDraw", 6) || !strcmp(n, "njDrawSprite3D") ? 4 : 0);
   if (cn < 64) { ca[cn] = a; ck[cn] = (uint32_t)k; cn++; }
   return k;
@@ -303,6 +306,9 @@ static int sbx_steps(SH4 *c, uint32_t ret, uint32_t sp, int64_t steps) {
     if (r) { sbx_at = c->fault; return r == -1 ? END_ILLEGAL : r == -3 ? END_SLOT : END_UNSUP; }
     if (c->last == SH4_BR_NONE) continue;
     if (c->last == SH4_BR_RET && c->pc == ret && c->r[15] >= sp) return END_RET;
+    /* S17: as rt.c's interp_call: the rest of a function Ghidra cut short, entered with the PR of its last call, returns
+       to hw_call's marker when the original's caller is hand-written (side B only: side A runs no hand-written code) */
+    if (c->last == SH4_BR_RET && c->pc == 0x8C000F08u) return END_RET;
     uint32_t t = RT_NORM(c->pc);
     if (c->last != SH4_BR_RET) note_entry(t);
     if (hle_known(t)) {
@@ -451,7 +457,7 @@ static int side_b_compare(int ea, uint32_t at_a) {
         if (p[i] != q[i]) { fail("hle call %x (draw) render state %x: %x", (uint32_t)k, i, p[i] ^ q[i]); return 0; }
       for (uint32_t i = 0; i < 4; i++)
         if ((used >> (4 + i) & 1) && p[1 + i] != q[1 + i]) { fail("hle draw %x memory at arg %x %x", x->t, i, p[1 + i] ^ q[1 + i]); return 0; }
-      if (p[5] != q[5]) { fail("hle draw %x fr4 %x", x->t, p[5] ^ q[5], 0); return 0; }
+      if ((draw_kind(x->t) & 2) && p[5] != q[5]) { fail("hle draw %x fr4 %x", x->t, p[5] ^ q[5], 0); return 0; }
     }
     /* S13: the float arguments hand-written code passed (FARGS: FR4 ...) */
     for (uint32_t i = 0; i < y->fargs && i < 4; i++)
@@ -737,6 +743,13 @@ int hwt_replay(const char *list) {
     int ea;
     uint32_t at_a;
     if (replay_load(path, &ea, &at_a)) { rt_log("hw replay unreadable %s", path); bad++; continue; }
+    if (getenv("PENPEN_REPLAY_DUMP")) { /* S17: ADDR:N words of the snapshot (debugging a sample) */
+      uint32_t a0 = (uint32_t)strtoul(getenv("PENPEN_REPLAY_DUMP"), 0, 16), nw = 8;
+      const char *c2 = strchr(getenv("PENPEN_REPLAY_DUMP"), ':');
+      if (c2) nw = (uint32_t)strtoul(c2 + 1, 0, 10);
+      for (uint32_t i = 0; i < nw; i++) { uint32_t w; memcpy(&w, buf_s + ((a0 + 4 * i) & 0xFFFFFC), 4); rt_log("hw replay dump %08x %08x", a0 + 4 * i, w); }
+      rt_log("hw replay dump r4-r7 %08x %08x %08x %08x pr %08x", snap.r[4], snap.r[5], snap.r[6], snap.r[7], snap.pr);
+    }
     n++;
     if (!side_b_compare(ea, at_a)) {
       rt_log("hw replay FAIL %s %08x: %s", path, cur->addr, cur->why);
@@ -777,7 +790,8 @@ int hwt_synth_live;
 #define SY_QUEUE 64
 typedef struct { int base; uint32_t a[4], f[4]; int np; uint32_t pa[SY_POKES], pv[SY_POKES]; } sy_input;
 static struct {
-  uint32_t fn, end, insn, iters, keep, seed, steps;
+  uint32_t fn, end, insn, iters, keep, seed, steps, stale, secs; /* S17: stale / secs: 0 = 600 / 20 */
+  int nopoke;                      /* `nopoke`: the arguments only (the objects they point to stay as the base has them) */
   int nbase;
   char base[SY_BASES][512];
   int npre;
@@ -794,13 +808,46 @@ static uint32_t sy_glob[64], sy_nglob;                      /* globals the funct
 static uint32_t sy_offs[128], sy_noffs;   /* field offsets the function's instructions use (displacements, immediates) */
 static uint32_t sy_consts[64], sy_nconsts; /* small constants it compares with or loads (cmp/eq #imm, mov #imm) */
 int hwt_synth_hw;  /* the job's `hw` line: the function may write hardware registers */
+void hwt_synth_odd_note(const char *kind, uint32_t a) {
+  if (!hwt_synth_odd++ && getenv("PENPEN_SYNTH_DEBUG")) rt_log("hw synth odd %s %08x", kind, a);
+}
 int hwt_synth_odd; /* the recording pass touched memory no real pointer does (rt.c): the input is refused */
 static uint8_t *sy_cov, *sy_cov_it;
 static uint64_t sy_rs;
 static uint32_t sy_rnd(void) { sy_rs ^= sy_rs << 13; sy_rs ^= sy_rs >> 7; sy_rs ^= sy_rs << 17; return (uint32_t)(sy_rs >> 11); }
 
 /* a spec value: hex, or $k / $k+hex / $k-hex = the k-th prelude call's result (plus an offset) of the base */
+static uint32_t sy_value(const char *t, int base);
+/* [X] (S17): the word at address X of the base after its prelude, e.g. [[8c096230]+4c]: the race scene's player 0 */
+static uint32_t sy_expr(const char **pp, int base) {
+  const char *p = *pp;
+  uint32_t v;
+  char *e;
+  if (*p == '[') {
+    p++;
+    uint32_t a = sy_expr(&p, base);
+    if (*p == ']') p++;
+    v = 0;
+    if (sh4_is_ram(a) && sy_prep[base]) memcpy(&v, sy_prep[base] + (a & 0xFFFFFC), 4);
+  } else if (*p == '$') {
+    int k = (int)strtol(p + 1, &e, 10);
+    v = k >= 0 && k < SY_PRE ? sy_preret[base][k] : 0;
+    p = e;
+  } else {
+    v = (uint32_t)strtoul(p, &e, 16);
+    p = e;
+  }
+  while (*p == '+' || *p == '-') {
+    int neg = *p == '-';
+    uint32_t o = (uint32_t)strtoul(p + 1, &e, 16);
+    v = neg ? v - o : v + o;
+    p = e;
+  }
+  *pp = p;
+  return v;
+}
 static uint32_t sy_value(const char *t, int base) {
+  if (t[0] == '[') return sy_expr(&t, base);
   if (t[0] == '$') {
     char *e;
     int k = (int)strtol(t + 1, &e, 10);
@@ -819,6 +866,13 @@ static int sy_run(SH4 *c, uint32_t ret, uint32_t sp, int64_t steps, uint8_t *cov
   while (steps-- > 0) {
     uint32_t pc = RT_NORM(c->pc);
     if (cov && pc >= sj.fn && pc < sj.end) cov[(pc - sj.fn) >> 1] = 1;
+    { /* code outside the code ranges (a call through a vtable word that is no method): no game state does that */
+      uint32_t k = pc & 0x1FFFFFFFu;
+      if (!((k >= 0x0C010000u && k < 0x0C066900u) || (k >= 0x0C0998D4u && k < 0x0C17994Cu) || (k >= 0x0C18F112u && k < 0x0C197090u))) {
+        hwt_synth_odd_note("pc", pc);
+        return END_STOP;
+      }
+    }
     int r = sh4_step(c);
     if (r) { sbx_at = c->fault; return r == -1 ? END_ILLEGAL : r == -3 ? END_SLOT : END_UNSUP; }
     if (c->last == SH4_BR_NONE) continue;
@@ -849,7 +903,7 @@ static struct sigaction sy_old_segv, sy_old_bus;
 static int sy_faults, sy_bfaults;
 static void sy_fault(int sig) {
   if (hwt_synth_live) { sy_faults++; siglongjmp(sbx_jb, END_STOP); }
-  if (hwt_synth_sideb) { sy_bfaults++; siglongjmp(sbx_jb, END_ILLEGAL + 100); } /* side B's host fault: a FAIL */
+  if (hwt_synth_sideb) { sy_bfaults++; siglongjmp(sbx_jb, END_ILLEGAL + 100); } /* side B's host fault (sy_job) */
   sigaction(sig, sig == SIGSEGV ? &sy_old_segv : &sy_old_bus, 0);
   raise(sig);
 }
@@ -891,7 +945,13 @@ static int sy_guarded(SH4 *c, uint8_t *ram, int record, uint8_t *cov, int64_t st
   sh4_ram = save;
   return code;
 }
-static int sy_is_ram(uint32_t w) { return (w >> 24) == 0x8C && (w & 0xFFFFFF) >= 0x10000; }
+/* the code ranges (game, SDK, SDK code in the data area: port/recomp/diff_main.c): no object lives there, and a poke
+   there would change the code side A interprets but not the code side B runs translated */
+static int sy_is_code(uint32_t w) {
+  uint32_t k = w & 0x00FFFFFFu;
+  return (k >= 0x010000u && k < 0x066900u) || (k >= 0x0998D4u && k < 0x17994Cu) || (k >= 0x18F112u && k < 0x197090u);
+}
+static int sy_is_ram(uint32_t w) { return (w >> 24) == 0x8C && (w & 0xFFFFFF) >= 0x10000 && !sy_is_code(w); }
 static void sy_pool_add(int b, uint32_t v) {
   if (sy_npool[b] >= SY_POOL) return;
   for (uint32_t i = 0; i < sy_npool[b]; i++) if (sy_pool[b][i] == v) return;
@@ -945,7 +1005,7 @@ static const float sy_floats[] = {0.0f, 1.0f, -1.0f, 0.5f, 2.0f, 10.0f, 100.0f, 
 /* a value that would be a pointer into RAM only through a mirror (0x0D-0x0F, 0x8E...) or unaligned: no real object is
    there (the interpreter masks the low bits where the SH-4 would raise an address error): a small number instead */
 static uint32_t sy_sane(uint32_t v) {
-  if (sh4_is_ram(v) && ((v & 3) || ((v >> 24) & 0x1F) != 0x0C)) return v & 0xFF;
+  if (sh4_is_ram(v) && ((v & 3) || ((v >> 24) & 0x1F) != 0x0C || sy_is_code(v))) return v & 0xFF;
   if (v >= 0xE0000000u && v < 0xFFFF0000u) return v & 0xFF; /* the SH-4's own area: no object either */
   return v;
 }
@@ -979,7 +1039,7 @@ static void sy_mutate(sy_input *in) {
     uint32_t k = sy_rnd() % 8;
     if (k < 2) { int i = (int)(sy_rnd() % 4); in->a[i] = sy_pick_arg(in->base, i); }
     else if (k < 3) { int i = (int)(sy_rnd() % 4); in->f[i] = sy_pick_farg(in->base, i); }
-    else if (k < 7 && in->np < SY_POKES) {
+    else if (k < 7 && in->np < SY_POKES && !sj.nopoke) {
       /* a poke: a word of an argument's object, or a global the function names */
       uint32_t at;
       if (sy_nglob && (sy_rnd() & 1)) at = sy_glob[sy_rnd() % sy_nglob] + 4 * (sy_rnd() % 4);
@@ -989,6 +1049,7 @@ static void sy_mutate(sy_input *in) {
         if (!sy_is_ram(p)) continue;
         at = (p & ~3u) + (sy_noffs && sy_rnd() % 4 ? sy_offs[sy_rnd() % sy_noffs] : 4 * (sy_rnd() % (sy_rnd() & 1 ? 32 : 128)));
       }
+      if (sy_is_code(at)) continue;
       uint32_t old;
       memcpy(&old, sy_prep[in->base] + (at & 0xFFFFFC), 4);
       uint32_t v, r = sy_rnd() % 10;
@@ -1017,7 +1078,7 @@ static void sy_describe(const sy_input *in, char *o, size_t n) {
                    in->a[2], in->a[3], in->f[0], in->f[1], in->f[2], in->f[3]);
   for (int i = 0; i < in->np && k < (int)n - 20; i++) k += snprintf(o + k, n - (size_t)k, " %08x=%08x", in->pa[i], in->pv[i]);
 }
-static FILE *sy_log;
+static FILE *sy_log, *sy_fail_f;
 static void sy_job(void) {
   static sy_input queue[SY_QUEUE];
   int nq = 0, ok[SY_BASES] = {0}, nok = 0;
@@ -1049,7 +1110,7 @@ static void sy_job(void) {
 #undef SY_ADD
   for (int b = 0; b < sj.nbase; b++) if (!sy_base(b)) { ok[b] = 1; nok++; }
   cur = stat_of(sj.fn);
-  uint32_t kept = 0, pass = 0, failn = 0, rets = 0, covered = 0, judged = 0, odd = 0;
+  uint32_t kept = 0, pass = 0, failn = 0, rets = 0, covered = 0, judged = 0, odd = 0, domain = 0;
   int64_t steps = sj.steps ? sj.steps : 2000000;
   char why0[128] = "";
   /* S17: a job ends after ITERS inputs, KEEP kept samples, 600 inputs in a row that ran no new code (after the first
@@ -1058,10 +1119,10 @@ static void sy_job(void) {
   clock_gettime(CLOCK_MONOTONIC, &tj0);
   uint32_t stale = 0;
   for (uint32_t it = 0; nok && cur && it < sj.iters && kept < sj.keep; it++) {
-    if (kept && ++stale > 600) break;
+    if (kept && ++stale > (sj.stale ? sj.stale : 600)) break;
     if ((it & 15) == 15) {
       clock_gettime(CLOCK_MONOTONIC, &tj);
-      if (tj.tv_sec - tj0.tv_sec > 20) break;
+      if (tj.tv_sec - tj0.tv_sec > (sj.secs ? (long)sj.secs : 20)) break;
     }
     sy_input in;
     if (nq && sy_rnd() % 4) { in = queue[sy_rnd() % (uint32_t)nq]; sy_mutate(&in); }
@@ -1082,9 +1143,14 @@ static void sy_job(void) {
     cur->why[0] = 0;
     cur_frame = 0;
     synth_keep = 1;
-    hwt_synth_sideb = 1; /* cleared by run_side_b; only side B's faults are caught as FAILs */
+    hwt_synth_sideb = 1; /* cleared by run_side_b; only side B's faults are caught */
+    int bf0 = sy_bfaults;
     int v = sample_judge();
     hwt_synth_sideb = 0;
+    /* side B left guest RAM (a host fault): the input took an index or a pointer the hand-written code does not take
+       (C indexing past the 16 MiB where the original's 32-bit address arithmetic lands somewhere): outside its domain,
+       refused and counted, not a FAIL (the original would write a stray word there: no game input does) */
+    if (v == 0 && sy_bfaults != bf0) { domain++; cur->fail--; continue; }
     synth_keep = 0;
     judged++;
     char d[400];
@@ -1096,6 +1162,20 @@ static void sy_job(void) {
       kept++; pass++; stale = 0;
       if (sy_log) fprintf(sy_log, "%08x\tpass\t%s\t%s\n", sj.fn, sj.base[in.base], d);
     } else if (v == 0) {
+      /* the FAIL sample is kept too, listed in DIR/fail.tsv (not index.tsv: the replay gate never selects it), to be
+         replayed with PENPEN_REPLAY_DIFFS */
+      if (!sy_fail_f) { char fp[600]; snprintf(fp, sizeof fp, "%s/fail.tsv", corpus_dir); sy_fail_f = fopen(fp, "a"); }
+      if (sy_fail_f) {
+        FILE *keep = index_f;
+        index_f = sy_fail_f;
+        synth_keep = 1;
+        keep_stat *ksf = keep_of(cur->addr);
+        uint32_t kept0 = ksf ? ksf->kept : 0;
+        corpus_keep(END_RET, 0, 0);
+        if (ksf) ksf->kept = kept0;
+        synth_keep = 0;
+        index_f = keep;
+      }
       failn++;
       if (!why0[0]) memcpy(why0, cur->why, sizeof why0);
       rt_log("hw synth FAIL %08x it %u: %s; %s", sj.fn, it, cur->why, d);
@@ -1104,13 +1184,13 @@ static void sy_job(void) {
     }
   }
   /* coverage in instruction bytes of the original (the extent's halfwords that ran, of insn bytes) */
-  rt_log("hw synth %08x bases %d iters %u returned %u odd %u judged %u kept %u pass %u fail %u cover %u/%u%s%s", sj.fn,
-         nok, sj.iters, rets, odd, judged, kept, pass, failn, covered * 2, sj.insn, failn ? ": " : "", why0);
+  rt_log("hw synth %08x bases %d iters %u returned %u odd %u domain %u judged %u kept %u pass %u fail %u cover %u/%u%s%s",
+         sj.fn, nok, sj.iters, rets, odd, domain, judged, kept, pass, failn, covered * 2, sj.insn, failn ? ": " : "", why0);
   if (sy_log) fflush(sy_log);
   free(sy_cov); free(sy_cov_it);
 }
 /* SPEC: jobs, each
- *   job FN END INSN_BYTES ITERS KEEP SEED [STEPS]
+ *   job FN END INSN_BYTES ITERS KEEP SEED [STEPS [STALE [SECS]]]
  *   base CORPUS_SAMPLE_PATH          (1-8)
  *   pre FN A0 A1 A2 A3               (0-6: prelude calls on each base; $k = the k-th call's result)
  *   arg I V V ...                    (candidates for argument I: hex, $k, $k+hex)
@@ -1137,7 +1217,11 @@ int hwt_synth(const char *spec) {
       sj.insn = (uint32_t)strtoul(tok[3], 0, 10); sj.iters = (uint32_t)strtoul(tok[4], 0, 10);
       sj.keep = (uint32_t)strtoul(tok[5], 0, 10); sj.seed = (uint32_t)strtoul(tok[6], 0, 10);
       if (n > 7) sj.steps = (uint32_t)strtoul(tok[7], 0, 10);
+      if (n > 8) sj.stale = (uint32_t)strtoul(tok[8], 0, 10);
+      if (n > 9) sj.secs = (uint32_t)strtoul(tok[9], 0, 10);
       sj.fn = RT_NORM(sj.fn); sj.end = RT_NORM(sj.end);
+    } else if (!strcmp(tok[0], "nopoke")) {
+      sj.nopoke = 1;
     } else if (!strcmp(tok[0], "hw")) {
       hwt_synth_hw = 1;
     } else if (!strcmp(tok[0], "base") && n == 2 && sj.nbase < SY_BASES) {
@@ -1163,7 +1247,7 @@ int hwt_synth(const char *spec) {
   }
   fclose(f);
   if (sy_log) fclose(sy_log);
-  rt_log("hw synth done %d jobs (host faults inside recording passes, inputs refused: %d; host faults of side B, FAILs: %d)", njobs, sy_faults, sy_bfaults);
+  rt_log("hw synth done %d jobs (host faults inside recording passes, inputs refused: %d; host faults of side B, inputs refused: %d)", njobs, sy_faults, sy_bfaults);
   return 0;
 }
 
