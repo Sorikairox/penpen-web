@@ -25,6 +25,12 @@ static void penpen_gl_frame(const void *p, int len) { (void)p; (void)len; }
 #endif
 
 rd_stats_t rd_stats;
+int rd_digest_on;
+uint64_t rd_digest;
+static uint64_t dl_hash(uint64_t g, const uint32_t *w, uint32_t n) {
+  for (uint32_t i = 0; i < n; i++) { g ^= w[i]; g *= 0x100000001B3ull; g ^= g >> 29; }
+  return g;
+}
 
 typedef struct { rd_state s; uint32_t first, count; } cmd_t;
 typedef struct { uint32_t st; float key; uint32_t seq; rd_vtx v[3]; } tri_t;
@@ -173,6 +179,18 @@ void rd_end(void) {
   rd_stats.uploads = nups; rd_stats.op = op_cmds; rd_stats.tr = ntr; rd_stats.om = n_om;
   rd_stats.textures = 0;
   for (uint32_t i = 1; i < ntex; i++) rd_stats.textures += tex[i].live;
+  if (rd_digest_on) { /* S21: the frame's draw list, host pointers left out (the uploads' pixels hashed instead) */
+    uint64_t g = 0x9E3779B97F4A7C15ull;
+    uint32_t *w = (uint32_t *)out, upw = (hdr + csz + vsz) / 4;
+    for (uint32_t i = 0; i < nups; i++) w[upw + 4 * i + 3] = 0;
+    g = dl_hash(g, w, total / 4);
+    for (uint32_t i = 0; i < nups; i++) {
+      tex_t *t = &tex[ups[i]];
+      g = dl_hash(g, t->rgba, (uint32_t)t->w * (uint32_t)t->h);
+      w[upw + 4 * i + 3] = (uint32_t)(uintptr_t)t->rgba;
+    }
+    rd_digest = g;
+  }
   penpen_gl_frame(out, (int)total);
   /* uploaded: the backend has its own copy now */
   for (uint32_t i = 0; i < nups; i++) { free(tex[ups[i]].rgba); tex[ups[i]].rgba = 0; }

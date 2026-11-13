@@ -63,5 +63,9 @@ int rd_tex_size(uint32_t id, int *w, int *h);
 /* stats of the last frame (logged by the HLE) */
 typedef struct { uint32_t cmds, tris, verts, culled, uploads, textures, op, tr, om; } rd_stats_t;
 extern rd_stats_t rd_stats;
+/* S21: the draw-list digest (the frame line's "draw" field): when rd_digest_on, rd_end hashes the packed frame (header,
+ * commands, vertices, fog table, texture ids freed) with each upload's pixels in place of its host pointer */
+extern int rd_digest_on;
+extern uint64_t rd_digest;
 
 #endif

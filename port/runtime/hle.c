@@ -551,8 +551,15 @@ static void frame_log_line(void) {
     for (int k = 0; k < 8; k++) *o++ = "0123456789abcdef"[(v >> (28 - 4 * k)) & 15];
   }
   *o = 0;
-  rt_log("frame %u hle %u guest %u interp %u files %d heap %u/%u pad %x ram %s%s%s", frame, f_hle, f_guest,
-         rt_interp_calls() - f_interp0, gd_files_loaded, fr, blocks, io_pad_on(0), d, nwatch ? " watch" : "", w);
+  /* S21: "draw": the digest of the frame's draw list (rd.c), so a difference that reaches only what is drawn (the
+     current matrix XMTRX, read by no RAM word: DECOMP 22.1) shows in the whole-run comparison */
+  char dl[20] = "-";
+  if (d[0] != '-') {
+    for (int i = 0; i < 16; i++) dl[i] = "0123456789abcdef"[(rd_digest >> (60 - 4 * i)) & 15];
+    dl[16] = 0;
+  }
+  rt_log("frame %u hle %u guest %u interp %u files %d heap %u/%u pad %x ram %s draw %s%s%s", frame, f_hle, f_guest,
+         rt_interp_calls() - f_interp0, gd_files_loaded, fr, blocks, io_pad_on(0), d, dl, nwatch ? " watch" : "", w);
   if (audio_enabled && d[0] != '-')
     rt_log("audio frame %u samples %u digest %08x peak %d voices %d cdda %d", frame, audio_frames_made(), audio_digest(),
            audio_peak(), aica_voices(), cdda_track());
@@ -567,7 +574,10 @@ static void h_njWaitVSync(SH4 *c) {
   /* end of render: the EOR callback, then the type-2 chain */
   if (eor_fn) rt_guest_call(c, eor_fn, 0, 0, 0, 0);
   chain_fire(c, 0x920);
+  /* S21: the draw-list digest for the frame line, on the frames whose RAM digest is written */
+  rd_digest_on = hle_frame_log && hle_digest_every > 0 && frame % (uint32_t)hle_digest_every == 0;
   nj_frame_end();
+  rd_digest_on = 0;
   if (audio_enabled) audio_frame();
   frame_log();
   for (int i = 0; i < NTAB; i++) tab[i].fcalls = 0;
