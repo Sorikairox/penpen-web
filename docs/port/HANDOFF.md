@@ -21,7 +21,7 @@ corpora (guest RAM) only in the Docker volume `penpen-corpus` (new: `/corpus/c6`
 3. **Outside the game region** (20.3, 20.4): measured (`tools/outside_measure.py`, `docs/progress/outside*.tsv`);
    begun with the C runtime's float maths (`src/lib/shc_math.c`: atan2f, asinf, acosf, floorf, their kernels and
    errno wrappers: 12 functions).
-4. **Mull** (20.5): PLACEHOLDER_MULL
+4. **Mull** (20.5): n1's rest (n2: 1 150 mutants, 798 killed), S18's 1 694 open ids again with the closed gaps (n3b: 531 killed), the S19 batches (n4: 844 mutants, 81.5 %). Combined: **22 991 mutants, 16 753 killed, 144 equivalent, 4 510 unreached, 1 584 survived (each with a reason): 73.3 %, reach 91.4 %**; the survivors classified by reason (13 accepted, the rest open with the input class that would kill them).
 
 5. **Bugs found**: the cup4b divergence (the original's uninitialised read; the run time now defines fresh frames);
    a build race of S19's own making (the rtw build and the wasm comparison shared /build/wasm-genhand: one route's
