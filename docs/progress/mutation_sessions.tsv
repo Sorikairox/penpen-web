@@ -11,3 +11,4 @@ S17	16960	0	12496	38	3163	1263	73.8	90.8	audio-file 11 crash-file 36 difftest 5 
 S19	22991	0	16753	144	4510	1584	73.3	91.4	audio-file 11 crash-file 39 difftest 5 difftest-file 720 frame-file 2188 replay 13220 replay-crash 348 stop-file 44 timeout 46 timeout-file 132	Mull 0.37.0 (LLVM 18)
 S20	24181	0	17631	169	4692	1689	73.4	91.3	audio-file 11 crash-file 39 difftest 5 difftest-file 727 frame-file 2192 replay 14023 replay-crash 382 stop-file 46 timeout 46 timeout-file 160	Mull 0.37.0 (LLVM 18)
 S21	24181	0	17882	170	4435	1694	74.5	91.3	audio-file 11 crash-file 39 difftest 5 difftest-file 726 frame-file 2172 replay 14293 replay-crash 395 stop-file 45 timeout 46 timeout-file 150	Mull 0.37.0 (LLVM 18)
+S22	24318	0	18369	201	4000	1748	76.2	91.3	audio-file 11 crash-file 40 difftest 5 difftest-file 728 frame-file 2261 replay 14669 replay-crash 403 stop-file 45 timeout 46 timeout-file 161	Mull 0.37.0 (LLVM 18)
