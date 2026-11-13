@@ -67,3 +67,9 @@
 8c04f966	S19 run time (rt interp): game code in a gap of functions.tsv (an inline setter emitted out of line / type 0x19 init by pointer)
 8c04f96a	S19 run time (rt interp): game code in a gap of functions.tsv (an inline setter emitted out of line / type 0x19 init by pointer)
 8c0505a4	S19 run time (rt interp): game code in a gap of functions.tsv (an inline setter emitted out of line / type 0x19 init by pointer)
+8c059cd0	S22 run time (rt interp, route csd30: a woken type 0x30 actor): game code the pure translation entered through the interpreter
+8c059aae	S22 run time (rt interp, route csd30: a woken type 0x30 actor): game code the pure translation entered through the interpreter
+8c0600c2	S22 run time (rt interp, route csd30: a woken type 0x30 actor): game code the pure translation entered through the interpreter
+8c0617f2	S22 run time (rt interp, route csd30: a woken type 0x30 actor): game code the pure translation entered through the interpreter
+8c05ec56	S22 run time (rt interp, route csd30: a woken type 0x30 actor): game code the pure translation entered through the interpreter
+8c05e174	S22 run time (rt interp, route csd30: a woken type 0x30 actor): game code the pure translation entered through the interpreter

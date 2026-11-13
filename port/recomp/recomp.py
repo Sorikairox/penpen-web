@@ -525,6 +525,10 @@ def trim(img, funcs, table, names, via_rt, hle_c, hand=None, hand_mode=None, c_r
                     t = norm(w) if w is not None and not w & 1 else None
                 if t is not None and t in funcs and t not in reach and not (f <= t < end):
                     work.append(t)
+            # S22: a function that ends with a call (functions.tsv split it after a jsr it took for one that does not
+            # return: Ninja's motion interpolators at 0x8C0A5068 / 5116 / 51E2 / 535A) runs on into the next one
+            if end in funcs and end not in reach and decode(img, end - 4)[1] in ('JSR', 'BSR', 'BSRF'):
+                work.append(end)
         return reach
     if report:
         # S20: every function's class: hand (hand-written), hle (the runtime replaces it), c (reached from the C and the
@@ -558,6 +562,8 @@ def trim(img, funcs, table, names, via_rt, hle_c, hand=None, hand_mode=None, c_r
                 t = norm(w) if w is not None and not w & 1 else None
             if t is not None and t in funcs and t not in reach and not (f <= t < end):
                 work.append(t)
+        if end in funcs and end not in reach and decode(img, end - 4)[1] in ('JSR', 'BSR', 'BSRF'):
+            work.append(end)  # S22: the code runs on into the next function after a call (as walk() above)
     if hand_mode:
         reach |= set(hand) & set(funcs)  # every hand-written function stays in the table (rt_lookup finds its C)
     drop = [f for f in funcs if f not in reach]
@@ -691,6 +697,11 @@ def main():
                     if fn.endswith(('.c', '.h')):
                         for m in re.finditer(r'0[xX]([89][cC][0-9a-fA-F]{6})', open(os.path.join(d, fn), errors='replace').read()):
                             c_roots.add(norm(int(m.group(1), 16)))
+        # S22: addresses the C names but never calls (src/lib/ninja/motion.c): the motion reader's step tables (the C
+        # handles their two entries itself; another index goes through rt_call) and the whole-object readers' entries
+        # nj_MotionSetup stores for code nothing runs
+        c_roots -= {0x8C181B6C, 0x8C181B74, 0x8C0A54C6, 0x8C0A6168, 0x8C0A56CA, 0x8C0A562C, 0x8C0A61A0, 0x8C0A6186,
+                    0x8C0A555C, 0x8C0A61BA}
         ntrim = trim(img, funcs, table, sdk_names(a), via_rt, a.trim, hand, a.trim_hand, c_roots, a.classify)
     for addr in hand:
         if addr not in funcs:

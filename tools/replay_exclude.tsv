@@ -29,3 +29,30 @@
 /corpus/syn/s18dz2_0_0/s000003.smp	8c03c804	recorded under the undefined stack (stale slot read); passes with the fresh-frame clearing off: DECOMP 21.6, 22.2
 /corpus/syn/s18n3_1_0/s000014.smp	8c03c99c	recorded under the undefined stack (stale slot read); passes with the fresh-frame clearing off: DECOMP 21.6, 22.2
 /corpus/syn/s18n5_0_0/s000024.smp	8c05e098	recorded in S18 under the undefined stack: PoseFrame pos / ang / scl never written (nj_MotionStepA-C are HLE stubs here), leftovers on side A, zeros on side B; passes with the fresh-frame clearing off: DECOMP 22.2
+# S22: 22 samples of actor_type30_pose_node (0x8C05E098) recorded while nj_MotionStepA / B / C / End were HLE stubs
+# (S17-S20): their side A recorded those calls as HLE calls (1-4 of them, nothing written). S22 runs the motion reader as
+# guest code (src/lib/ninja/motion.c, the original interpreted on side A): side B makes no such HLE call, so the
+# recorded HLE log cannot match ("hle calls N/0"). Fresh samples with the reader as code: /corpus/syn/s22t30pose,
+# s22t30 (the draw).
+/corpus/syn/s18b05b_1_0/s000005.smp	8c05e098	S22: recorded with the motion reader as HLE stubs (its HLE calls are code now)
+/corpus/syn/s18b05b_1_0/s000006.smp	8c05e098	S22: recorded with the motion reader as HLE stubs (its HLE calls are code now)
+/corpus/syn/s18dv12_1_0/s000034.smp	8c05e098	S22: recorded with the motion reader as HLE stubs (its HLE calls are code now)
+/corpus/syn/s19re_0_0/s000002.smp	8c05e098	S22: recorded with the motion reader as HLE stubs (its HLE calls are code now)
+/corpus/syn/s19re_0_0/s000003.smp	8c05e098	S22: recorded with the motion reader as HLE stubs (its HLE calls are code now)
+/corpus/syn/s19re_0_0/s000004.smp	8c05e098	S22: recorded with the motion reader as HLE stubs (its HLE calls are code now)
+/corpus/syn/s19re_0_0/s000005.smp	8c05e098	S22: recorded with the motion reader as HLE stubs (its HLE calls are code now)
+/corpus/syn/s19re_0_0/s000006.smp	8c05e098	S22: recorded with the motion reader as HLE stubs (its HLE calls are code now)
+/corpus/syn/s19re_0_0/s000007.smp	8c05e098	S22: recorded with the motion reader as HLE stubs (its HLE calls are code now)
+/corpus/syn/s19re_0_0/s000008.smp	8c05e098	S22: recorded with the motion reader as HLE stubs (its HLE calls are code now)
+/corpus/syn/s20re2_0_0/s000000.smp	8c05e098	S22: recorded with the motion reader as HLE stubs (its HLE calls are code now)
+/corpus/syn/s20re2_0_0/s000001.smp	8c05e098	S22: recorded with the motion reader as HLE stubs (its HLE calls are code now)
+/corpus/syn/s20re2_0_0/s000002.smp	8c05e098	S22: recorded with the motion reader as HLE stubs (its HLE calls are code now)
+/corpus/syn/s20re2_0_0/s000003.smp	8c05e098	S22: recorded with the motion reader as HLE stubs (its HLE calls are code now)
+/corpus/syn/s20re2_0_0/s000004.smp	8c05e098	S22: recorded with the motion reader as HLE stubs (its HLE calls are code now)
+/corpus/syn/s20re2_0_0/s000005.smp	8c05e098	S22: recorded with the motion reader as HLE stubs (its HLE calls are code now)
+/corpus/syn/s20re3_0_0/s000002.smp	8c05e098	S22: recorded with the motion reader as HLE stubs (its HLE calls are code now)
+/corpus/syn/s20re3_0_0/s000003.smp	8c05e098	S22: recorded with the motion reader as HLE stubs (its HLE calls are code now)
+/corpus/syn/s20re3_0_0/s000004.smp	8c05e098	S22: recorded with the motion reader as HLE stubs (its HLE calls are code now)
+/corpus/syn/s20re3_0_0/s000005.smp	8c05e098	S22: recorded with the motion reader as HLE stubs (its HLE calls are code now)
+/corpus/syn/s20re3_0_0/s000006.smp	8c05e098	S22: recorded with the motion reader as HLE stubs (its HLE calls are code now)
+/corpus/syn/s20re3_0_0/s000007.smp	8c05e098	S22: recorded with the motion reader as HLE stubs (its HLE calls are code now)

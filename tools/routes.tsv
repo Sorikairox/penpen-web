@@ -65,3 +65,7 @@ cup4b	3300	600:START,700:A,1100:START,1200:A,1500:A,1620:RIGHT,1640:RIGHT,1660:R
 # shows its menu again. S21's poke of `requested` alone hung: the slots were -1 (no race was run), the penguin's
 # model name read before the table, and the file loader retried a missing file for ever (the pure build too)
 owner	2450	600:START,700:A,1100:START,1200:A,1500:A,1700:A	--poke 8CE169E4=0@1740,8CE169E8=1@1740,8CE169EC=2@1740,8CE16A08=0@1740,8CE16A0C=2@1740,8CE16A10=5@1740,8CE169C8=2@1740
+# csd30 (S22): cup4b's course (CSD) with one of its six type 0x30 actors (at 0x8CB31FA0; they stand in cells 200-203,
+# out of the routes' reach) moved at 1840 to 55 ahead of the start line (cell 2, its Body): the player, A held from
+# 1900, wakes it: it rises, puffs and plays its motion (the motion reader's keys: S22), drawn from ~1950
+csd30	2100	600:START,700:A,1100:START,1200:A,1500:A,1620:RIGHT,1640:RIGHT,1660:RIGHT,1700:A,1730:DOWN,1760:A,1900+200:A	--poke 8C1B7E54=FFFFFFFF@1100,8C1B7E58=FFFFFFFF@1100,8C1B7E5C=FFFFFFFF@1100,8C1B7E60=FFFFFFFF@1100,8CB31FA4=2@1840,8CB3208C=C20C0000@1840,8CB32090=40F00000@1840,8CB32094=C2480000@1840

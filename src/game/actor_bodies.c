@@ -400,7 +400,7 @@ HW_OFFSET(RestingActor, body, 0x28);
 HW_OFFSET(RestingActor, kind, 0x58);
 HW_OFFSET(RestingActor, angle, 0x64);
 
-/* was func_8C059CAC (with its tail at 0x8C059CD0): the Body at rest at the placement's position, no damping and no
+/* was func_8C059CAC (with its tail at 8C059CD0): the Body at rest at the placement's position, no damping and no
  * velocity, then the placement's angles and param */
 void resting_actor_init(gaddr actor, gaddr placement) {
   RestingActor *a = (RestingActor *)hw_ptr(actor);

@@ -11,7 +11,7 @@
  * End moves to the next node (and multiplies the current matrix by a matrix the reader's other entries set; Setup
  * clears it). The arithmetic is the FPU's (fpu.h), in the original's order.
  *
- * functions.tsv splits each interpolator after its first call (0x8C0A5068, 0x8C0A5116, 0x8C0A51E2, 0x8C0A535A): those
+ * functions.tsv splits each interpolator after its first call (8C0A5068, 8C0A5116, 8C0A51E2, 8C0A535A): those
  * parts are written with their heads here; no code enters them on its own (the trimmed translations drop them, so
  * they are not declared as fragments). */
 #include "hw.h"
@@ -147,7 +147,7 @@ static f32 motion_t(const NjKey3 *k0, const NjKey3 *k1, gaddr ones) {
   return fdiv(from, d[(int32_t)(k1->frame - k0->frame) > 0 ? 1 : 0]);
 }
 
-/* was func_8C0A5054 (with its part at 0x8C0A5068): position / scale keys, linear */
+/* was func_8C0A5054 (with its part at 8C0A5068): position / scale keys, linear */
 static void motion_linear_v(gaddr keys, uint32_t lo, uint32_t count, gaddr out) {
   const NjKey3 *k0 = key_at(keys, lo), *k1 = key_at(keys, rt_urem(lo + 1, count));
   f32 t = motion_t(k0, k1, G_ONES_LINEAR_V);
@@ -157,7 +157,7 @@ static void motion_linear_v(gaddr keys, uint32_t lo, uint32_t count, gaddr out) 
 }
 HW_EXPORT(8c0a5054, motion_linear_v(ARG0, ARG1, ARG2, ARG3))
 
-/* was func_8C0A5102 (with its part at 0x8C0A5116): angle keys, linear (through floats, truncated) */
+/* was func_8C0A5102 (with its part at 8C0A5116): angle keys, linear (through floats, truncated) */
 static void motion_linear_a(gaddr keys, uint32_t lo, uint32_t count, gaddr out) {
   const NjKey3 *k0 = key_at(keys, lo), *k1 = key_at(keys, rt_urem(lo + 1, count));
   f32 t = motion_t(k0, k1, G_ONES_LINEAR_A);
@@ -196,7 +196,7 @@ static f32 spline_sum(const SplineWeights *w, f32 pm, f32 p0, f32 p1, f32 p2) {
   return fmac(w->k2, p2, fmac(w->k1, p1, fmac(w->m, pm, fmul(w->k0, p0))));
 }
 
-/* was func_8C0A51CA (with its part at 0x8C0A51E2): position / scale keys, spline */
+/* was func_8C0A51CA (with its part at 8C0A51E2): position / scale keys, spline */
 static void motion_spline_v(gaddr keys, uint32_t lo, uint32_t count, gaddr out) {
   const NjKey3 *k[4];
   spline_keys(keys, lo, count, k);
@@ -207,7 +207,7 @@ static void motion_spline_v(gaddr keys, uint32_t lo, uint32_t count, gaddr out) 
 }
 HW_EXPORT(8c0a51ca, motion_spline_v(ARG0, ARG1, ARG2, ARG3))
 
-/* was func_8C0A5340 (with its part at 0x8C0A535A): angle keys, spline (through floats, truncated) */
+/* was func_8C0A5340 (with its part at 8C0A535A): angle keys, spline (through floats, truncated) */
 static void motion_spline_a(gaddr keys, uint32_t lo, uint32_t count, gaddr out) {
   const NjKey3 *k[4];
   spline_keys(keys, lo, count, k);
