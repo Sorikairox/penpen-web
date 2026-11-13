@@ -2,7 +2,8 @@
  * original for the version in game/racer_camera_update.c whose export is commented out (it failed the difftest
  * through racer_camera_update). This one also keeps the original's frame words: the racer at 0x5C and the
  * scratch word at 0x00 (the start value in step 0, then the chosen vector), and calls the locals' empty
- * constructors. It replaces that racer_camera_start (same name, racer.h declares it).
+ * constructors. It replaces that racer_camera_start (same name, racer.h declares it). S16: exported (the far point's
+ * test was reversed: found by the replay of racer_camera_update's samples, DECOMP.md 17).
  *
  * Step 0 sets the camera up (the eye and the three angle springs reset, the focus at the racer's position, the
  * heading spring at the scene's start value, t = 0) and goes on as step 1: the point is made by njProjectScreen
@@ -28,7 +29,7 @@ static inline void njProjectScreen(gaddr v, gaddr out, uint32_t flag, f32 t) {
 }
 
 /* the vectors the intro camera's point is made from (static data) */
-#define START_POINT_FAR     0x8C083198u /* more than 4 players, or a course that starts past segment 0 */
+#define START_POINT_FAR     0x8C083198u /* a count of at most 4, or a course that starts past segment 0 */
 #define START_POINT_COURSE3 0x8C083168u /* course 3 */
 #define START_POINT_OTHER   0x8C083138u /* the others */
 #define START_FRAMES 360                /* t runs from 0 to 1 over these frames */
@@ -81,7 +82,9 @@ void racer_camera_start(gaddr racer) {
   }
   if (running) {
     gaddr source;
-    if (race_setup_at(race_setup_get())->player_count > START_FAR_PLAYERS)
+    /* S16: the far point unless the set-up's count is above 4 (the S15 versions had this test reversed: the
+     * difftest replay of racer_camera_update's samples found it in the time trial's intro) */
+    if (race_setup_at(race_setup_get())->player_count <= START_FAR_PLAYERS)
       source = START_POINT_FAR;
     else if (race_scene_start_segment(panel_get()) != 0)
       source = START_POINT_FAR;
@@ -103,4 +106,4 @@ void racer_camera_start(gaddr racer) {
   vec3_copy_bytes(member_addr(racer, Racer, camera_eye), point);
   hw_stack_free(sizeof(StartFrame));
 }
-/* not exported (S15 difftest: racer_camera_update failed at the races' first frame while it called this: the eye's position differs; to find): HW_EXPORT(8c03c804, racer_camera_start(ARG0)) */
+HW_EXPORT(8c03c804, racer_camera_start(ARG0))

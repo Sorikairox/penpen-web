@@ -4,13 +4,12 @@
 #include "sound.h"
 #include "sdk.h"
 #include "../core/file.h"
+#include "../core/system.h" /* system_language, video_mode (S16: hand-written, called directly) */
 
 /* still translated (the start-up of each subsystem; names say what they are where known) */
 static void sb_init_system(int32_t mode, int32_t frame, int32_t count) { CALL3(0x8C010184u, mode, frame, count); } /* the SDK sample's sbInitSystem, linked into the game */
 static void sb_exit_system(void) { CALL0(0x8C01022Cu); }
 static void graphics_init(void) { CALL0(0x8C010C28u); }    /* heaps, texture/vertex buffers, matrices, lights */
-static int32_t video_cable_type(void) { return (int32_t)CALL0(0x8C0623EEu); }
-static int32_t video_info_b(void) { return (int32_t)CALL0(0x8C0623B4u); }
 static int32_t video_info_c(void) { return (int32_t)CALL0(0x8C062440u); }
 static void game_shutdown(void) { CALL0(0x8C016792u); }    /* never reached: the game leaves through syBtExit */
 static void run_static_destructors(void) { CALL0(0x8C016510u); }
@@ -60,8 +59,8 @@ HW_EXPORT_MAIN(8c0164b4, game_main())
 
 /* was func_8C016248: the display: VGA-capable cable or TV, 60 Hz, then the SDK's system start-up */
 void video_init(void) {
-  g_cable_type = video_cable_type();
-  g_video_info_b = video_info_b();
+  g_cable_type = video_mode();
+  g_video_info_b = system_language();
   g_video_info_c = video_info_c();
   g_video_flag = 1;
   g_display_mode = g_cable_type == 1 ? 1 : 0x38;

@@ -22,13 +22,6 @@ static inline void njProjectScreen(gaddr v, gaddr out, uint32_t flag, f32 t) {
   CALL3(0x8C0C4A80u, v, out, flag);
 }
 
-/* the vectors the state-0 camera's point is made from (static data) */
-
-
-/* func_8C03C804 through the original: the C version (game/racer_camera_start.c) fails the difftest (S15: two
- * writers' versions, the same differences in the eye's position at the races' first frame; to find) */
-static void racer_camera_start_translated(gaddr racer) { CALL1(0x8C03C804u, racer); }
-
 /* the camera modes still translated */
 /* func_8C03C99C: the camera of state 1 */
 static void racer_camera_state1(gaddr racer) { CALL1(0x8C03C99Cu, racer); }
@@ -60,7 +53,7 @@ void racer_camera_update(gaddr racer) {
     return;
   switch (r->state) {
   case 0:
-    racer_camera_start_translated(racer);
+    racer_camera_start(racer);
     return;
   case 2:
     racer_camera_intro(racer);

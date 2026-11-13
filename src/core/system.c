@@ -71,12 +71,13 @@ HW_OFFSET(SysConfigBlock, language, 0x0C);
 int32_t system_language(void) {
   syBtCfg_ReadFlash(0);
   gaddr block = bios_config_block();
-  switch (((const SysConfigBlock *)hw_ptr(block))->language) {
+  /* through the I/O model, not hw_ptr: the BIOS HLE gives no block (0), and the original then reads address 0x0C,
+   * outside main RAM (S16: the difference S15 found in game_init's sample) */
+  switch ((int8_t)hw_read8(block + (gaddr)__builtin_offsetof(SysConfigBlock, language))) {
   case '1': return 1;
   case '2': return 2;
   case '3': return 3;
   default: return 0;
   }
 }
-/* not exported (S13, S14: untestable: its only caller is game_init, whose difftest samples run past the step
- * budget; it is called from hand-written C, so it is never sampled itself): HW_EXPORT(8c0623b4, RET(system_language())) */
+HW_EXPORT(8c0623b4, RET(system_language()))

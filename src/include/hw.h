@@ -41,6 +41,8 @@ static inline gaddr hw_addr(const void *p) { return 0x8C000000u | (uint32_t)((co
 /* hardware registers and other non-RAM areas: through the runtime's I/O model */
 static inline uint32_t hw_read32(gaddr a) { return rd32(a); }
 static inline void hw_write32(gaddr a, uint32_t v) { wr32(a, v); }
+/* S16: a byte that may lie outside main RAM (a structure the BIOS HLE places at address 0, ...) */
+static inline uint8_t hw_read8(gaddr a) { return rd8(a); }
 
 /* layout checks: a struct shared with translated code must keep the original's offsets */
 #define HW_OFFSET(type, field, off) _Static_assert(__builtin_offsetof(type, field) == (off), #type "." #field)

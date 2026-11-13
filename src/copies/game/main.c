@@ -6,6 +6,7 @@
 #include "../../game/sound.h"
 #include "sdk.h"
 #include "../../core/file.h"
+#include "../../core/system.h"
 
 /* copies of 8c01b202 */
 HW_EXPORT(8c029016, video_resume())
