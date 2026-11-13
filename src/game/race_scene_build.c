@@ -38,8 +38,7 @@ static f32 course_start_value(gaddr course) {
 /* still translated */
 /* func_8C062B2C: the C runtime's srand */
 static void rt_srand(uint32_t seed) { CALL1(0x8C062B2Cu, seed); }
-/* func_8C02C1AA: mode 2's players */
-static void race_start_mode2(gaddr scene) { CALL1(0x8C02C1AAu, scene); }
+void race_start_three(gaddr scene); /* game/race_start_three.c (func_8C02C1AA): mode 2's players */
 /* func_8C041350: the course reset for another run */
 static void course_reset(gaddr course) { CALL1(0x8C041350u, course); }
 /* func_8C044766: the scenery actors reset for another run */
@@ -55,7 +54,7 @@ static void race_start_players(gaddr scene, int32_t mode) {
   else if (mode == 1)
     race_start_two(scene);
   else if (mode == 2)
-    race_start_mode2(scene);
+    race_start_three(scene);
   else if (mode == 3)
     race_start_four(scene);
   else if (mode == 4)

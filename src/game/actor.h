@@ -1331,5 +1331,9 @@ void actor_group_attach(gaddr group, gaddr actor, gaddr placement, int32_t index
 void actor_group_draw_view(gaddr group);
 /* S15 b08: game/actor_types.c */
 void body_damping_none(gaddr body);
+/* S18 b02: game/actor_factory.c (declared for game/trap_set_objects.c, whose factory is a copy) */
+gaddr actor_create(gaddr group, uint32_t type);
+/* S18 b02: game/trap_set_objects.c (the Actor flags word's getter, func_8C01F6AC) */
+uint32_t actor_flags(gaddr actor);
 
 #endif

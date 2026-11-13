@@ -465,8 +465,11 @@ HW_SIZE(Racer, 0x5A8);
 typedef struct RacerVtbl {
   TaskVtbl task;  /* 0x00 */
   VMethod reset;  /* 0x18 */
+  VMethod finish; /* 0x20: S18 b03: placed at the end of the race (this, position, a value in fr4: the race
+                   * scene's func_8C029272), called by the ending (race_scene_ending) */
 } RacerVtbl;
 HW_OFFSET(RacerVtbl, reset, 0x18);
+HW_OFFSET(RacerVtbl, finish, 0x20);
 
 /* A racer class larger than Racer: the computer player (S14 b08: constructor func_8C03DB9A -> func_8C03DB60, vtable
  * 0x8C23DB34, destructor body func_8C03DBC4, deleting destructor func_8C03DBEA; reset func_8C03DC54, update

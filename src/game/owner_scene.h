@@ -63,4 +63,5 @@ typedef struct OwnerPair {
 } OwnerPair;
 HW_SIZE(OwnerPair, 8);
 
+gaddr owner_scene_construct(gaddr scene, gaddr setup); /* game/owner_scene_construct.c (func_8C02FC12, resumable) */
 #endif

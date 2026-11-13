@@ -100,5 +100,7 @@ gaddr config_scene_delete(gaddr scene, int32_t free_memory);
 gaddr config_scene_destroy_self(gaddr scene);
 void config_scene_update(gaddr scene);
 void config_scene_draw(gaddr scene);
+/* S18 b02: game/config_entries.c */
+void config_scene_draw_entry(gaddr scene, int32_t selected, int32_t n);
 
 #endif

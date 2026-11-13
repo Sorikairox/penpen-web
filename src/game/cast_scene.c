@@ -8,18 +8,7 @@
 #include "../core/inline.h"
 #include "../game/motion.h"
 
-typedef struct CastScene {
-  Task task;                /* 0x00 */
-  uint8_t pad_024[0x5C - 0x24];
-  gaddr penguins[8];        /* 0x5C: g_cast_count of them used (0 = none) */
-  gaddr trap_set;           /* 0x7C */
-} CastScene;
-HW_OFFSET(CastScene, penguins, 0x5C);
-HW_OFFSET(CastScene, trap_set, 0x7C);
-
-#define g_cast_count GUEST_VAR(int32_t, 0x8C072644u) /* the penguins the scene makes (8) */
-
-static inline CastScene *cast_scene_at(gaddr a) { return (CastScene *)hw_ptr(a); }
+#include "cast_scene.h" /* S18: the class moved to its header */
 
 /* was func_8C020062: the destructor's body: each penguin deleted (and freed), then the Task's (empty) body. The
  * loop runs to g_cast_count as it is now (no bound by the array's 8: the original has none). */

@@ -42,9 +42,8 @@ static int32_t game_language(void) { return (int32_t)CALL0(0x8C019860u); }
 static void game_set_language(int32_t language) { CALL1(0x8C019864u, language); }
 /* func_8C018F7C (still translated): writes the save file; nonzero once it is done */
 static int32_t save_write(void) { return (int32_t)CALL0(0x8C018F7Cu); }
-/* func_8C02219E / func_8C02232C (still translated): draw language entry n / the leave entry n, highlighted when
- * `selected` */
-static void config_entry_draw(gaddr scene, int32_t selected, int32_t n) { CALL3(0x8C02219Eu, scene, selected, n); }
+/* func_8C02232C (still translated): draws the leave entry n, highlighted when `selected` (language entry n:
+ * config_scene_draw_entry, game/config_entries.c) */
 static void config_leave_draw(gaddr scene, int32_t selected, int32_t n) { CALL3(0x8C02232Cu, scene, selected, n); }
 
 /* was func_8C021D6E: the scene's body: the Task part by hand (its pause word and vtable left as they are), the pad
@@ -175,7 +174,7 @@ void config_scene_draw(gaddr scene) {
   ((NjSprite *)hw_ptr(back))->tlist = c->texlist;
   njDrawSprite2D(back, 0, F32(-300.0f), 0);
   for (n = 1; n <= 6; n++)
-    config_entry_draw(scene, c->shown == n, n);
+    config_scene_draw_entry(scene, c->shown == n, n);
   if (c->shown == 7)
     config_leave_draw(scene, c->shown == 7, 7);
   else

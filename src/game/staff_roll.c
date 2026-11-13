@@ -18,19 +18,11 @@
 #include "staff_roll.h"
 
 #define STAFF_ROLL_TEXLIST_B 0x8C08CDACu /* a static NJS_TEXLIST released with the scene */
-#define STAFF_ROLL_LINES     0x8C091C10u /* per language: StaffRollLine entries */
-#define STAFF_ROLL_LANGUAGE_SIZE 0x24Cu  /* bytes per language (49 entries) */
 #define STAFF_ROLL_MUSIC     0x2F
 #define STAFF_ROLL_LAST_PHASE 4
 #define PHASE_FRAMES         3900        /* the countdown of each phase before the last */
 #define DRIVE_PLAYING        3           /* gdFsGetDrvStat: the drive is still playing */
 #define NEXT_MODE            4
-
-typedef struct StaffRollLine {
-  int32_t seconds;            /* 0x00: how long the line stays */
-  uint8_t unknown04[8];
-} StaffRollLine;
-HW_SIZE(StaffRollLine, 12);
 
 /* ---- the scene's update ---- */
 

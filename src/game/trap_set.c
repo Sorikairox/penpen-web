@@ -9,28 +9,11 @@
 #include "../core/file.h"
 #include "../core/inline.h"
 
-typedef struct TrapSet {
-  Task task;                /* 0x000 */
-  gaddr objects[256];       /* 0x024: the placed objects (func_8C01F780 makes them) */
-  int32_t object_count;     /* 0x424 */
-  int32_t word428;          /* 0x428: 0 at construction */
-  int32_t layout;           /* 0x42C: picks the file names (1 at construction) */
-  gaddr file;               /* 0x430: the container (container_load); its first entry's data is the texlist */
-  int32_t word434;          /* 0x434: 1 at construction */
-  int32_t shown;            /* 0x438: 0 = the objects are not updated or drawn */
-  gaddr texlist;            /* 0x43C */
-  uint8_t pad_440[0x558 - 0x440];
-} TrapSet;
-HW_OFFSET(TrapSet, object_count, 0x424);
-HW_OFFSET(TrapSet, layout, 0x42C);
-HW_OFFSET(TrapSet, file, 0x430);
-HW_OFFSET(TrapSet, shown, 0x438);
-HW_SIZE(TrapSet, 0x558);
+#include "trap_set.h" /* S18: the class moved to its header */
 #define TRAP_SET_VTABLE    0x8C23D9FCu
 #define TRAP_SET_BINS      ((const gaddr *)hw_ptr(0x8C0971E4u)) /* the container's file name by layout */
 #define TRAP_SET_PVMS      ((const gaddr *)hw_ptr(0x8C097204u)) /* its textures' file name by layout */
 
-static inline TrapSet *trap_set_at(gaddr a) { return (TrapSet *)hw_ptr(a); }
 
 /* func_8C0120CA (core/texture.c, not declared in a header): loads a texture file into a texlist */
 static void texture_load(gaddr name, gaddr texlist, int32_t flags) { CALL3(0x8C0120CAu, name, texlist, flags); }

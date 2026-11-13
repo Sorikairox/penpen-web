@@ -13,6 +13,7 @@
 #include "../core/inline.h"
 #include "../core/view.h"
 #include "race_scene.h"
+#include "owner_scene.h"
 #include "game.h"
 #include "racer.h"
 #include "course.h"
@@ -490,7 +491,7 @@ void race_setup_update(gaddr setup) {
   case 2:
     block = syMalloc(COURSE_MAP_SIZE);
     if (block == 0) { scene = 0; break; }
-    HW_YIELDING(3, scene = CALL2(0x8C02FC12u, block, setup));
+    HW_YIELDING(3, scene = owner_scene_construct(block, setup));
     break;
   case 3: owner->next_mode = MODE_4; owner->mode_arg = 0; return;
   case 4: owner->next_mode = MODE_9; owner->mode_arg = 0; return;
