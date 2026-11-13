@@ -51,6 +51,11 @@ static inline uint8_t hw_read8(gaddr a) { return rd8(a); }
 /* ---- the CPU the hand-written code runs on (the live one, or a difftest sandbox's) ---- */
 extern SH4 *hw_cpu;
 
+/* S20: Ninja's current matrix lives in the FPU's back bank (XMTRX = XF0..XF15, column order: fpu.h ftrv), not in
+ * RAM: the SDK's matrix functions load and store it there, and the draw HLE reads it from there. Hand-written SDK
+ * code reaches it through this (the CPU it runs on: the live one or a difftest sandbox's). */
+static inline f32 *hw_xmtrx(void) { return (f32 *)hw_cpu->xf.u; }
+
 /* ---- calls into guest code (translated, SDK, HLE) ----
  * hw_call(fn, n, a0..a3): n = the number of arguments the callee takes (recorded for the difftest's comparison of
  * the SDK calls); returns r0. When the frame is being rewound it repeats the call that yielded (checked). */

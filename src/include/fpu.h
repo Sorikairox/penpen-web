@@ -19,6 +19,7 @@
  *   f32_to_int            FTRC (toward zero, saturating; NaN -> 0x80000000)
  *   fsca                  FSCA (sine and cosine of a 16-bit angle unit: 0x10000 = one turn)
  *   fsrra fipr            FSRRA (1/sqrt), FIPR (4-element dot product)
+ *   ftrv                  FTRV XMTRX, FVn (S20: a 4x4 matrix in the back bank's column order times a vector)
  *
  * Constants: F32(1.5f) for a value that is a float exactly, F32_BITS(0x3F19999Au) for one the binary stores as a
  * pattern (a decimal literal would be parsed with the host's rounding: the original's constants were not always
@@ -84,6 +85,16 @@ static inline f32 fipr(const f32 a[4], const f32 b[4]) {
   double s = 0;
   for (int i = 0; i < 4; i++) s += (double)fpu_in(b[i].f) * (double)fpu_in(a[i].f);
   return (f32){fq(f_dz(f_rz(s, 0)))};
+}
+/* S20: FTRV XMTRX, FVn: v = m v, m in XMTRX's order (XF0..XF15: column j is m[4j .. 4j+3], so row i is m[i],
+ * m[i+4], m[i+8], m[i+12]); each element is four exact products summed in double, left to right, one rounding */
+static inline void ftrv(const f32 m[16], f32 v[4]) {
+  double x[4], r[4];
+  for (int j = 0; j < 4; j++) x[j] = fpu_in(v[j].f);
+  for (int i = 0; i < 4; i++)
+    r[i] = (double)fpu_in(m[i].f) * x[0] + (double)fpu_in(m[i + 4].f) * x[1] + (double)fpu_in(m[i + 8].f) * x[2] +
+           (double)fpu_in(m[i + 12].f) * x[3];
+  for (int i = 0; i < 4; i++) v[i] = (f32){fq(f_dz(f_rz(r[i], 0)))};
 }
 
 #endif

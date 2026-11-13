@@ -480,6 +480,8 @@ static int side_b_compare(int ea, uint32_t at_a) {
   if (a->pr != b->pr) { fail("pr %x/%x", a->pr, b->pr, 0); return 0; }
   if (a->gbr != b->gbr || a->fpscr != b->fpscr) { fail("gbr/fpscr %x/%x", a->gbr ^ b->gbr, a->fpscr ^ b->fpscr, 0); return 0; }
   for (int i = 12; i < 16; i++) if (a->fr.u[i] != b->fr.u[i]) { fail("fr%x %x/%x", (uint32_t)i, a->fr.u[i], b->fr.u[i]); return 0; }
+  /* S20: XMTRX (XF0-XF15) holds Ninja's current matrix across calls (hw.h hw_xmtrx): compared like memory */
+  for (int i = 0; i < 16; i++) if (a->xf.u[i] != b->xf.u[i]) { fail("xf%x %x/%x", (uint32_t)i, a->xf.u[i], b->xf.u[i]); return 0; }
   if ((ret & 1) && a->r[0] != b->r[0]) { fail("r0 %x/%x", a->r[0], b->r[0], 0); return 0; }
   if ((ret & 2) && a->fr.u[0] != b->fr.u[0]) { fail("fr0 %x/%x", a->fr.u[0], b->fr.u[0], 0); return 0; } /* S13: RETF */
   /* the calls into the HLE, in order */

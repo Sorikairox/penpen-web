@@ -145,6 +145,27 @@ int main(int argc, char **argv) {
     exec1(0xF9ED); /* fipr fv4, fv8: n = 8 (bits 11-10 = 2), m = 4 (bits 9-8 = 1) */
     check(f32_bits(fipr(a, b)), c->fr.u[11], "fipr", f32_bits(a[0]), f32_bits(b[0]));
   }
+  /* S20: ftrv xmtrx, fv8: fv8 = XMTRX fv8 */
+  for (long n = 0; n < nrand / 4; n++) {
+    f32 m[16], v[5]; /* a fifth element that ftrv must leave alone */
+    v[4] = F32(1e20f);
+    for (int i = 0; i < 16; i++) {
+      uint32_t x = n < 64 && (rnd() & 1) ? edge[rnd() % (uint32_t)ne]
+                                          : ((110u + rnd() % 40u) << 23) | (rnd() & 0x7FFFFFu) | (rnd() & 1u) << 31;
+      if (n % 7 == 3 && i % 5 != 0) x = 0; /* an affine matrix's zeros */
+      m[i] = F32_BITS(x); c->xf.u[i] = x;
+    }
+    for (int i = 0; i < 4; i++) {
+      uint32_t y = n < 64 ? edge[rnd() % (uint32_t)ne] : ((110u + rnd() % 40u) << 23) | (rnd() & 0x7FFFFFu) | (rnd() & 1u) << 31;
+      if (n % 3 == 1 && i == 3) y = 0x3F800000u; /* a point (w = 1) */
+      v[i] = F32_BITS(y); c->fr.u[8 + i] = y;
+    }
+    uint32_t in0 = f32_bits(v[0]);
+    exec1(0xF9FD); /* ftrv xmtrx, fv8: n = 8 (bits 11-10 = 2) */
+    ftrv(m, v);
+    for (int i = 0; i < 4; i++) check(f32_bits(v[i]), c->fr.u[8 + i], "ftrv", in0, f32_bits(m[i]));
+    check(f32_bits(v[4]), f32_bits(F32(1e20f)), "ftrv past the vector", in0, 0);
+  }
   printf("fpu tests: %ld checks, %ld failures\n", checks, fails);
   return fails > 99 ? 99 : (int)fails;
 }
