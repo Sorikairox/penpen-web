@@ -2800,8 +2800,14 @@ address	c_function	bases	returned	kept	pass	fail	covered_bytes	insn_bytes	note	r
 8c062388	debug_log_word	10	601	1	1	0	12	32		h1
 8c0623b4	system_language	10	601	1	1	0	46	58		t8
 8c0623ee	video_mode	10	0	0	0	0	0	70		s18dv05b
+8c062848	-	10	600	1	1	0	52	58		s19math2
+8c062898	-	12	600	2	2	0	52	58		s19math2
 8c0628e8	-	12	600	2	2	0	52	58		s19math
+8c062988	-	10	600	3	3	0	58	58		s19math2
+8c063494	-	10	600	1	1	0	20	20		s19math2
+8c0634b0	-	10	600	7	7	0	208	208		s19math2
 8c0635a4	-	10	600	3	3	0	70	70		s19math
+8c0635fc	-	10	600	3	3	0	78	78		s19math2
 8c0647b4	-	10	28	8	8	0	362	400		s19math
 8c064994	-	10	600	5	5	0	220	228		s19math
 8c064a98	-	10	89	8	8	0	158	158		s19math

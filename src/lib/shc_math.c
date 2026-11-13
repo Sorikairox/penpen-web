@@ -1,6 +1,6 @@
 /* Pen Pen port, S19: the C runtime's single-precision maths (the SHC library linked after the game code, region
  * shc_rt of port/symbols/functions.tsv): atan2f and the pieces it is built from. The first library code outside the
- * game region written by hand (DECOMP.md 20): every operation is the FPU instruction the original runs (fpu.h:
+ * game region written by hand (DECOMP.md 20), with asinf, acosf and floorf: every operation is the FPU instruction the original runs (fpu.h:
  * round toward zero, denormals as zero), and the library's error reporting is kept: errno (0x8C1BAC68) is set to
  * EDOM when a result is a NaN and to ERANGE when it is infinite, as the float wrappers do. */
 #include "hw.h"
@@ -157,3 +157,42 @@ HW_EXPORT(8c0635a4, RETF(rt_atan2f_body(FARG0, FARG1)))
 /* was func_8C0628E8: atan2f(y, x), errno set as the library's float wrappers do */
 f32 rt_atan2f(f32 y, f32 x) { return rt_check(rt_atan2f_body(y, x)); }
 HW_EXPORT(8c0628e8, RETF(rt_atan2f(FARG0, FARG1)))
+
+/* was func_8C0634B0: asinf. |x| > 1 or NaN: the library's NaN; |x| = 1: +-pi/2; zero: x; else 2 atan(t), t the
+ * half-angle tangent: x / (1 + sqrt(1 - x^2)) below 1/2, (1 - sqrt(1 - x^2)) / x from there */
+f32 rt_asinf(f32 x) {
+  int neg = (f32_bits(x) & SIGN_BIT) != 0;
+  if (!feq(x, x)) return RT_NAN;
+  f32 ax = neg ? fneg(x) : x;
+  if (fgt(ax, F32(1.0f))) return RT_NAN;
+  if (feq(ax, F32(1.0f))) return neg ? fneg(RT_HALF_PI) : RT_HALF_PI;
+  if (feq(F32(0.0f), x)) return x;
+  f32 root = fsqrt(fsub(F32(1.0f), fmul(x, x)));
+  f32 t = fgt(F32(0.5f), ax) ? fdiv(x, fadd(F32(1.0f), root)) : fdiv(fsub(F32(1.0f), root), x);
+  return rt_ldexpf(rt_atanf(t), 1);
+}
+HW_EXPORT(8c0634b0, RETF(rt_asinf(FARG0)))
+
+/* was func_8C063494: acosf = pi/2 - asinf(x) */
+f32 rt_acosf(f32 x) { return fsub(RT_HALF_PI, rt_asinf(x)); }
+HW_EXPORT(8c063494, RETF(rt_acosf(FARG0)))
+
+/* was func_8C0635FC: floorf: below 2^32 in size the fraction is dropped (toward zero, the sign kept), then a negative
+ * x that had a fraction goes down by one */
+f32 rt_floorf(f32 x) {
+  uint32_t sign = f32_bits(x) & SIGN_BIT;
+  f32 t = x;
+  if ((int32_t)(f32_bits(x) & EXP_MASK) < (int32_t)0x4F800000u) t = f32_from_int(f32_to_int(x));
+  t = F32_BITS(f32_bits(t) | sign);
+  if (sign && !feq(x, t)) t = fadd(F32(-1.0f), t);
+  return t;
+}
+HW_EXPORT(8c0635fc, RETF(rt_floorf(FARG0)))
+
+/* was func_8C062898 / func_8C062848 / func_8C062988: asinf, acosf and floorf with errno set as atan2f's wrapper does */
+f32 rt_asinf_checked(f32 x) { return rt_check(rt_asinf(x)); }
+HW_EXPORT(8c062898, RETF(rt_asinf_checked(FARG0)))
+f32 rt_acosf_checked(f32 x) { return rt_check(rt_acosf(x)); }
+HW_EXPORT(8c062848, RETF(rt_acosf_checked(FARG0)))
+f32 rt_floorf_checked(f32 x) { return rt_check(rt_floorf(x)); }
+HW_EXPORT(8c062988, RETF(rt_floorf_checked(FARG0)))
