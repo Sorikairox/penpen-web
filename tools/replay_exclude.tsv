@@ -1,23 +1,31 @@
 # S20: corpus samples the replay gates leave out (tools/replay_corpus.py load_index: Mull, tools/replay_all.sh,
 # tools/linecov.py). Kept in the corpus (not deleted: the user's rule); each line: sample path, function, reason.
-# The 14 synthetic samples below were recorded in S17 / S18. The replay judges today's side B against the side A
-# recorded then (difftest.c --hwreplay does not re-run the original). The racer cameras' and the title intro's 7: their
-# recorded side A read never-written stack words (stale slots: DECOMP 20.1 / 20.2) that held earlier code's leftovers
-# then; since S19 a fresh frame reads as zero, so side B differs in the words computed from them. Type 0x30's pose's 7:
-# see their reason. The same five functions have fresh samples recorded under the defined stack (S19's s19re, S20's
-# s20re / s20re2) that pass.
-/corpus/syn/d1_0_0/s000210.smp	8c03cbc2	recorded under the undefined stack (stale slot read): DECOMP 21.6
-/corpus/syn/h1_0_0/s001090.smp	8c03cbc2	recorded under the undefined stack (stale slot read): DECOMP 21.6
-/corpus/syn/n1_0_0/s000094.smp	8c01bef8	recorded under the undefined stack (stale slot read): DECOMP 21.6
-/corpus/syn/s18b05b_1_0/s000004.smp	8c05e098	recorded in S18: under S19 it failed the FR4 comparison at the nj_MotionEnd stub (a test over-reach: no float is read there; fixed in S20), under S20 it fails the new XF0-XF15 comparison (side B ends with XF0 0, the recorded side A with a matrix); fresh samples of the function (s20re2) pass with both: DECOMP 21.6
-/corpus/syn/s18dv12_1_0/s000028.smp	8c05e098	recorded in S18: under S19 it failed the FR4 comparison at the nj_MotionEnd stub (a test over-reach: no float is read there; fixed in S20), under S20 it fails the new XF0-XF15 comparison (side B ends with XF0 0, the recorded side A with a matrix); fresh samples of the function (s20re2) pass with both: DECOMP 21.6
-/corpus/syn/s18dv12_1_0/s000029.smp	8c05e098	recorded in S18: under S19 it failed the FR4 comparison at the nj_MotionEnd stub (a test over-reach: no float is read there; fixed in S20), under S20 it fails the new XF0-XF15 comparison (side B ends with XF0 0, the recorded side A with a matrix); fresh samples of the function (s20re2) pass with both: DECOMP 21.6
-/corpus/syn/s18dv12_1_0/s000030.smp	8c05e098	recorded in S18: under S19 it failed the FR4 comparison at the nj_MotionEnd stub (a test over-reach: no float is read there; fixed in S20), under S20 it fails the new XF0-XF15 comparison (side B ends with XF0 0, the recorded side A with a matrix); fresh samples of the function (s20re2) pass with both: DECOMP 21.6
-/corpus/syn/s18dv12_1_0/s000031.smp	8c05e098	recorded in S18: under S19 it failed the FR4 comparison at the nj_MotionEnd stub (a test over-reach: no float is read there; fixed in S20), under S20 it fails the new XF0-XF15 comparison (side B ends with XF0 0, the recorded side A with a matrix); fresh samples of the function (s20re2) pass with both: DECOMP 21.6
-/corpus/syn/s18dv12_1_0/s000032.smp	8c05e098	recorded in S18: under S19 it failed the FR4 comparison at the nj_MotionEnd stub (a test over-reach: no float is read there; fixed in S20), under S20 it fails the new XF0-XF15 comparison (side B ends with XF0 0, the recorded side A with a matrix); fresh samples of the function (s20re2) pass with both: DECOMP 21.6
-/corpus/syn/s18dv12_1_0/s000033.smp	8c05e098	recorded in S18: under S19 it failed the FR4 comparison at the nj_MotionEnd stub (a test over-reach: no float is read there; fixed in S20), under S20 it fails the new XF0-XF15 comparison (side B ends with XF0 0, the recorded side A with a matrix); fresh samples of the function (s20re2) pass with both: DECOMP 21.6
-/corpus/syn/s18dv7_1_0/s000025.smp	8c03c99c	recorded under the undefined stack (stale slot read): DECOMP 21.6
-/corpus/syn/s18dz0_0_0/s000065.smp	8c01bef8	recorded under the undefined stack (stale slot read): DECOMP 21.6
-/corpus/syn/s18dz2_0_0/s000003.smp	8c03c804	recorded under the undefined stack (stale slot read): DECOMP 21.6
-/corpus/syn/s18n3_1_0/s000014.smp	8c03c99c	recorded under the undefined stack (stale slot read): DECOMP 21.6
-/corpus/syn/s18n5_0_0/s000024.smp	8c05e098	recorded in S18: fails the S20 XF0-XF15 comparison (XF4: -0 recorded on side A, +0 on side B), as the 7 above; fresh samples of the function (s20re2, s20re3) and 580 000 unit cases of the Ninja matrix C against the original (tools/s3.sh ninjatest) pass: DECOMP 21.6
+# The 15 synthetic samples below were recorded in S17 / S18, before S19 defined a fresh guest stack frame as zero
+# (sh4_ops.h sh4_stack_lowered, hw.c hw_stack_alloc). The replay judges today's side B against the side A recorded
+# then (difftest.c --hwreplay does not re-run the original): their side A read stack words no code had written, which
+# held what earlier code left in the snapshot; today's side B reads zeros there.
+# S21 proof (DECOMP 22.2): a debug build of the hand side with sh4_stack_lowered's clearing turned off (nothing else
+# changed) passes all 15 (hw replay done 15 failed 0); the normal build fails each. The never-written words:
+# - the racer cameras' and the title intro's 7 (8c03cbc2, 8c01bef8, 8c03c99c, 8c03c804): stale slots of their frames
+#   (DECOMP 20.1 / 20.2);
+# - type 0x30's pose's 8 (8c05e098, actor_type30_pose_node): its PoseFrame's pos / ang / scl, which the original fills
+#   by nj_MotionStepA / B / C; this port's HLE answers those three with h_default (r0 = 0, nothing written), so the
+#   frame keeps the snapshot's leftovers on side A and zeros on side B; a zero scale then gives XF0-XF3 = 0 (side B),
+#   a leftover one a matrix (side A); s18n5's: XF4 -0 / +0 from a zero against a leftover angle.
+# The same five functions have fresh samples recorded under the defined stack (S19's s19re, S20's s20re / s20re2 / s20re3)
+# that pass.
+/corpus/syn/d1_0_0/s000210.smp	8c03cbc2	recorded under the undefined stack (stale slot read); passes with the fresh-frame clearing off: DECOMP 21.6, 22.2
+/corpus/syn/h1_0_0/s001090.smp	8c03cbc2	recorded under the undefined stack (stale slot read); passes with the fresh-frame clearing off: DECOMP 21.6, 22.2
+/corpus/syn/n1_0_0/s000094.smp	8c01bef8	recorded under the undefined stack (stale slot read); passes with the fresh-frame clearing off: DECOMP 21.6, 22.2
+/corpus/syn/s18b05b_1_0/s000004.smp	8c05e098	recorded in S18 under the undefined stack: PoseFrame pos / ang / scl never written (nj_MotionStepA-C are HLE stubs here), leftovers on side A, zeros on side B; passes with the fresh-frame clearing off: DECOMP 22.2
+/corpus/syn/s18dv12_1_0/s000028.smp	8c05e098	recorded in S18 under the undefined stack: PoseFrame pos / ang / scl never written (nj_MotionStepA-C are HLE stubs here), leftovers on side A, zeros on side B; passes with the fresh-frame clearing off: DECOMP 22.2
+/corpus/syn/s18dv12_1_0/s000029.smp	8c05e098	recorded in S18 under the undefined stack: PoseFrame pos / ang / scl never written (nj_MotionStepA-C are HLE stubs here), leftovers on side A, zeros on side B; passes with the fresh-frame clearing off: DECOMP 22.2
+/corpus/syn/s18dv12_1_0/s000030.smp	8c05e098	recorded in S18 under the undefined stack: PoseFrame pos / ang / scl never written (nj_MotionStepA-C are HLE stubs here), leftovers on side A, zeros on side B; passes with the fresh-frame clearing off: DECOMP 22.2
+/corpus/syn/s18dv12_1_0/s000031.smp	8c05e098	recorded in S18 under the undefined stack: PoseFrame pos / ang / scl never written (nj_MotionStepA-C are HLE stubs here), leftovers on side A, zeros on side B; passes with the fresh-frame clearing off: DECOMP 22.2
+/corpus/syn/s18dv12_1_0/s000032.smp	8c05e098	recorded in S18 under the undefined stack: PoseFrame pos / ang / scl never written (nj_MotionStepA-C are HLE stubs here), leftovers on side A, zeros on side B; passes with the fresh-frame clearing off: DECOMP 22.2
+/corpus/syn/s18dv12_1_0/s000033.smp	8c05e098	recorded in S18 under the undefined stack: PoseFrame pos / ang / scl never written (nj_MotionStepA-C are HLE stubs here), leftovers on side A, zeros on side B; passes with the fresh-frame clearing off: DECOMP 22.2
+/corpus/syn/s18dv7_1_0/s000025.smp	8c03c99c	recorded under the undefined stack (stale slot read); passes with the fresh-frame clearing off: DECOMP 21.6, 22.2
+/corpus/syn/s18dz0_0_0/s000065.smp	8c01bef8	recorded under the undefined stack (stale slot read); passes with the fresh-frame clearing off: DECOMP 21.6, 22.2
+/corpus/syn/s18dz2_0_0/s000003.smp	8c03c804	recorded under the undefined stack (stale slot read); passes with the fresh-frame clearing off: DECOMP 21.6, 22.2
+/corpus/syn/s18n3_1_0/s000014.smp	8c03c99c	recorded under the undefined stack (stale slot read); passes with the fresh-frame clearing off: DECOMP 21.6, 22.2
+/corpus/syn/s18n5_0_0/s000024.smp	8c05e098	recorded in S18 under the undefined stack: PoseFrame pos / ang / scl never written (nj_MotionStepA-C are HLE stubs here), leftovers on side A, zeros on side B; passes with the fresh-frame clearing off: DECOMP 22.2
