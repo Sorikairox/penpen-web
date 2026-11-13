@@ -44,7 +44,7 @@ functions (s20re*); **ninjatest 580 000 / 0**; pure vs hand **identical frame li
 for genhand and genlib; native = wasm; the interpreter entered nowhere** (`--no-interp`); sh4 **257 / 0**; fpu
 **9 249 782 / 0** (+ ftrv); mixer **26 / 0**; harness **5 953 functions: 5 747 pass, 0 fail, 206 untested**
 (unchanged); `GEN=genhand tools/rtw.sh build` + `check` **OK** (and with GEN=genlib); browser e2e **passed** with both
-(58.1 / 58.3 game frames/s in the race); the title, PenPen House and race screenshots look right. Mull (new code):
+(the final hand build: 58.8 game frames/s in the race; the build without generated code, before the last three fixes: 58.3); the title, PenPen House and race screenshots look right. Mull (new code):
 **1 373 mutants, 1 035 killed, 25 equivalent, 183 unreached, 130 survived (each with a reason): 76.8 %, reach 88.8 %**;
 combined **24 181 mutants, 73.4 %, reach 91.3 %**.
 

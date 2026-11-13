@@ -1613,8 +1613,8 @@ s20re2 / s20re3 (the stale samples' functions). Unit tests: sh4 257 / 0, fpu 9 2
 mixer 26 / 0, harness 5 953 functions: 5 747 pass, 0 fail, 206 untested (unchanged). Pure vs hand: **identical frame
 lines on all 19 routes, native and wasm, for the hand build (genhand) and the build without generated code (genlib,
 `--no-interp`: interpreter never entered); native = wasm**. `GEN=genhand tools/rtw.sh build` + check OK; browser e2e
-passed with the hand build (58.1 game frames/s in the race) and with the build without generated code (58.3; "0
-recompiled functions, 4 179 hand-written"); the title, PenPen House and race screenshots look right.
+passed with the final hand build (58.8 game frames/s in the race) and with the build without generated code (58.3, before
+the last three fixes; "0 recompiled functions, 4 179 hand-written"); the title, PenPen House and race screenshots look right.
 
 Next:
 
