@@ -4,6 +4,7 @@
 #   tools/s3.sh fncover ["r1 r2"]  S13: the game functions each route runs (rt cover lines; tools/fncover.py)
 #   tools/s3.sh dupes           S13: groups of identical game functions (rt dupe lines; tools/dupes.py)
 #   tools/s3.sh fputest [N]     S13: src/include/fpu.h against the interpreter (N random operands per operation)
+#   tools/s3.sh ninjatest [N]   S20: Ninja's C against the original SDK code (N cases per function)
 #   tools/s3.sh fpu-mull [N]    S13: Mull on fpu.h, test_fpu.c as the test program
 #   tools/s3.sh gen [args]      recompile 1ST_READ.BIN -> C in penpen-build:/build/gen (local-only scaffold);
 #                               S8: trimmed to the code that can run (--trim); NOTRIM=1 translates everything
@@ -57,6 +58,11 @@ case "${1:-}" in
     # S13: the hand-written C's float helpers (src/include/fpu.h) against the interpreter (no disc data)
     shift
     box $IMG sh -c "cd /tmp && gcc $CF -o t /src/port/sh4/tests/test_fpu.c /src/port/sh4/sh4_interp.c -lm && ./t $*" ;;
+  ninjatest)
+    # S20: Ninja's matrix / vector / trig C against the original SDK code in the interpreter (port/sh4/tests/test_ninja.c;
+    # it runs the disc's code: sandbox, the binary from penpen-work)
+    shift
+    box -v penpen-work:/work:ro $IMG sh -c "cd /tmp && gcc $CF -I/src/src/include -o t /src/port/sh4/tests/test_ninja.c /src/port/sh4/sh4_interp.c /src/src/lib/ninja/matrix.c /src/src/lib/ninja/transform.c /src/src/lib/ninja/vector.c /src/src/lib/ninja/trig.c /src/src/lib/shc_math.c -lm 2>&1 | grep -c error; ./t /work/fs/1ST_READ.BIN ${1:-2000}" 2>&1 | grep -E '^(ninja test|[0-9]+$)' ;;
   fpu-mull)
     # S13: Mull on fpu.h with test_fpu.c as the test program (tools/mull_fpu.py)
     shift

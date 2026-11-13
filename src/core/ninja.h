@@ -22,6 +22,7 @@ void matrix_rotate_x(f32 a);
 void matrix_rotate_y(f32 a);
 void matrix_rotate_z(f32 a);
 void matrix_rotate_xyz(f32 x, f32 y, f32 z);
+void matrix_rotate_zxy(f32 x, f32 y, f32 z); /* S20: func_8C0304CA */
 void matrix_scale(f32 x, f32 y, f32 z);
 void matrix_scale_all(f32 s);
 void matrix_multiply(gaddr m);

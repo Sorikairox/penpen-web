@@ -20,6 +20,7 @@ void nj_rotate_x(gaddr m, int32_t angle);
 void nj_rotate_y(gaddr m, int32_t angle);
 void nj_rotate_z(gaddr m, int32_t angle);
 void nj_rotate_xyz(gaddr m, int32_t x, int32_t y, int32_t z);
+void nj_rotate_zxy(gaddr m, int32_t x, int32_t y, int32_t z);
 void nj_scale(gaddr m, f32 x, f32 y, f32 z);
 void nj_translate(gaddr m, f32 x, f32 y, f32 z);
 void nj_translate_v(gaddr m, gaddr v);

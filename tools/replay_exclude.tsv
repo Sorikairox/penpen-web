@@ -20,3 +20,4 @@
 /corpus/syn/s18dz0_0_0/s000065.smp	8c01bef8	recorded under the undefined stack (stale slot read): DECOMP 21.6
 /corpus/syn/s18dz2_0_0/s000003.smp	8c03c804	recorded under the undefined stack (stale slot read): DECOMP 21.6
 /corpus/syn/s18n3_1_0/s000014.smp	8c03c99c	recorded under the undefined stack (stale slot read): DECOMP 21.6
+/corpus/syn/s18n5_0_0/s000024.smp	8c05e098	recorded in S18: fails the S20 XF0-XF15 comparison (XF4: -0 recorded on side A, +0 on side B), as the 7 above; fresh samples of the function (s20re2, s20re3) and 580 000 unit cases of the Ninja matrix C against the original (tools/s3.sh ninjatest) pass: DECOMP 21.6

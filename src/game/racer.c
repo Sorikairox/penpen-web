@@ -23,8 +23,9 @@ HW_EXPORT(8c03044a, njInvertMatrix(ARG0))
 /* was func_8C03045A: out = a matrix's third row (its z axis; the racer's matrix at 0x3A8) */
 HW_EXPORT(8c03045a, vec3_copy(ARG1, member_addr(ARG0, Matrix, m[8])))
 
-/* was func_8C0304CA: rotate the current matrix by three float angles */
-HW_EXPORT(8c0304ca, matrix_rotate_xyz(FARG0, FARG1, FARG2))
+/* was func_8C0304CA: rotate the current matrix by three float angles, in the order Y, X, Z (njRotateZXY: S20, it
+ * was exported as the XYZ order before) */
+HW_EXPORT(8c0304ca, matrix_rotate_zxy(FARG0, FARG1, FARG2))
 
 /* was func_8C030972: a FrameBody's push += v (the racer's, at 0x2B8) */
 HW_EXPORT(8c030972, vec3_add(member_addr(ARG0, FrameBody, push), ARG1))

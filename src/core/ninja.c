@@ -73,6 +73,9 @@ HW_EXPORT(8c030434, njRotateZ(ARG0, f32_to_int(FARG0)))
 /* was func_8C02278C */
 void matrix_rotate_xyz(f32 x, f32 y, f32 z) { njRotateXYZ(0, f32_to_int(x), f32_to_int(y), f32_to_int(z)); }
 HW_EXPORT(8c02278c, matrix_rotate_xyz(FARG0, FARG1, FARG2))
+/* S20: was func_8C0304CA (until S20 exported as matrix_rotate_xyz: it jumps to njRotateZXY, not njRotateXYZ; the
+ * difference shows only in XMTRX, which the difftest compares since S20): the current matrix rotated by Y, X, Z */
+void matrix_rotate_zxy(f32 x, f32 y, f32 z) { nj_rotate_zxy(0, f32_to_int(x), f32_to_int(y), f32_to_int(z)); }
 /* was func_8C01B03A */
 void matrix_scale(f32 x, f32 y, f32 z) { njScale(0, x, y, z); }
 HW_EXPORT(8c01b03a, matrix_scale(FARG0, FARG1, FARG2))
