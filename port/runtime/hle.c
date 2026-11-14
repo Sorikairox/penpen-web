@@ -120,6 +120,8 @@ static const char *const guest[] = {
   "buMakeBackupFileImage",
   /* S22: Ninja's step-by-step motion reader (type 0x30's poses; src/lib/ninja/motion.c): stubs until S22 */
   "nj_MotionSetup", "nj_MotionStepA", "nj_MotionStepB", "nj_MotionStepC", "nj_MotionEnd",
+  /* S23: the motion drawers' node callback (a store; the draw HLE calls the function): a stub until S23 */
+  "nj_SetCallback",
 };
 /* the heap's free list (SDK globals of syMalloc, for the per-frame log): rover -> circular list of
  * {next, size in 32-byte units} */

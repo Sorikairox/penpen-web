@@ -65,6 +65,7 @@ HW_SIZE(NjArgb, 0x10);
 #define g_nj_texbuf_addr      GUEST_VAR(gaddr, 0x8C1EF488u)    /* njInitTextureBuffer: the buffer */
 #define g_nj_texbuf_size      GUEST_VAR(uint32_t, 0x8C1EF48Cu) /*   and its size, rounded down to 2 KB */
 #define g_nj_control3d        GUEST_VAR(uint32_t, 0x8C1EF2ECu) /* njControl3D flags (NJG_CTRL3D) */
+#define g_nj_node_callback    GUEST_VAR(gaddr, 0x8C1C6F7Cu)    /* nj_SetCallback: called with each node a motion drawer passes */
 #define g_nj_cattr_and        GUEST_VAR(uint32_t, 0x8C1EF320u) /* njSetConstantAttr masks (NJG_CATTR_AND / _OR) */
 #define g_nj_cattr_or         GUEST_VAR(uint32_t, 0x8C1EF324u)
 #define g_nj_cmaterial        GUEST_VAR(NjArgb, 0x8C1EF328u)   /* njSetConstantMaterial (NJG_CMAT) */

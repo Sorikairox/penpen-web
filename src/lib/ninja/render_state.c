@@ -11,6 +11,11 @@ int32_t nj_set_texture(gaddr texlist) {
 }
 HW_EXPORT(8c0a4540, RET(nj_set_texture(ARG0)))
 
+/* was func_8C0CB12C (nj_SetCallback, S23): the function the motion drawers call with each node they pass (0: none);
+ * the draw HLE (port/render/nj_model.c draw_motion) calls it. HLE stub (nothing stored) before S23. */
+void nj_set_callback(gaddr fn) { g_nj_node_callback = fn; }
+HW_EXPORT(8c0cb12c, nj_set_callback(ARG0))
+
 /* was func_8C0A966C (njControl3D): the 3D drawing flags */
 void nj_control_3d(uint32_t flags) { g_nj_control3d = flags; }
 HW_EXPORT(8c0a966c, nj_control_3d(ARG0))
