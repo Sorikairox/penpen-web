@@ -13,8 +13,11 @@
  *   volume (modifier volumes), end.
  * Projection: the screen of njSetScreen (dist, cx, cy at 0x8C1EF2A4...) with near clipping in view space. */
 #include <math.h>
+#include <stdlib.h>
+#include <string.h>
 #include "nj.h"
 #include "det_math.h" /* S22: powf / sinf / cosf as our own code (native = wasm) */
+#include "../../src/include/fpu.h" /* S23: the motion keys' blend as the FPU computes it (round toward zero) */
 #define R(i) HLE_R(i) /* S11: marks the argument registers read (rt.h) */
 
 /* SDK guest functions used for the node transforms */
@@ -29,16 +32,22 @@
 #define NJG_SCREEN 0x8C1EF2A4u /* dist, w, h, cx, cy */
 #define NJG_NEARFAR 0x8C1EF2D0u
 
-/* this SDK's njTranslate, njRotateXYZ/ZXY and njScale do nothing when the matrix argument is NULL (unlike the
- * documented "NULL = current matrix"): pass the current matrix itself */
-#define CUR_M rd32(NJG_CURMATRIX)
+/* S23: Ninja's current matrix is XMTRX (the FPU's back bank: src/include/hw.h), and a matrix argument of 0 means
+ * it (src/lib/ninja/matrix.c, transform.c). S8 read "NULL does nothing" because gcall restored the whole CPU,
+ * XMTRX included, after each call: the HLE then transformed the stack's RAM slot instead, which njPushMatrix
+ * overwrites with XMTRX for each child, so every node was drawn at the object's matrix times its own transform
+ * only (a parent's rotation never reached its children: the characters' bind pose). The transforms now go to
+ * XMTRX (argument 0) and gcall keeps the back bank the callee left. */
+#define CUR_M 0u
 static void gcall(SH4 *c, uint32_t fn, uint32_t a0, uint32_t a1, uint32_t a2, uint32_t a3, float f0, float f1, float f2) {
   SH4 save = *c;
   c->r[4] = a0; c->r[5] = a1; c->r[6] = a2; c->r[7] = a3;
   c->fr.f[4] = f0; c->fr.f[5] = f1; c->fr.f[6] = f2;
   c->pr = 0x8C000F00u;
   rt_call(c, fn);
+  sh4_fbank xm = c->xf;
   *c = save;
+  c->xf = xm;
 }
 
 /* ---- lights (per family; one shared set for now: RENDER.md 5) ---- */
@@ -74,7 +83,9 @@ static void h_l2update(SH4 *c) { hle_logcall(c, ""); memcpy(l2, l2_set, sizeof l
 typedef struct { float p[3], n[3]; uint32_t col; uint8_t hascol, hasn; } vb_t;
 static vb_t vb[NVB];
 static float M[16]; /* current matrix (row vectors: p' = p * M, translation in 12..14) */
-static void load_matrix(void) { uint32_t p = rd32(NJG_CURMATRIX); for (int i = 0; i < 16; i++) M[i] = nj_f(p + 4u * (uint32_t)i); }
+static SH4 *cpu_now;
+/* S23: the current matrix is XMTRX (not the matrix stack's RAM slot, which holds it only as it was at the last push) */
+static void load_matrix(void) { memcpy(M, cpu_now->xf.u, sizeof M); }
 static void xform(const float *p, float *o) {
   o[0] = p[0] * M[0] + p[1] * M[4] + p[2] * M[8] + M[12];
   o[1] = p[0] * M[1] + p[1] * M[5] + p[2] * M[9] + M[13];
@@ -326,8 +337,10 @@ static void plist(uint32_t a, int depth) {
 }
 
 static void self_check(SH4 *c, uint32_t model);
-static SH4 *cpu_now;
+static void dc_record(int side, uint32_t model, const uint32_t *xm);
+static int dc_recording;
 static void draw_model(uint32_t m) {
+  if (dc_recording) dc_record(1, m, cpu_now->xf.u);
   if (!sh4_is_ram(m)) return;
   self_check(cpu_now, m);
   load_matrix();
@@ -359,7 +372,7 @@ static int key_find(uint32_t keys, uint32_t nb, uint32_t stride, uint32_t nbf, f
   if (*t > 1) *t = 1;
   return 1;
 }
-typedef struct { uint32_t mot, shape; float frame; int node; } anim_t;
+typedef struct { uint32_t mot, shape; float frame; int node; int link; uint32_t mot1, shape1; float frame1, rate; } anim_t;
 static int mdata_get(uint32_t mot, int node, uint32_t bit, uint32_t *keys, uint32_t *nb) {
   if (!mot) return 0;
   uint32_t md = rd32(mot), type = rd16(mot + 8);
@@ -368,19 +381,6 @@ static int mdata_get(uint32_t mot, int node, uint32_t bit, uint32_t *keys, uint3
   uint32_t e = md + (uint32_t)node * (uint32_t)n * 8;
   *keys = rd32(e + (uint32_t)slot * 4); *nb = rd32(e + (uint32_t)(n + slot) * 4);
   return *nb && sh4_is_ram(*keys);
-}
-static void interp3f(uint32_t keys, uint32_t nb, uint32_t nbf, float f, float *o) {
-  uint32_t k0, k1; float t;
-  if (!key_find(keys, nb, 16, nbf, f, &k0, &k1, &t)) return;
-  for (int i = 0; i < 3; i++) { float a = nj_f(k0 + 4 + 4u * (uint32_t)i), b = nj_f(k1 + 4 + 4u * (uint32_t)i); o[i] = a + (b - a) * t; }
-}
-static void interp3a(uint32_t keys, uint32_t nb, uint32_t nbf, float f, int32_t *o) {
-  uint32_t k0, k1; float t;
-  if (!key_find(keys, nb, 16, nbf, f, &k0, &k1, &t)) return;
-  for (int i = 0; i < 3; i++) {
-    int32_t a = (int32_t)rd32(k0 + 4 + 4u * (uint32_t)i), b = (int32_t)rd32(k1 + 4 + 4u * (uint32_t)i);
-    o[i] = a + (int32_t)((float)(b - a) * t);
-  }
 }
 /* the arrays of the keys around frame f and the blend factor (linear between keys, as the SDK's shape
  * motion: wraps from the last key to the first over nbFrame) */
@@ -399,42 +399,202 @@ static uint32_t ptrkey(uint32_t keys, uint32_t nb, uint32_t nbf, float f, uint32
 #define EV_HIDE 8u
 #define EV_BREAK 0x10u
 #define EV_ZXY 0x20u
-static void draw_object(SH4 *c, uint32_t o, anim_t *an, int depth) {
+/* S23: the motion drawers' keys, as the original's element functions (8C0CACDA / 8C0CADFA / 8C0CAD6A) and their
+ * interpolators (8C0CA1C2 positions / scales, 8C0CA270 angles; the same code as the step reader's linear ones,
+ * src/lib/ninja/motion.c): the key at or before the frame by a binary search on the keys' frame numbers (unsigned; the
+ * frame truncated, 2^31 and up wrapped), the next key (index + 1 modulo the count: the last key blends toward the
+ * FIRST one, divided by the rodata 1.0 since its frame is not after: the blend runs past 1 there), value =
+ * (1 - t) * k0 + t * k1 with FMAC, angles through floats and truncated. S5-S22: a linear search, wrap over the motion's
+ * frame count, t clamped to [0, 1], angles as a + (b - a) * t in host floats. */
+#define G_ONES_V 0x8C17A5ECu
+#define G_ONES_A 0x8C17A5F4u
+static f32 mot_frame;
+static uint32_t mot_find(uint32_t keys, uint32_t count) {
+  f32 f = mot_frame;
+  if (fgt(f, F32(2147483648.0f))) f = fsub(f, F32(4294967296.0f));
+  uint32_t fr = (uint32_t)f32_to_int(f), lo = 0, hi = count;
+  while (hi - lo > 1) {
+    uint32_t mid = (lo + hi) >> 1;
+    if (fr >= rd32(keys + mid * 16)) lo = mid; else hi = mid;
+  }
+  return lo;
+}
+static uint32_t mot_next(uint32_t lo, uint32_t count) {
+  if (!count) { wr32(0x8C1BAC68u, 0x44Eu); return 0; } /* the C runtime's unsigned remainder: errno, 0 */
+  return (lo + 1) % count;
+}
+static f32 mot_t(uint32_t k0, uint32_t k1, uint32_t ones) {
+  uint32_t a = rd32(k0), b = rd32(k1);
+  f32 d = (int32_t)(b - a) > 0 ? f32_from_uint(b - a) : F32_BITS(rd32(ones));
+  return fdiv(fsub(mot_frame, f32_from_uint(a)), d);
+}
+/* nj_MotionL3b picks its interpolators by the motion's 0xC0 bits: positions / scales from table 8C181CBC (linear
+ * 8C0CA1C2 or Catmull-Rom 8C0CA354 through the keys before, at, after and after that, as motion.c's spline ones),
+ * angles from table 8C181CC4, whose two entries are both the linear 8C0CA270; the L1 drawers always use the linear
+ * ones */
+static int mot_spline;
+static uint32_t mot_mod(uint32_t a, uint32_t count) { if (!count) { wr32(0x8C1BAC68u, 0x44Eu); return 0; } return a % count; }
+static void spline_w(f32 t, f32 *w) {
+  const f32 half = F32(0.5f);
+  f32 t2 = fmul(t, t), t3 = fmul(t, t2), two_t2 = fmul(t2, fadd(F32(1.0f), F32(1.0f)));
+  w[0] = fmul(fsub(fsub(two_t2, t), t3), half);
+  f32 a = fmul(t3, F32(1.5f)), b = fsub(fmul(t, half), a);
+  w[1] = fadd(fsub(a, fmul(t2, F32(2.5f))), F32(1.0f));
+  w[2] = fadd(b, two_t2);
+  w[3] = fmul(fsub(t3, t2), half);
+}
+static f32 spline_s(const f32 *w, f32 pm, f32 p0, f32 p1, f32 p2) { return fmac(w[3], p2, fmac(w[2], p1, fmac(w[0], pm, fmul(w[1], p0)))); }
+static void mot_spline_keys(uint32_t keys, uint32_t count, uint32_t *k, f32 *w, uint32_t ones) {
+  uint32_t lo = mot_find(keys, count);
+  k[0] = keys + mot_mod(lo + count - 1, count) * 16; k[1] = keys + lo * 16;
+  k[2] = keys + mot_mod(lo + 1, count) * 16; k[3] = keys + mot_mod(lo + 2, count) * 16;
+  spline_w(mot_t(k[1], k[2], ones), w);
+}
+static void mot_keys_v(uint32_t keys, uint32_t count, float *o) {
+  if (mot_spline) {
+    uint32_t k[4]; f32 w[4];
+    mot_spline_keys(keys, count, k, w, G_ONES_V);
+    for (uint32_t i = 0; i < 3; i++)
+      o[i] = spline_s(w, F32_BITS(rd32(k[0] + 4 + 4 * i)), F32_BITS(rd32(k[1] + 4 + 4 * i)), F32_BITS(rd32(k[2] + 4 + 4 * i)), F32_BITS(rd32(k[3] + 4 + 4 * i))).f;
+    return;
+  }
+  uint32_t lo = mot_find(keys, count), k0 = keys + lo * 16, k1 = keys + mot_next(lo, count) * 16;
+  f32 t = mot_t(k0, k1, G_ONES_V), u = fsub(F32(1.0f), t);
+  for (uint32_t i = 0; i < 3; i++) o[i] = fmac(u, F32_BITS(rd32(k0 + 4 + 4 * i)), fmul(t, F32_BITS(rd32(k1 + 4 + 4 * i)))).f;
+}
+static void mot_keys_a(uint32_t keys, uint32_t count, int32_t *o) {
+  uint32_t lo = mot_find(keys, count), k0 = keys + lo * 16, k1 = keys + mot_next(lo, count) * 16;
+  f32 t = mot_t(k0, k1, G_ONES_A), u = fsub(F32(1.0f), t);
+  for (uint32_t i = 0; i < 3; i++)
+    o[i] = f32_to_int(fmac(u, f32_from_int((int32_t)rd32(k0 + 4 + 4 * i)), fmul(t, f32_from_int((int32_t)rd32(k1 + 4 + 4 * i)))));
+}
+/* the node's key pointer and count of the element that has `bit` (the motion's NJS_MDATA: n pointers then n counts,
+ * n = the element count of inp_fn); 0 when the motion has no such element or its pointer is 0 */
+static uint32_t mot_elem(uint32_t mot, uint32_t node, uint32_t bit, uint32_t *nb) {
+  uint32_t type = rd16(mot + 8), n = rd16(mot + 10) & 0xFF3Fu;
+  if (!(type & bit)) return 0;
+  uint32_t slot = (uint32_t)bitcount(type & (bit - 1) & 7u), e = rd32(mot) + node * n * 8;
+  *nb = rd32(e + (n + slot) * 4);
+  return rd32(e + slot * 4);
+}
+
+/* S23: the link drawers (nj_ShapeMotionL1b ...: object, NJS_MOTION_LINK {motion[2], frame[2]}, rate in FR4): per node
+ * each motion's element from its keys at its own frame (else the node's own value: 8C1124CC / 8C1128D6 ...), then
+ * 8C112BFE blends them when either had keys (8C1121FC positions / scales, 8C112324 angles: (1 - r) * v0 + r * v1,
+ * the first component as FMAC(r, v1, u v0), the others as FMAC(u, v0, r v1), angles through floats, truncated); with no
+ * keys in either, the node's value. (S5-S22: the link was read as a motion: garbage keys.) */
+static void blend_v(const float *v0, const float *v1, f32 r, float *o) {
+  f32 u = fsub(F32(1.0f), r);
+  o[0] = fmac(r, F32(v1[0]), fmul(u, F32(v0[0]))).f;
+  for (int i = 1; i < 3; i++) o[i] = fmac(u, F32(v0[i]), fmul(r, F32(v1[i]))).f;
+}
+static void blend_a(const int32_t *v0, const int32_t *v1, f32 r, int32_t *o) {
+  f32 u = fsub(F32(1.0f), r);
+  o[0] = f32_to_int(fmac(r, f32_from_int(v1[0]), fmul(u, f32_from_int(v0[0]))));
+  for (int i = 1; i < 3; i++) o[i] = f32_to_int(fmac(u, f32_from_int(v0[i]), fmul(r, f32_from_int(v1[i]))));
+}
+static uint32_t mot_elem(uint32_t mot, uint32_t node, uint32_t bit, uint32_t *nb);
+static uint32_t n_quat_link;
+static void link_node(const anim_t *an, uint32_t node, float *pos, int32_t *ang, float *scl) {
+  float p[2][3], s[2][3];
+  int32_t a[2][3];
+  int fp = 0, fa = 0, fs = 0;
+  for (int k = 0; k < 2; k++) {
+    memcpy(p[k], pos, 12); memcpy(s[k], scl, 12); memcpy(a[k], ang, 12);
+    uint32_t mot = k ? an->mot1 : an->mot, keys, nb;
+    if (!mot) continue;
+    if (rd16(mot + 8) & 0x2000u) n_quat_link++;
+    mot_frame = F32(k ? an->frame1 : an->frame);
+    if ((keys = mot_elem(mot, node, 1, &nb))) { mot_keys_v(keys, nb, p[k]); fp |= k + 1; }
+    if ((keys = mot_elem(mot, node, 2, &nb))) { mot_keys_a(keys, nb, a[k]); fa |= k + 1; }
+    if ((keys = mot_elem(mot, node, 4, &nb))) { mot_keys_v(keys, nb, s[k]); fs |= k + 1; }
+  }
+  f32 r = F32(an->rate);
+  if (fp) blend_v(p[0], p[1], r, pos); else memcpy(pos, p[0], 12);
+  if (fa) blend_a(a[0], a[1], r, ang); else memcpy(ang, a[0], 12);
+  if (fs) blend_v(s[0], s[1], r, scl); else memcpy(scl, s[0], 12);
+}
+
+#define EV_SKIP 0x40u
+#define G_CALLBACK 0x8C1C6F7Cu /* nj_SetCallback's function: called with each node the motion drawers pass */
+static void node_shape(anim_t *an, uint32_t node) {
+  uint32_t keys, nb, sv = 0, sn = 0, sv1 = 0, sn1 = 0;
+  float st = 0, st2 = 0;
+  if (an && an->shape) {
+    uint32_t nbf = rd32(an->shape + 4);
+    if (mdata_get(an->shape, (int)node, 0x10, &keys, &nb)) sv = ptrkey(keys, nb, nbf, an->frame, &sv1, &st);
+    if (mdata_get(an->shape, (int)node, 0x20, &keys, &nb)) sn = ptrkey(keys, nb, nbf, an->frame, &sn1, &st2);
+    if (!sv) st = st2;
+  }
+  shape_vert = sh4_is_ram(sv) ? sv : 0; shape_norm = sh4_is_ram(sn) ? sn : 0;
+  shape_vert1 = shape_vert ? sv1 : 0; shape_norm1 = shape_norm ? sn1 : 0; shape_t = st;
+}
+static void trace_node(uint32_t o, uint32_t ev, uint32_t model, const float *pos, const int32_t *ang, const float *scl) {
+  if (hle_tracing()) rt_log("hle trace node %08x ev %x model %08x pos %d %d %d ang %x %x %x scl %d %d %d /1000 shape %08x %08x",
+                            o, ev, model, (int)(pos[0] * 1000), (int)(pos[1] * 1000), (int)(pos[2] * 1000), ang[0], ang[1], ang[2],
+                            (int)(scl[0] * 1000), (int)(scl[1] * 1000), (int)(scl[2] * 1000), shape_vert, shape_norm);
+}
+/* S23: the object drawers (nj_ModelL*, nj_ObjectL1), as the original's walk (8C0D023C): a node whose three UNIT
+ * flags are all set is drawn at the current matrix without a push; otherwise push, translate / rotate (the node's
+ * own ZXY flag) / scale unless UNIT, draw unless HIDE, the child unless BREAK, pop. BREAK stops only the child: the
+ * walk always goes on to the sibling (S5-S22 returned, dropping the siblings). */
+static void draw_object(SH4 *c, uint32_t o, int depth) {
   for (int guard = 0; sh4_is_ram(o) && guard < 512; guard++) {
-    uint32_t ev = rd32(o), model = rd32(o + 4), node = an ? (uint32_t)an->node++ : 0;
+    uint32_t ev = rd32(o), model = rd32(o + 4), child = rd32(o + 0x2C);
     float pos[3] = {nj_f(o + 8), nj_f(o + 12), nj_f(o + 16)}, scl[3] = {nj_f(o + 32), nj_f(o + 36), nj_f(o + 40)};
     int32_t ang[3] = {(int32_t)rd32(o + 20), (int32_t)rd32(o + 24), (int32_t)rd32(o + 28)};
-    uint32_t keys, nb;
-    shape_vert = shape_norm = 0;
-    if (an && an->mot) {
-      uint32_t nbf = rd32(an->mot + 4);
-      if (mdata_get(an->mot, (int)node, 1, &keys, &nb)) { interp3f(keys, nb, nbf, an->frame, pos); ev &= ~EV_UNIT_POS; }
-      if (mdata_get(an->mot, (int)node, 2, &keys, &nb)) { interp3a(keys, nb, nbf, an->frame, ang); ev &= ~EV_UNIT_ANG; }
-      if (mdata_get(an->mot, (int)node, 4, &keys, &nb)) { interp3f(keys, nb, nbf, an->frame, scl); ev &= ~EV_UNIT_SCL; }
+    shape_vert = shape_norm = shape_vert1 = shape_norm1 = 0;
+    trace_node(o, ev, model, pos, ang, scl);
+    if ((ev & 7u) == 7u) {
+      if (!(ev & EV_HIDE) && model) draw_model(model);
+      if (!(ev & EV_BREAK) && child && depth < 64) draw_object(c, child, depth + 1);
+    } else {
+      gcall(c, G_PUSH, 0, 0, 0, 0, 0, 0, 0);
+      if (!(ev & EV_UNIT_POS)) gcall(c, G_TRANSLATE, CUR_M, 0, 0, 0, pos[0], pos[1], pos[2]);
+      if (!(ev & EV_UNIT_ANG)) gcall(c, (ev & EV_ZXY) ? G_ROTZXY : G_ROTXYZ, CUR_M, (uint32_t)ang[0], (uint32_t)ang[1], (uint32_t)ang[2], 0, 0, 0);
+      if (!(ev & EV_UNIT_SCL)) gcall(c, G_SCALE, CUR_M, 0, 0, 0, scl[0], scl[1], scl[2]);
+      if (!(ev & EV_HIDE) && model) draw_model(model);
+      if (!(ev & EV_BREAK) && child && depth < 64) draw_object(c, child, depth + 1);
+      gcall(c, G_POP, 1, 0, 0, 0, 0, 0, 0);
     }
-    uint32_t sv = 0, sn = 0, sv1 = 0, sn1 = 0;
-    float st = 0, st2 = 0;
-    if (an && an->shape) {
-      uint32_t nbf = rd32(an->shape + 4);
-      if (mdata_get(an->shape, (int)node, 0x10, &keys, &nb)) sv = ptrkey(keys, nb, nbf, an->frame, &sv1, &st);
-      if (mdata_get(an->shape, (int)node, 0x20, &keys, &nb)) sn = ptrkey(keys, nb, nbf, an->frame, &sn1, &st2);
-      if (!sv) st = st2;
-    }
-    if (hle_tracing()) rt_log("hle trace node %08x ev %x model %08x pos %d %d %d ang %x %x %x scl %d %d %d /1000 shape %08x %08x",
-                              o, ev, model, (int)(pos[0] * 1000), (int)(pos[1] * 1000), (int)(pos[2] * 1000), ang[0], ang[1], ang[2],
-                              (int)(scl[0] * 1000), (int)(scl[1] * 1000), (int)(scl[2] * 1000), sv, sn);
+    o = rd32(o + 0x30);
+  }
+}
+/* S23: the motion drawers' walk (8C0CC6F4): every node is pushed; a node without SKIP takes its position, angles
+ * and scale from the motion's keys where the motion has them (else its own values; the UNIT flags are not looked
+ * at) and uses the next node of the motion; the rotation order is the ROOT object's ZXY flag; a SKIP node uses its
+ * own values and its own ZXY flag and no motion node. Then nj_SetCallback's function (if any) with the node, the
+ * model unless HIDE, the child (BREAK is not looked at), pop, the sibling. */
+static void draw_motion(SH4 *c, uint32_t o, anim_t *an, uint32_t root_zxy, int depth) {
+  for (int guard = 0; sh4_is_ram(o) && guard < 512; guard++) {
+    uint32_t ev = rd32(o), model = rd32(o + 4), child = rd32(o + 0x2C);
+    float pos[3] = {nj_f(o + 8), nj_f(o + 12), nj_f(o + 16)}, scl[3] = {nj_f(o + 32), nj_f(o + 36), nj_f(o + 40)};
+    int32_t ang[3] = {(int32_t)rd32(o + 20), (int32_t)rd32(o + 24), (int32_t)rd32(o + 28)};
+    uint32_t zxy = ev & EV_ZXY, keys, nb;
+    shape_vert = shape_norm = shape_vert1 = shape_norm1 = 0;
     gcall(c, G_PUSH, 0, 0, 0, 0, 0, 0, 0);
-    if (!(ev & EV_UNIT_POS)) gcall(c, G_TRANSLATE, CUR_M, 0, 0, 0, pos[0], pos[1], pos[2]);
-    if (!(ev & EV_UNIT_ANG)) gcall(c, (ev & EV_ZXY) ? G_ROTZXY : G_ROTXYZ, CUR_M, (uint32_t)ang[0], (uint32_t)ang[1], (uint32_t)ang[2], 0, 0, 0);
-    if (!(ev & EV_UNIT_SCL)) gcall(c, G_SCALE, CUR_M, 0, 0, 0, scl[0], scl[1], scl[2]);
-    shape_vert = sh4_is_ram(sv) ? sv : 0; shape_norm = sh4_is_ram(sn) ? sn : 0;
-    shape_vert1 = shape_vert ? sv1 : 0; shape_norm1 = shape_norm ? sn1 : 0; shape_t = st;
+    if (!(ev & EV_SKIP)) {
+      uint32_t node = (uint32_t)an->node++;
+      zxy = root_zxy;
+      if (an->link) link_node(an, node, pos, ang, scl);
+      else if (an->mot) {
+        mot_frame = F32(an->frame);
+        if ((keys = mot_elem(an->mot, node, 1, &nb))) mot_keys_v(keys, nb, pos);
+        if ((keys = mot_elem(an->mot, node, 2, &nb))) mot_keys_a(keys, nb, ang);
+        if ((keys = mot_elem(an->mot, node, 4, &nb))) mot_keys_v(keys, nb, scl);
+      }
+      node_shape(an, node);
+    }
+    trace_node(o, ev, model, pos, ang, scl);
+    gcall(c, G_TRANSLATE, CUR_M, 0, 0, 0, pos[0], pos[1], pos[2]);
+    gcall(c, zxy ? G_ROTZXY : G_ROTXYZ, CUR_M, (uint32_t)ang[0], (uint32_t)ang[1], (uint32_t)ang[2], 0, 0, 0);
+    gcall(c, G_SCALE, CUR_M, 0, 0, 0, scl[0], scl[1], scl[2]);
+    uint32_t cb = rd32(G_CALLBACK);
+    if (cb) gcall(c, cb, o, 0, 0, 0, 0, 0, 0);
     if (!(ev & EV_HIDE) && model) draw_model(model);
     shape_vert = shape_norm = shape_vert1 = shape_norm1 = 0;
-    uint32_t child = rd32(o + 0x2C);
-    if (!(ev & EV_BREAK) && child && depth < 64) draw_object(c, child, an, depth + 1);
+    if (child && depth < 64) draw_motion(c, child, an, root_zxy, depth + 1);
     gcall(c, G_POP, 1, 0, 0, 0, 0, 0, 0);
-    if (ev & EV_BREAK) return;
     o = rd32(o + 0x30);
   }
 }
@@ -459,26 +619,147 @@ static void self_check(SH4 *c, uint32_t model) {
          (int)(o[0] * 1000), (int)(o[1] * 1000), (int)(o[2] * 1000), (int)nj_f(s + 0x20), (int)nj_f(s + 0x24), (int)pv.x, (int)pv.y);
 }
 
-/* nj_ModelL1/L2/L3 (model), nj_ObjectL1/B (object), nj_Motion* (object, motion, frame in FR4),
+/* ---- S23: the draw check (PENPEN_DRAWCHECK=N, native test builds): every N-th frame, each drawer call is first run
+ * as the ORIGINAL Ninja code in the interpreter (the disc's code at its address, on a copy of the CPU; RAM restored
+ * afterwards), its per-model draw functions (L1 8C0D01E0, L2 8C0D0A8C, L3 8C0D1850, the L3 motions' 8C11A720:
+ * model in r4, the current
+ * matrix in XMTRX) trapped to record (model, XMTRX); then the HLE runs and records the same at draw_model. The two
+ * lists are compared bit for bit (and within 1e-4 relative). The HLE shares nothing with the original's drawers, so
+ * a difference in the node walk, the motion's keys, the matrices or the callback shows here (S5-S22: every
+ * comparison had the same HLE on both sides). ---- */
+/* an address of the original's code the HLE never calls (written so that genlib's C-root scan, recomp.py --croots,
+ * does not take it for a function to translate) */
+#define ORIG(lo) ((0x8Cu << 24) | (lo))
+#define DC_N 1024
+typedef struct { uint32_t model, m[16]; } dc_rec;
+static dc_rec dc_list[2][DC_N];
+static int dc_n[2], dc_every = -1;
+static uint32_t dc_calls, dc_exact, dc_near, dc_bad, dc_bad_logged;
+static struct { uint32_t fn, calls, exact, near, bad; } dc_fn[24];
+static int dc_nfn;
+static void dc_record(int side, uint32_t model, const uint32_t *xm) {
+  if (dc_n[side] < DC_N) { dc_list[side][dc_n[side]].model = model; memcpy(dc_list[side][dc_n[side]].m, xm, 64); }
+  dc_n[side]++;
+}
+static uint8_t *dc_ram;
+#define DC_MAGIC 0x8C000F08u
+static int dc_original(SH4 *c, uint32_t fn) {
+  c->pc = fn; c->pr = DC_MAGIC;
+  for (long n = 0; n < 4000000; n++) {
+    uint32_t pc = c->pc;
+    if (pc == DC_MAGIC) return 0;
+    if (pc == ORIG(0x0D01E0u) || pc == ORIG(0x0D0A8Cu) || pc == ORIG(0x0D1850u) || pc == ORIG(0x11A720u)) { dc_record(0, c->r[4], c->xf.u); c->r[0] = 0; c->pc = c->pr; continue; }
+    if (sh4_step(c)) return 1;
+  }
+  return 2;
+}
+static float dc_f(uint32_t u) { float f; memcpy(&f, &u, 4); return f; }
+/* 1: run the check around this call (the HLE then records); the caller calls dc_end after the HLE */
+static int dc_begin(SH4 *c, uint32_t fn) {
+  if (dc_every < 0) {
+#ifndef __EMSCRIPTEN__
+    const char *e = getenv("PENPEN_DRAWCHECK");
+    dc_every = e ? atoi(e) : 0;
+#else
+    dc_every = 0;
+#endif
+  }
+  if (dc_every <= 0 || hle_frame() % (uint32_t)dc_every || rt_sandbox) return 0;
+  if (!dc_ram) dc_ram = malloc(16u << 20);
+  memcpy(dc_ram, sh4_ram, 16u << 20);
+  SH4 save = *c;
+  dc_n[0] = dc_n[1] = 0;
+  int r = dc_original(c, fn);
+  *c = save;
+  memcpy(sh4_ram, dc_ram, 16u << 20);
+  if (r) { rt_log("render drawcheck frame %u fn %08x: the original stopped (%d) at %08x", hle_frame(), fn, r, c->pc); return 0; }
+  dc_recording = 1;
+  return 1;
+}
+static void dc_end(uint32_t fn) {
+  dc_recording = 0;
+  dc_calls++;
+  int bad = dc_n[0] != dc_n[1], exact = !bad, first = -1;
+  double worst = 0;
+  for (int i = 0; i < dc_n[0] && i < dc_n[1] && i < DC_N; i++) {
+    const dc_rec *a = &dc_list[0][i], *b = &dc_list[1][i];
+    if (a->model != b->model) { bad = 1; exact = 0; if (first < 0) first = i; continue; }
+    for (int k = 0; k < 16; k++) {
+      if (a->m[k] == b->m[k]) continue;
+      exact = 0;
+      double x = dc_f(a->m[k]), y = dc_f(b->m[k]), d = fabs(x - y) / (fabs(x) > 1 ? fabs(x) : 1);
+      if (d > worst) worst = d;
+      if (d > 1e-4) { bad = 1; if (first < 0) first = i; }
+    }
+  }
+  int f = 0;
+  while (f < dc_nfn && dc_fn[f].fn != fn) f++;
+  if (f == dc_nfn && dc_nfn < 24) dc_fn[dc_nfn++].fn = fn;
+  if (f < 24) { dc_fn[f].calls++; if (exact) dc_fn[f].exact++; else if (!bad) dc_fn[f].near++; else dc_fn[f].bad++; }
+  if (exact) dc_exact++;
+  else if (!bad) dc_near++;
+  else {
+    dc_bad++;
+    if (dc_bad_logged++ < 40) {
+      int i = first < 0 ? 0 : first;
+      rt_log("render drawcheck DIFF frame %u fn %08x models %d/%d first %d model %08x/%08x worst %d e-6 t %d %d %d / %d %d %d",
+             hle_frame(), fn, dc_n[0], dc_n[1], first, dc_list[0][i].model, dc_list[1][i].model, (int)(worst * 1e6),
+             (int)dc_f(dc_list[0][i].m[12]), (int)dc_f(dc_list[0][i].m[13]), (int)dc_f(dc_list[0][i].m[14]),
+             (int)dc_f(dc_list[1][i].m[12]), (int)dc_f(dc_list[1][i].m[13]), (int)dc_f(dc_list[1][i].m[14]));
+    }
+  }
+}
+void nj_drawcheck_log(void) {
+  if (dc_every <= 0) return;
+  for (int f = 0; f < dc_nfn; f++)
+    rt_log("render drawcheck fn %08x calls %u exact %u near %u differ %u", dc_fn[f].fn, dc_fn[f].calls, dc_fn[f].exact, dc_fn[f].near, dc_fn[f].bad);
+  rt_log("render drawcheck calls %u exact %u near %u differ %u", dc_calls, dc_exact, dc_near, dc_bad);
+}
+#define DC_WRAP(fn, call) do { int dc_ = dc_begin(c, fn); call; if (dc_) dc_end(fn); } while (0)
+
+/* nj_ModelL1/L2/L3 (object), nj_ObjectL1/B (model), nj_Motion* (object, motion, frame in FR4),
  * nj_ShapeMotion* (object, motion, shape, frame in FR4) */
 /* nj_Model*: the game passes an NJS_CNK_OBJECT (eval flags, model, pos ...; usually with BREAK: this node
  * only); a word 0 that is a pointer means a bare NJS_CNK_MODEL (vlist first) */
 static void h_model(SH4 *c) {
   hle_logcall(c, ""); cpu_now = c; mat_reset();
   uint32_t w0 = rd32(R(4));
-  if (sh4_is_ram(w0)) draw_model(R(4)); else draw_object(c, R(4), 0, 0);
+  if (sh4_is_ram(w0)) draw_model(R(4)); else draw_object(c, R(4), 0);
   R(0) = 0;
 }
-static void h_object(SH4 *c) { hle_logcall(c, ""); cpu_now = c; mat_reset(); draw_object(c, R(4), 0, 0); R(0) = 0; }
+/* S23: the census's "nj_ObjectL1" (8C0D02FE) draws a bare chunk MODEL at the current matrix (the per-model function
+ * 8C0D01E0, between the polygon-context save / restore): no node walk (S5-S22 read an object: type 0x30's parts) */
+static void h_object(SH4 *c) { hle_logcall(c, ""); cpu_now = c; mat_reset(); draw_model(R(4)); R(0) = 0; }
+/* the drawers draw nothing when the frame is not before the motion's end (its frame count as an unsigned float) */
+static int mot_past_end(uint32_t mot, float frame) { return mot && !fgt(f32_from_uint(rd32(mot + 4)), F32(frame)); }
 static void h_motion(SH4 *c) {
   hle_logcall(c, ""); cpu_now = c;
+  if (mot_past_end(R(5), c->fr.f[4])) { R(0) = 0; return; }
   anim_t an = {R(5), 0, c->fr.f[4], 0};
-  mat_reset(); draw_object(c, R(4), &an, 0); R(0) = 0;
+  mat_reset(); draw_motion(c, R(4), &an, rd32(R(4)) & EV_ZXY, 0); R(0) = 0;
+}
+/* the link drawers: nothing when the rate is above 1 or a motion's frame is not before its end */
+static int link_read(uint32_t link, anim_t *an, int shape) {
+  uint32_t m0 = link ? rd32(link) : 0, m1 = link ? rd32(link + 4) : 0;
+  float f0 = link ? nj_f(link + 8) : 0, f1 = link ? nj_f(link + 12) : 0;
+  if (mot_past_end(m0, f0) || mot_past_end(m1, f1)) return 0;
+  if (shape) { an->shape = m0; an->shape1 = m1; } else { an->mot = m0; an->mot1 = m1; an->frame = f0; an->frame1 = f1; }
+  return 1;
+}
+static void h_shapemotion_link(SH4 *c) {
+  hle_logcall(c, ""); cpu_now = c;
+  anim_t an = {0};
+  an.link = 1; an.rate = c->fr.f[4];
+  if (fgt(F32(an.rate), F32(1.0f)) || !link_read(R(5), &an, 0) || !link_read(R(6), &an, 1)) { R(0) = 0; return; }
+  /* the shapes: the HLE draws the nearer of the two (their vertex blend, 8C1147F0, is not modelled) at its frame */
+  if (an.rate >= 0.5f) { an.shape = an.shape1; }
+  mat_reset(); draw_motion(c, R(4), &an, rd32(R(4)) & EV_ZXY, 0); R(0) = 0;
 }
 static void h_shapemotion(SH4 *c) {
   hle_logcall(c, ""); cpu_now = c;
+  if (mot_past_end(R(5), c->fr.f[4]) || mot_past_end(R(6), c->fr.f[4])) { R(0) = 0; return; }
   anim_t an = {R(5), R(6), c->fr.f[4], 0};
-  mat_reset(); draw_object(c, R(4), &an, 0); R(0) = 0;
+  mat_reset(); draw_motion(c, R(4), &an, rd32(R(4)) & EV_ZXY, 0); R(0) = 0;
 }
 /* ---- modifier volumes (cheap shadow): njCnkModDrawModel draws a closed volume into the opaque modifier
  * volume list; volume chunks 56 (triangles), 57 (quads), 58 (strips): {nb | user count << 14}, then the
@@ -542,7 +823,7 @@ static void h_njSetCheapShadowMode(SH4 *c) { hle_logcall(c, ""); rd_shadow(R(4))
 /* njDrawSprite3D(sprite, n, attr): the sprite's quad in the model's xy plane at sprite->p (y down as in
  * 2D, scaled by sx, sy; attr 1 rotates it by ang), through the current matrix, projected like a model */
 static void h_njDrawSprite3D(SH4 *c) {
-  hle_logcall(c, "");
+  hle_logcall(c, ""); cpu_now = c;
   uint32_t sp = R(4), n = R(5), attr = R(6);
   uint32_t tl = rd32(sp + 0x18), ta = rd32(sp + 0x1C) + n * 20;
   if (tl) wr32(NJG_TEXLIST, tl);
@@ -654,24 +935,39 @@ static void draw_basic(uint32_t m) {
 }
 static void h_basic_model(SH4 *c) { hle_logcall(c, ""); cpu_now = c; cur_fam = 0; draw_basic(R(4)); R(0) = 0; }
 void nj_model_log(void) {
+  nj_drawcheck_log();
+  if (n_quat_link) rt_log("render link motions with quaternion keys %u (not modelled)", n_quat_link);
   rt_log("render 3d models %u basic %u triangles %u near-clipped-out %u unknown vlist %u plist %u volumes %u", n_models, n_basic, n_tris3d, n_clipped, n_unknown_v, n_unknown_p, n_volumes);
 }
 
-#define FAMILY(n, i) \
-  static void h_model_##n(SH4 *c) { cur_fam = i; h_model(c); } \
-  static void h_motion_##n(SH4 *c) { cur_fam = i; h_motion(c); } \
-  static void h_shapemotion_##n(SH4 *c) { cur_fam = i; h_shapemotion(c); }
-FAMILY(l1, 0)
-FAMILY(l2, 1)
-FAMILY(l3, 2)
-FAMILY(l4, 3)
-static void h_object_l1(SH4 *c) { cur_fam = 0; h_object(c); }
+/* the L3 drawers pick the spline interpolator of positions / scales by the motion's 0xC0 bits; L1 / L2 always linear */
+#define SPLINE_IF(i) do { mot_spline = (i) == 2 && R(5) && (rd16(R(5) + 10) & 0xC0u); } while (0)
+#define FAMILY(n, i, am, amo, ash) \
+  static void h_model_##n(SH4 *c) { cur_fam = i; DC_WRAP(am, h_model(c)); } \
+  static void h_motion_##n(SH4 *c) { cur_fam = i; SPLINE_IF(i); DC_WRAP(amo, h_motion(c)); mot_spline = 0; } \
+  static void h_shapemotion_##n(SH4 *c) { cur_fam = i; SPLINE_IF(i); DC_WRAP(ash, h_shapemotion(c)); mot_spline = 0; }
+FAMILY(l1, 0, ORIG(0x0D0312u), ORIG(0x0CC84Eu), ORIG(0x0CC98Eu))
+FAMILY(l2, 1, ORIG(0x0D0C22u), ORIG(0x0CB7FCu), ORIG(0x0CB956u))
+FAMILY(l3, 2, ORIG(0x0D1996u), ORIG(0x0CD0A6u), ORIG(0x0CD1F4u))
+FAMILY(l4, 3, ORIG(0x0AB8C8u), ORIG(0x0A7224u), ORIG(0x0A72F0u))
+static void h_object_l1(SH4 *c) { cur_fam = 0; DC_WRAP(ORIG(0x0D02FEu), h_object(c)); }
+/* nj_MotionL3b is a plain motion drawer (object, motion, frame) whose interpolation follows the motion's 0xC0 bits */
+static void h_motion_l3b(SH4 *c) {
+  cur_fam = 2;
+  mot_spline = R(5) && (rd16(R(5) + 10) & 0xC0u);
+  DC_WRAP(ORIG(0x0CD94Eu), h_motion(c));
+  mot_spline = 0;
+}
+static void h_shapemotion_l1b(SH4 *c) { cur_fam = 0; DC_WRAP(ORIG(0x0C94CAu), h_shapemotion_link(c)); }
+static void h_shapemotion_l2b(SH4 *c) { cur_fam = 1; DC_WRAP(ORIG(0x0C74AAu), h_shapemotion_link(c)); }
+/* nj_ShapeMotionL3b, like nj_MotionL3b, is a plain drawer (object, motion, shape, frame), not a link */
+static void h_shapemotion_l3b(SH4 *c) { cur_fam = 2; SPLINE_IF(2); DC_WRAP(ORIG(0x0CDAA8u), h_shapemotion(c)); mot_spline = 0; }
 const nj_impl_t nj_model_impls[] = {
   {"nj_ModelL1", h_model_l1}, {"nj_ModelL2", h_model_l2}, {"nj_ModelL3", h_model_l3}, {"nj_ModelL4", h_model_l4},
   {"nj_ObjectL1", h_object_l1}, {"nj_ObjectB", h_basic_model},
-  {"nj_MotionL1", h_motion_l1}, {"nj_MotionL2", h_motion_l2}, {"nj_MotionL3", h_motion_l3}, {"nj_MotionL3b", h_motion_l3}, {"nj_MotionL4", h_motion_l4},
-  {"nj_ShapeMotionL1", h_shapemotion_l1}, {"nj_ShapeMotionL1b", h_shapemotion_l1}, {"nj_ShapeMotionL2", h_shapemotion_l2},
-  {"nj_ShapeMotionL2b", h_shapemotion_l2}, {"nj_ShapeMotionL3", h_shapemotion_l3}, {"nj_ShapeMotionL3b", h_shapemotion_l3},
+  {"nj_MotionL1", h_motion_l1}, {"nj_MotionL2", h_motion_l2}, {"nj_MotionL3", h_motion_l3}, {"nj_MotionL3b", h_motion_l3b}, {"nj_MotionL4", h_motion_l4},
+  {"nj_ShapeMotionL1", h_shapemotion_l1}, {"nj_ShapeMotionL1b", h_shapemotion_l1b}, {"nj_ShapeMotionL2", h_shapemotion_l2},
+  {"nj_ShapeMotionL2b", h_shapemotion_l2b}, {"nj_ShapeMotionL3", h_shapemotion_l3}, {"nj_ShapeMotionL3b", h_shapemotion_l3b},
   {"nj_ShapeMotionL4", h_shapemotion_l4},
   {"njDrawSprite3D", h_njDrawSprite3D}, {"njCnkModDrawModel", h_njCnkModDrawModel},
   {"njSetCheapShadowMode", h_njSetCheapShadowMode},

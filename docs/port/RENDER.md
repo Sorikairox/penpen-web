@@ -102,12 +102,23 @@ load time because the game reads the PVM into the texture buffer area and overwr
   `nj_ObjectL1` = object tree, `nj_Motion*` = (object, motion, frame in FR4), `nj_ShapeMotion*` = (object,
   motion, shape, frame in FR4). All families (L1–L4) use one implementation for now.
 - **Node transforms by the SDK's own matrix code** (guest calls: njPushMatrix, njTranslate, njRotateXYZ /
-  njRotateZXY, njScale, njPopMatrix on the current matrix whose pointer is at 0x8C1EF2B8): the HLE reads the
-  resulting 4×4 (row vectors, translation in elements 12–14). **This SDK's njTranslate / njRotateXYZ /
-  njRotateZXY / njScale return at once when the matrix argument is NULL** (not "NULL = current matrix"): the
-  HLE passes the current matrix pointer itself. S5 passed NULL, so every node transform of a model tree was
-  lost (S8 fix: the title's ice tube sat 544 units too close and unscaled, in front of the logo; the
-  characters' limbs were all at their root).
+  njRotateZXY, njScale, njPopMatrix). **S23: the current matrix is XMTRX** (the FPU's back bank; a matrix argument
+  of 0 means it), not the matrix stack's RAM slot at 0x8C1EF2B8 (that holds it only as it was at the last push). The
+  HLE passes 0, its guest calls keep the back bank the callee leaves, and draw_model reads XMTRX. S8-S22 read "this
+  SDK ignores a NULL matrix" because the call helper restored the whole CPU (XMTRX included) after each call; the HLE
+  then transformed the RAM slot, which njPushMatrix overwrites with XMTRX for every child: each node was drawn at the
+  object's matrix times its own transform only (the characters' bind pose, the user's S23 report).
+- **The node walks are the original's** (S23): the object drawers (0x8C0D023C): all three UNIT flags = no push;
+  else push, translate / rotate (the node's ZXY flag) / scale unless UNIT, draw unless HIDE, the child unless BREAK,
+  pop, **always the sibling**. The motion drawers (0x8C0CC6F4): always push; a non-SKIP node takes the motion's keys
+  where it has them (else its own values; UNIT flags ignored), the next motion node, the ROOT's ZXY flag; a SKIP node
+  its own values and ZXY flag and no motion node; nj_SetCallback's function with the node; the model unless HIDE;
+  the child (BREAK ignored); pop. Keys: binary search, linear (L1 / L2) or, for the L3 family by the motion's 0xC0
+  bits, Catmull-Rom positions / scales (angles always linear), the last key blending toward the first (rodata 1.0
+  divisor), FMAC order, angles through floats; nothing drawn when a frame is not before its motion's end. Links
+  (nj_ShapeMotionL1b ...: object, {motion[2], frame[2]}, rate): both motions per node, blended by the rate.
+  **Checked against the original** by `tools/s11.sh drawcheck` (PENPEN_DRAWCHECK: the original drawer run in the
+  interpreter first, its per-model draws trapped, the (model, XMTRX) lists compared bit for bit).
 - **Conventions, checked at run time** (`render check` line: our transform = the SDK's njCalcPoint): view space
   **+z forward, y down the screen**; screen = cx + dist·x/z, cy + dist·y/z with njSetScreen's {dist, w, h, cx,
   cy} at 0x8C1EF2A4 (554.3, 320, 240 here; 60° horizontal); near plane at 0x8C1EF2D0 (1.0; far 10000).
@@ -131,9 +142,8 @@ load time because the game reads the PVM into the texture buffer area and overwr
   (mode bit 19). The title tube (L3, specular 0x0BFFFFFF) shows highlight rings. `njControl3D` bit 0x10
   (constant material): the constant material replaces the diffuse colour, alpha included (the title's two ice
   layers cross-fade this way).
-- Motions: NJS_MOTION {mdata, nbFrame, type, inp_fn}; per node n = popcount(type) pointers then n counts;
-  pos/ang/scl keys {frame, 3 values} linear (angles as Sint32 differences), wrap from the last key to the first
-  over nbFrame; a channel with keys overrides the UNIT flag. Shape motions: VERT/NORM keys {frame, pointer},
+- Motions: NJS_MOTION {mdata, nbFrame, type, inp_fn}; per node n = (inp_fn & 0xFF3F) pointers then n counts;
+  pos/ang/scl keys {frame, 3 values} (S23: as the original, see above). Shape motions: VERT/NORM keys {frame, pointer},
   **linear blend of the two keys around the frame** per point / normal (S8; normals renormalised).
 - **Basic models** (S8): the game's `nj_ObjectB` (0x8C0C30A8, one site, once per character in races and the
   attract demo) takes a basic **NJS_MODEL** {points, normals, nbPoint, meshsets, mats, nbMeshset/nbMat,
@@ -193,7 +203,9 @@ Known wrong or missing (to do):
 - Translucency is sorted per triangle (no per-pixel autosort); no punch-through list is used by the game.
 - Flat shading and ignore-ambient strip flags ignored; the L2 IntensityN second value (100 on the route) is
   not used; the specular model is our reading (no SDK constant checked).
-- Spline motions (inp_fn) are interpolated linearly.
+- Shape motions' vertex keys are still our reading (linear between the keys around the frame, wrapping over
+  nbFrame; a link's two shapes are not blended: the nearer one is drawn): the draw check compares matrices only.
+- Quaternion motions (type 0x2000) are not modelled (none met on the routes; counted in the log).
 - `nj_ModelB` (1 site, never called on the routes), the B-family motions and `njPrint` not implemented.
 - Palettised textures not decoded; `njLoadTexture` (GBIX/PVRT from a file) not implemented (1 site).
 - `njCalcScreen`'s guest result did not match the formula in the self-check (its arguments are not
