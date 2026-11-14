@@ -534,11 +534,16 @@ static void trace_node(uint32_t o, uint32_t ev, uint32_t model, const float *pos
                             o, ev, model, (int)(pos[0] * 1000), (int)(pos[1] * 1000), (int)(pos[2] * 1000), ang[0], ang[1], ang[2],
                             (int)(scl[0] * 1000), (int)(scl[1] * 1000), (int)(scl[2] * 1000), shape_vert, shape_norm);
 }
+static void draw_basic(uint32_t m);
+/* S24: the model drawer of a walk: the chunk drawers' (8C0D01E0 ...) or, for nj_ModelL4, the basic one (8C0AB13C) */
+typedef void (*model_fn)(uint32_t m);
+static void draw_object_with(SH4 *c, uint32_t o, int depth, model_fn draw);
 /* S23: the object drawers (nj_ModelL*, nj_ObjectL1), as the original's walk (8C0D023C): a node whose three UNIT
  * flags are all set is drawn at the current matrix without a push; otherwise push, translate / rotate (the node's
  * own ZXY flag) / scale unless UNIT, draw unless HIDE, the child unless BREAK, pop. BREAK stops only the child: the
  * walk always goes on to the sibling (S5-S22 returned, dropping the siblings). */
-static void draw_object(SH4 *c, uint32_t o, int depth) {
+static void draw_object(SH4 *c, uint32_t o, int depth) { draw_object_with(c, o, depth, draw_model); }
+static void draw_object_with(SH4 *c, uint32_t o, int depth, model_fn draw) {
   for (int guard = 0; sh4_is_ram(o) && guard < 512; guard++) {
     uint32_t ev = rd32(o), model = rd32(o + 4), child = rd32(o + 0x2C);
     float pos[3] = {nj_f(o + 8), nj_f(o + 12), nj_f(o + 16)}, scl[3] = {nj_f(o + 32), nj_f(o + 36), nj_f(o + 40)};
@@ -546,15 +551,15 @@ static void draw_object(SH4 *c, uint32_t o, int depth) {
     shape_vert = shape_norm = shape_vert1 = shape_norm1 = 0;
     trace_node(o, ev, model, pos, ang, scl);
     if ((ev & 7u) == 7u) {
-      if (!(ev & EV_HIDE) && model) draw_model(model);
-      if (!(ev & EV_BREAK) && child && depth < 64) draw_object(c, child, depth + 1);
+      if (!(ev & EV_HIDE) && model) draw(model);
+      if (!(ev & EV_BREAK) && child && depth < 64) draw_object_with(c, child, depth + 1, draw);
     } else {
       gcall(c, G_PUSH, 0, 0, 0, 0, 0, 0, 0);
       if (!(ev & EV_UNIT_POS)) gcall(c, G_TRANSLATE, CUR_M, 0, 0, 0, pos[0], pos[1], pos[2]);
       if (!(ev & EV_UNIT_ANG)) gcall(c, (ev & EV_ZXY) ? G_ROTZXY : G_ROTXYZ, CUR_M, (uint32_t)ang[0], (uint32_t)ang[1], (uint32_t)ang[2], 0, 0, 0);
       if (!(ev & EV_UNIT_SCL)) gcall(c, G_SCALE, CUR_M, 0, 0, 0, scl[0], scl[1], scl[2]);
-      if (!(ev & EV_HIDE) && model) draw_model(model);
-      if (!(ev & EV_BREAK) && child && depth < 64) draw_object(c, child, depth + 1);
+      if (!(ev & EV_HIDE) && model) draw(model);
+      if (!(ev & EV_BREAK) && child && depth < 64) draw_object_with(c, child, depth + 1, draw);
       gcall(c, G_POP, 1, 0, 0, 0, 0, 0, 0);
     }
     o = rd32(o + 0x30);
@@ -648,7 +653,7 @@ static int dc_original(SH4 *c, uint32_t fn) {
   for (long n = 0; n < 4000000; n++) {
     uint32_t pc = c->pc;
     if (pc == DC_MAGIC) return 0;
-    if (pc == ORIG(0x0D01E0u) || pc == ORIG(0x0D0A8Cu) || pc == ORIG(0x0D1850u) || pc == ORIG(0x11A720u)) { dc_record(0, c->r[4], c->xf.u); c->r[0] = 0; c->pc = c->pr; continue; }
+    if (pc == ORIG(0x0D01E0u) || pc == ORIG(0x0D0A8Cu) || pc == ORIG(0x0D1850u) || pc == ORIG(0x11A720u) || pc == ORIG(0x0AB13Cu)) { dc_record(0, c->r[4], c->xf.u); c->r[0] = 0; c->pc = c->pr; continue; }
     if (sh4_step(c)) return 1;
   }
   return 2;
@@ -898,6 +903,8 @@ static void draw_basic(uint32_t m) {
     if (!sh4_is_ram(uvp)) uvp = 0;
     uint32_t ma = (sh4_is_ram(mats) && mi < nmat) ? mats + mi * 20 : 0;
     uint32_t mattr = ma ? rd32(ma + 16) : 0;
+    if (hle_tracing()) rt_log("hle trace basic %08x points %u meshset %u type %u meshes %u mat %u attr %08x dif %08x tex %u uv %d vc %d",
+                              m, np, k, type, nb, mi, mattr, ma ? rd32(ma) : 0, ma ? rd32(ma + 12) & 0x1FFF : 0, uvp != 0, vcp != 0);
     mat_reset();
     if (ma) { mat.dif = rd32(ma); mat.spe = (rd32(ma + 4) & 0xFFFFFFu) | ((uint32_t)nj_f(ma + 8) & 0xFF) << 24; mat.texid = rd32(ma + 12) & 0x1FFF; }
     int alpha = (mattr & 0x00100000u) != 0;
@@ -944,12 +951,31 @@ void nj_model_log(void) {
 #define SPLINE_IF(i) do { mot_spline = (i) == 2 && R(5) && (rd16(R(5) + 10) & 0xC0u); } while (0)
 #define FAMILY(n, i, am, amo, ash) \
   static void h_model_##n(SH4 *c) { cur_fam = i; DC_WRAP(am, h_model(c)); } \
+  FAMILY_MOTIONS(n, i, amo, ash)
+#define FAMILY_MOTIONS(n, i, amo, ash) \
   static void h_motion_##n(SH4 *c) { cur_fam = i; SPLINE_IF(i); DC_WRAP(amo, h_motion(c)); mot_spline = 0; } \
   static void h_shapemotion_##n(SH4 *c) { cur_fam = i; SPLINE_IF(i); DC_WRAP(ash, h_shapemotion(c)); mot_spline = 0; }
 FAMILY(l1, 0, ORIG(0x0D0312u), ORIG(0x0CC84Eu), ORIG(0x0CC98Eu))
 FAMILY(l2, 1, ORIG(0x0D0C22u), ORIG(0x0CB7FCu), ORIG(0x0CB956u))
 FAMILY(l3, 2, ORIG(0x0D1996u), ORIG(0x0CD0A6u), ORIG(0x0CD1F4u))
-FAMILY(l4, 3, ORIG(0x0AB8C8u), ORIG(0x0A7224u), ORIG(0x0A72F0u))
+/* S24: the "L4" family (0x8C0A....-0x8C0AB...) is Ninja's BASIC-model family (NJS_OBJECT / NJS_MODEL, the census's
+ * names kept): nj_ModelL4 (8C0AB8C8 -> 8C0AB604) walks a basic object tree as the chunk walk does and draws each
+ * model with the basic drawer 8C0AB13C (draw_basic) in the L4 light. S5-S23 read the tree as chunk objects: the
+ * NJS_MODEL's points / normals pointers as a vertex / polygon chunk list, i.e. normals as strips whose indices hit
+ * whatever the vertex buffer held (the user's S24 report: Sweets' scrolling foam strip, type 4, drew long slabs
+ * toward the last model drawn, the penguin). nj_MotionL4 / nj_ShapeMotionL4 (basic motions, 8C0A6F88 ...) have no
+ * caller in the game (only the unused wrappers 8C01112C / 8C011698): still the chunk motion walk, not modelled. */
+static void draw_basic_l4(uint32_t m) {
+  if (dc_recording) dc_record(1, m, cpu_now->xf.u);
+  draw_basic(m);
+}
+static void h_basic_object(SH4 *c) {
+  hle_logcall(c, ""); cpu_now = c; mat_reset();
+  draw_object_with(c, R(4), 0, draw_basic_l4);
+  R(0) = 0;
+}
+static void h_model_l4(SH4 *c) { cur_fam = 3; DC_WRAP(ORIG(0x0AB8C8u), h_basic_object(c)); }
+FAMILY_MOTIONS(l4, 3, ORIG(0x0A7224u), ORIG(0x0A72F0u))
 static void h_object_l1(SH4 *c) { cur_fam = 0; DC_WRAP(ORIG(0x0D02FEu), h_object(c)); }
 /* nj_MotionL3b is a plain motion drawer (object, motion, frame) whose interpolation follows the motion's 0xC0 bits */
 static void h_motion_l3b(SH4 *c) {
