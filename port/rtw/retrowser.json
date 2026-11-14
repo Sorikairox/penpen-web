@@ -10,6 +10,7 @@
   },
   "video": "webgl",
   "hz": 60,
+  "picture": { "path": "cover.png", "sha256": "", "size": 0, "credit": "Box art © Infogrames / General Entertainment · image from libretro-thumbnails" },
   "rom": {
     "sha1": ["05c789c1b426912509fd5af9e861c1d0cc8cbd17"]
   },

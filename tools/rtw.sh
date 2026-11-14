@@ -40,7 +40,8 @@ case "${1:-}" in
       sh -c "sh /src/port/runtime/build.sh wasm /build/$G $W '$CF' 8 && rm -rf /build/rtw && mkdir -p /build/rtw &&
         cp $W/penpen.wasm /build/rtw/penpen.wasm &&
         cat /src/port/render/gl/render_gl.js /src/port/rtw/glue.js > /build/rtw/penpen.js &&
-        cp /src/port/rtw/retrowser.json /build/rtw/retrowser.json && echo rtw module assembled" 2>&1 || true)
+        cp /src/port/rtw/retrowser.json /build/rtw/retrowser.json && cp /src/port/rtw/cover.png /build/rtw/cover.png &&
+        echo rtw module assembled" 2>&1 || true)
     echo "$OUT" | filt
     echo "$OUT" | grep -q '^rtw module assembled$' || { echo "rtw build FAILED (the old module, if any, is left as it was)"; echo "$OUT" | grep -E '(error|Killed)' | grep -v '^ *[0-9]* |' | head -5; exit 1; }
     $D run $SAFE -v penpen-build:/build $IMG node /rtw/dist/tools/rtw.mjs hash /build/rtw 2>&1 | filt
