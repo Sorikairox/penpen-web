@@ -1889,3 +1889,95 @@ Next:
 2. A longer csd30 (type 0x30's motion run to its end, its sinking, its sound) and a second player near it.
 3. The owner route on course 2 and variant 4 (two penguins), a button to leave.
 4. The genhand compares again (native and wasm) on the 21 routes.
+
+## 24. S23: the characters' bind pose: the draw HLE against the ORIGINAL Ninja drawers
+
+The user (public genlib build on retrowser.app): "most of characters 3D pose and animation are wrong"; then a
+screenshot: in PenPen House every character stands in its bind pose (arms and wings straight out), the same in races.
+
+### 24.1 Why no test saw it
+
+Every whole-run comparison (pure vs genhand vs genlib, native vs wasm, the draw digest of S21) has the same draw HLE
+(port/render/nj_model.c) on both sides, and the difftest replays HLE calls: an HLE bug is identical on both sides. The
+HLE had never been compared with the original Ninja drawers linked into 1ST_READ.BIN. The S5 / S8 / S22 screenshots
+were judged by eye ("six characters in 3D").
+
+### 24.2 Root cause (old: since S5; S8's "fix" kept it)
+
+1. **The current matrix is XMTRX, not the matrix stack's RAM slot.** Ninja keeps it in the FPU's back bank (S20's
+   matrix.c / transform.c: a matrix argument of 0 means XMTRX). The HLE's guest-call helper `gcall` restored the whole
+   CPU after each call, XMTRX included, so a transform of matrix 0 looked like a no-op: S8 concluded "this SDK ignores a
+   NULL matrix" and transformed the RAM slot at 0x8C1EF2B8 instead, then read the RAM slot to draw. njPushMatrix copies
+   XMTRX into that slot for every child, so **each node was drawn at the object's matrix times its own transform only**:
+   no parent's rotation reached its children (the bind pose). Evidence: at the drawers' entry the RAM slot differed from
+   XMTRX on 4 815 of 10 021 calls (route, frames 0-1300); the one-time self-check line "render check calcpoint sdk
+   (39293, -52722, 792391) ours (39300, 30474, 716489)" (the SDK's njCalcPoint on XMTRX against ours on the slot) had
+   shown it since S5, now equal.
+2. **The node walks were not the original's.** Object drawers (8C0D023C): BREAK stops only the child, the walk goes on
+   to the sibling (the HLE returned, dropping siblings: 6 147 -> 14 040 vertices in the house frame); all three UNIT
+   flags mean no push. Motion drawers (8C0CC6F4): BREAK and the UNIT flags are not looked at; SKIP (0x40) nodes use
+   their own values and no motion node; the rotation order is the root's ZXY flag; nj_SetCallback's function is called
+   with each node (it was an HLE stub: the racers' hats and parts, drawn at the matrices that callback saves, were
+   misplaced); nothing is drawn when the frame is not before the motion's end.
+3. **The keys**: binary search, the last key blending toward the first with the rodata 1.0 divisor (no wrap over the
+   frame count, no clamp), FMAC order, angles through floats and truncated; the L3 drawers' Catmull-Rom positions /
+   scales by the motion's 0xC0 bits (their angle table holds the linear function twice).
+4. **Wrong signatures**: nj_ShapeMotionL1b / L2b take a motion link {motion[2], frame[2]} and a rate (read as a motion:
+   garbage keys); nj_MotionL3b / nj_ShapeMotionL3b are plain drawers, not links; the census's "nj_ObjectL1" (8C0D02FE)
+   draws a bare model, not an object tree (type 0x30's parts).
+
+**Regression or old: old.** The S8-era tree (d6f380b, built in a worktree into a separate volume) gives the same
+house picture with the same vertex count (6 147) as the S22 build.
+
+### 24.3 The fix (port/render/nj_model.c, src/lib/ninja/render_state.c)
+
+The HLE transforms XMTRX through the SDK's own functions (argument 0; `gcall` keeps the back bank the callee left) and
+draws from XMTRX; draw_object / draw_motion follow the two original walks; the motion keys are computed with fpu.h's
+operations exactly as the original's element functions and interpolators; links blend both motions per node as
+8C112BFE does (8C1121FC / 8C112324); nj_SetCallback is C (a store) and the HLE calls the stored function. Not
+modelled: quaternion motions (type 0x2000: counted, none on the routes), the shape motions' vertex keys (still S8's
+reading), a link's shape blend (the nearer shape is drawn), the per-model clip test of 8C0D01E0.
+
+### 24.4 The test: the original drawers in the interpreter (`tools/s11.sh drawcheck [N]`)
+
+PENPEN_DRAWCHECK=N (native test builds only): on every N-th frame each drawer call first runs the ORIGINAL code at its
+address in the interpreter on the live CPU (RAM saved and restored around it), its per-model draw functions trapped
+(8C0D01E0 L1, 8C0D0A8C L2, 8C0D1850 L3, 8C11A720 the L3 motions': model in r4, XMTRX recorded, return); then the HLE
+runs and records (model, XMTRX) at draw_model; the two lists are compared bit for bit. Node callbacks run inside the
+original as the disc's code. Addresses the HLE never calls are written ORIG(0x...) so that genlib's C-root scan does not
+translate them.
+
+First run (route, every 50th frame) with the XMTRX and walk fixes only: 1 143 calls, 955 exact, 176 differ
+(ShapeMotionL1 by up to 7e-4 relative: the key blend; MotionL3b: 0 vs 1 models: its L3 per-model function). A first
+all-route run found the ShapeMotionL3b and ObjectL1 signatures (staffroll, csd30). **Final: all 21 routes, every 10th
+frame: 178 327 drawer calls, 178 327 bit-exact** (ModelL1 131 683, ShapeMotionL1 23 356, ModelL2 9 236, ModelL3 6 082,
+MotionL3b 3 731, MotionL1 2 419, ShapeMotionL1b (links) 778, ShapeMotionL3 557, ShapeMotionL3b 455, ObjectL1 30).
+
+### 24.5 Stale samples
+
+The replay of c8 + c9 + syn found 483 samples failing as "hle calls N/M" (16 functions that set / clear the node
+callback: the racer and penguin draws, the house, menus, scenes): recorded while nj_SetCallback was an HLE stub. A build
+with nj_SetCallback back on the HLE list passes all 483 (18 361 samples, 0 FAIL); they are excluded with that reason in
+tools/replay_exclude.tsv (520 lines; nothing deleted). Fresh samples of those functions pass in the route difftest.
+
+### 24.6 Results and next
+
+Tests (end of S23): **drawcheck 21 routes, 178 327 calls, 0 differ**; pure vs genlib (`--no-interp`) **21 / 21
+identical, native and wasm, both digests; native = wasm on all 21**; route difftest (21 routes) **76 323 samples, 0
+FAIL** (4 189 exports: 2 249 pass, 1 940 untested; nj_SetCallback 998 samples pass); corpora replay (c8 + c9 + syn)
+**17 878 samples, 0 FAIL, 520 excluded** with reasons; sh4 **257 / 0**; ninjatest **80 103 cases / 0** (34 functions),
+motion **220 436 / 0**; genlib **0 translated functions** (4 189 kept = hand-written); outside the game **140
+hand-written, 166 HLE**; `tools/rtw.sh build` (penpen.wasm **1 291 816 bytes**) + `check` **OK**; browser e2e **done** (two boots, the save found after the reload, "0 recompiled functions, 4189 of them hand-written", **58.8 game frames/s** in the race over 40 s; its house and race shots show the characters posed).
+Screenshots (title, house, character select, race, csd30): characters posed and animated, hats on.
+
+Not verified: the shape motions' vertex keys and a link's shape blend (the check compares matrices); quaternion motions;
+the per-model clip test; njCnkModDrawModel and njDrawSprite3D (not in the check); the genhand compares; Mull on the
+changed HLE (port/render is not under Mull) and on render_state.c's one new store (covered by the difftest's 998
+samples).
+
+Next:
+
+1. Extend the draw check to the vertices (trap the vertex-list transform 8C0CFFE0 and compare the vertex buffer),
+   then the shape motions' keys and the link's shape blend (8C1147F0).
+2. The cheap-shadow drawer and njDrawSprite3D against the original.
+3. A fresh corpus for the 16 functions whose samples went stale (the Mull gate has fewer samples of them).

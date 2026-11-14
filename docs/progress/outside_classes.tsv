@@ -1095,7 +1095,7 @@
 8c0cb06c	64	Ninja	FUN_8c0cb06c	data	-
 8c0cb0ac	64	Ninja	FUN_8c0cb0ac	data	-
 8c0cb0ec	64	Ninja	FUN_8c0cb0ec	data	-
-8c0cb12c	6	Ninja	nj_SetCallback	hle	-
+8c0cb12c	6	Ninja	nj_SetCallback	hand	-
 8c0cb164	28	Ninja	FUN_8c0cb164	data	-
 8c0cb180	274	Ninja	FUN_8c0cb180	data	-
 8c0cb69c	146	Ninja	FUN_8c0cb69c	dead	-

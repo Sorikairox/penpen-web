@@ -2,6 +2,44 @@
 
 Newest session first. Read `docs/port/PLAN.md` (disc facts, survey, approach, phases, rules) before working.
 
+## S23 — 2026-11-14: the characters' bind pose: the draw HLE checked against the original Ninja drawers
+
+All guest code ran in `--network none --read-only --cap-drop ALL --security-opt no-new-privileges --tmpfs /tmp`
+containers; `git log --all -- port/gen` stays empty. Design and numbers: `docs/port/DECOMP.md` 24, `RENDER.md` 5.
+
+1. **The user's report** (public genlib build): every character in PenPen House and the races stood in its bind pose.
+   **Root cause** (DECOMP 24.2): Ninja's current matrix is XMTRX; the HLE's call helper restored XMTRX after each SDK
+   call, so since S8 the HLE transformed the matrix stack's RAM slot, which njPushMatrix overwrites with XMTRX for each
+   child: every node was drawn at the object's matrix times its own transform only. Also wrong: the node walks (BREAK
+   dropped siblings; SKIP, the root ZXY flag, the node callback), the key interpolation, the link drawers' arguments,
+   nj_ObjectL1 (a bare model), nj_SetCallback (a stub: the racers' hats / parts misplaced). **Old, not a
+   regression**: the S8 tree (d6f380b, built in a worktree into a scratch volume) draws the same picture.
+2. **The fix** (port/render/nj_model.c, nj_SetCallback in src/lib/ninja/render_state.c): transforms on XMTRX, the
+   original walks (8C0D023C, 8C0CC6F4), keys bit-exact with fpu.h, links blended as 8C112BFE.
+3. **The test that would have caught it: `tools/s11.sh drawcheck [N]`** (PENPEN_DRAWCHECK): each drawer call of every
+   N-th frame runs first as the ORIGINAL code in the interpreter, its per-model draws trapped, and its (model, XMTRX)
+   list is compared bit for bit with the HLE's. Before the key / signature fixes it found 176 of 1 143 calls different
+   (route); **final: 21 routes, every 10th frame, 178 327 drawer calls, all bit-exact**.
+4. **483 stale samples** (recorded with nj_SetCallback as an HLE call: "hle calls N/M"; a build with it HLE again
+   passes all 483) excluded with that reason in tools/replay_exclude.tsv; nothing deleted.
+
+Tests (end of S23): drawcheck **178 327 / 0**; pure vs genlib (`--no-interp`) **21 / 21 identical, native and wasm,
+both digests; native = wasm on all 21**; route difftest (21 routes) **76 323 samples, 0 FAIL**; corpora replay (c8 + c9 +
+syn) **17 878, 0 FAIL, 520 excluded**; sh4 257 / 0; ninjatest 80 103 / 0, motion 220 436 / 0; genlib 0 translated
+functions; outside the game 140 hand-written, 166 HLE; rtw build (penpen.wasm 1 291 816 bytes) + check OK; browser e2e
+done, 58.8 game frames/s.
+
+Screenshots (`/private/tmp/claude-501/-Users-sorikairo-Code-pokemonsnap/f6d4a533-34b6-4407-a635-03b29c8ddb2f/scratchpad/s23/`, PNG, not in git): before_house_f01150 /
+before_select_f01450 / before_race_f02300 (the pre-fix build), before_S8build_house_f01150 (the S8 tree: the same
+picture), after_title_f00500 / after_house_f01150 / after_select_f01450 / after_race_f02300 / after_race_f02500, e2e/b1-house,
+b1-select, b1-race (the browser).
+
+Not verified: the shape motions' vertex keys (S8's reading: the check compares matrices, not vertices) and a link's
+shape blend (the nearer shape is drawn); quaternion motions (none on the routes); the per-model clip test (8C0D01E0
+skips a model whose bounding sphere is off screen when njControl3D has 0x100: the HLE draws it). Next: compare the
+vertex buffer as well (trap 8C0CFFE0 / 8C0CFA56), then the shape motions' keys; the cheap-shadow drawer
+(njCnkModDrawModel) and njDrawSprite3D are not in the check.
+
 ## S22 — 2026-11-14: the motion reader as C, the owner scene routed, a deterministic draw HLE, types 0x30 / 0x32 drawn
 
 All guest code ran in `--network none --read-only --cap-drop ALL --security-opt no-new-privileges --tmpfs /tmp`
