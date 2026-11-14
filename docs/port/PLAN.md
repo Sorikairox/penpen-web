@@ -343,7 +343,8 @@ sources or libraries.
 - **Logs**: the boot logs opened files as directory index + 4-digit group + size, not by name; lines that may
   leave a container are filtered to our log vocabulary (`tools/s3.sh` `filt`).
 - **The retrowser module** (S6): `tools/rtw.sh build` assembles it in `penpen-build:/build/rtw` only (the wasm is
-  translated game code: never committed, never published); the check and the end-to-end test run the retrowser
+  translated game code up to S20: never committed, never published; since S21 built from the hand-written C only,
+  published on `rtw-dist`); the check and the end-to-end test run the retrowser
   host and headless Chromium in `--network none` containers of `penpen-rtw:1`, with the disc archive from
   `penpen-raw`; e2e PNGs stay in `/build/e2e` (`tools/rtw.sh look`). Never run it in the host's browser: the user
   decides when to try it (RTW.md 6).
@@ -358,7 +359,8 @@ sources or libraries.
 - **Audio** (S7): WAV captures (`tools/s7.sh capture`) are decoded disc audio: they stay in
   `penpen-build:/build/audio` and are only measured there (`tools/s7.sh report`: numbers); never copied to the
   host, never committed. The e2e's Chromium runs muted.
-- No push, no remote until the user names one; no GitHub.
+- Remote `pub` = github.com/Sorikairox/penpen-web (public, 2026-11-14, the user's request). `port/gen/` and anything
+  disc-derived stay out of git.
 - End each session with a `docs/port/HANDOFF.md` entry and a `docs/progress/sessions.tsv` row.
 
 ## 10. Risks

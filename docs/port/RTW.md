@@ -4,9 +4,10 @@ The port runs as a [retrowser](../../../retrowser/spec/retrowser.md) module, pla
 the player's disc (`rtw_disc_toc` / `rtw_disc_read`), steps it once per frame (`rtw_frame`), gives it the pads
 (`rtw_input`, `rtw_triggers`), stores the VMU (`rtw_save_*`) and relays rumble (`rtw_rumble`). The module draws
 with WebGL2 on the worker's OffscreenCanvas through our glue; S7: it makes sound (`rtw_audio_*`, `docs/port/AUDIO.md`). Everything here is our own code
-(MIT); the module's wasm contains the translated game code (the recompiled C of `port/gen/`), so the built module
-directory is disc-derived: it stays in the Docker volume `penpen-build:/build/rtw` and is never committed or
-published (PLAN 9).
+(MIT). Up to S20 the module's wasm contained the translated game code (the recompiled C of `port/gen/`) and was
+never published. Since S21 the default module is built from the hand-written C alone (`genlib`: 0 translated
+functions; the game's executable and data still come from the player's disc). That module is published on the
+orphan branch `rtw-dist` of github.com/Sorikairox/penpen-web (2026-11-14, the user's request).
 
 ## 1. Pieces
 
