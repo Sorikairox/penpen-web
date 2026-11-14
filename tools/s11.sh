@@ -13,6 +13,9 @@
 #   tools/s11.sh corpus [TAG [K]]  S16: the replay gate's sample corpus (volume penpen-corpus, /corpus/TAG/ROUTE)
 #   tools/s11.sh compare [native|wasm]   pure vs hand: frame lines (RAM digest every frame, stack area left out) over
 #                                 every route; prints the first difference, if any (ROUTES="a b": some routes)
+#   tools/s11.sh drawcheck [N]    S23: the draw HLE's node matrices against the ORIGINAL Ninja drawers run in the
+#                                 interpreter (port/render/nj_model.c, PENPEN_DRAWCHECK=N: every N-th frame, default 10)
+#                                 on every route, genlib native, PAR routes at a time (2); prints each route's verdict
 #   tools/s11.sh progress         docs/progress/decomp.tsv + decomp_functions.tsv (tools/decomp_progress.py)
 #   tools/s11.sh mutate [args]    S12: mutation testing of src/ with Mull (tools/mull_run.py + tools/mull_gate.py in
 #                                 the penpen-mull:1 sandbox): every mutant through the gates of the routes that run
@@ -70,6 +73,23 @@ case "${1:-}" in
       grep -E '^boot stopped' "$LOGS/test_$r.log" || true
     done
     python3 -I "$REPO/tools/hwtest_merge.py" "$LOGS" $(routes | cut -f1) ;;
+  drawcheck)
+    n=${2:-10}
+    GEN=genlib "$REPO/tools/s3.sh" native --frames 1 > "$LOGS/drawcheck_build.log" 2>&1 || true
+    grep -q 'build FAILED' "$LOGS/drawcheck_build.log" && { echo "drawcheck: build FAILED"; exit 1; }
+    i=0
+    for r in $(routes | cut -f1); do
+      routes | awk -F'\t' -v r="$r" '$1 == r' | { IFS='	' read -r r f p x
+        PENPEN_DRAWCHECK=$n NOBUILD=1 GEN=genlib "$REPO/tools/s3.sh" native --frames "$f" $(padarg "$p") $(extra "$x") --frame-log 0 --no-interp > "$LOGS/drawcheck_$r.log" 2>&1 || true; } &
+      i=$((i + 1))
+      [ $((i % ${PAR:-2})) -ne 0 ] || wait
+    done
+    wait
+    routes | while IFS='	' read -r r f p x; do
+      printf '%s: ' "$r"; grep -E '^render drawcheck calls' "$LOGS/drawcheck_$r.log" || echo "no summary (see $LOGS/drawcheck_$r.log)"
+      grep -E '^render drawcheck (DIFF|frame)|^render link' "$LOGS/drawcheck_$r.log" | head -5 || true
+      grep -E '^boot stopped' "$LOGS/drawcheck_$r.log" | grep -v 'frame limit' || true
+    done ;;
   corpus)
     # S16: the offline replay gate's sample corpus (DECOMP.md 17): every route of the hand build with the difftest and
     # --hwcorpus: up to K (default 8) passing samples per function into the volume penpen-corpus (/corpus/TAG/ROUTE;

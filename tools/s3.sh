@@ -29,7 +29,7 @@ REPO=$(cd "$(dirname "$0")/.." && pwd)
 J=${JOBS:-8}
 box() { # sandboxed container: repo read-only at /src, volumes as given by the caller
   $D run --rm --network none --read-only --cap-drop ALL --security-opt no-new-privileges --user 1000:1000 \
-    --tmpfs /tmp:exec,size=4g,mode=1777 -e HOME=/tmp -e EM_CACHE=/tmp/emcache ${PENPEN_REPLAY_DIFFS:+-e PENPEN_REPLAY_DIFFS=$PENPEN_REPLAY_DIFFS} ${PENPEN_HWT_FRAMES:+-e PENPEN_HWT_FRAMES=$PENPEN_HWT_FRAMES} ${PENPEN_HWT_SKIP:+-e PENPEN_HWT_SKIP=$PENPEN_HWT_SKIP} ${PENPEN_DIGEST_MAP:+-e PENPEN_DIGEST_MAP=$PENPEN_DIGEST_MAP} \
+    --tmpfs /tmp:exec,size=4g,mode=1777 -e HOME=/tmp -e EM_CACHE=/tmp/emcache ${PENPEN_REPLAY_DIFFS:+-e PENPEN_REPLAY_DIFFS=$PENPEN_REPLAY_DIFFS} ${PENPEN_HWT_FRAMES:+-e PENPEN_HWT_FRAMES=$PENPEN_HWT_FRAMES} ${PENPEN_HWT_SKIP:+-e PENPEN_HWT_SKIP=$PENPEN_HWT_SKIP} ${PENPEN_DIGEST_MAP:+-e PENPEN_DIGEST_MAP=$PENPEN_DIGEST_MAP} ${PENPEN_DRAWCHECK:+-e PENPEN_DRAWCHECK=$PENPEN_DRAWCHECK} \
     -v "$REPO/port":/src/port:ro -v "$REPO/tools":/src/tools:ro -v "$REPO/src":/src/src:ro "$@"
 }
 # What may be printed from a container that read disc-derived data: our own log vocabulary only (-a: a log line
