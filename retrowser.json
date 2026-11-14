@@ -28,5 +28,11 @@
     "kind": "vmu",
     "size": 131072
   },
-  "license": "MIT"
+  "license": "MIT",
+  "picture": {
+    "path": "cover.png",
+    "sha256": "9a118e7f6f68962dd73c6da665da4d8e2ddf25c725cce1512b950cdd979f0b86",
+    "size": 406131,
+    "credit": "Box art © Infogrames / General Entertainment · image from libretro-thumbnails"
+  }
 }
