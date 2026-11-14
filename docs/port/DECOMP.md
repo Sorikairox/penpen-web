@@ -1981,3 +1981,88 @@ Next:
    then the shape motions' keys and the link's shape blend (8C1147F0).
 2. The cheap-shadow drawer and njDrawSprite3D against the original.
 3. A fresh corpus for the 16 functions whose samples went stale (the Mull gate has fewer samples of them).
+
+## 25. S24: the foam glitch: nj_ModelL4 is the BASIC-model drawer; the draw check compares vertices
+
+The user (public genlib build on retrowser.app, iPhone Safari): "On candy race, on the running part, as soon as it hit
+the rose slow foam, I got this graphic glitch": TIME 1'18"06, the penguin running on foot in Sweets' wooden corridor,
+a brown slab across the right of the screen and a white / pink one across the top, both running into the penguin.
+
+### 25.1 Reproduction (route `foam`)
+
+The attract demo picks course 0 (Sweets' Easy course) at random; its computer player runs the whole course if the
+demo's 3600-frame time-out is held back (Game.mode_frames at 0x8CE16B18 poked to 0 at 3000 and 6000). It reaches the
+running section at ~6000 and the pink foam at ~6049, where the course's type-4 actor (the scrolling strip) starts to
+draw. Before the fix, from 6050 on, frames are crossed by slabs converging on the penguin (6440: half the screen one
+brown slab; 6340: the whole screen brown) and the dumps' vertex counts jump from ~12 000 to ~520 000. Native (trace)
+and wasm (screenshots) the same. Added to tools/routes.tsv as `foam` (6 500 frames, no input).
+
+### 25.2 Root cause (old: since S5)
+
+The strip's draw (`strip_draw`, func_8C0468C4, game/actor_misc.c) calls **nj_ModelL4** (8C0AB8C8), its only caller.
+The census named the 0x8C0A7000-0x8C0AB8FF family "L4"; it is Ninja's **basic-model** family (NJS_OBJECT with
+NJS_MODEL: points, normals, nbPoint, meshsets, materials, centre, radius): 8C0AB8C8 brackets 8C0AB604, the basic
+object walk (the same walk as the chunk one, 8C0D023C: UNIT flags, HIDE, BREAK, ZXY, sibling always), which draws each
+model with 8C0AB13C (vertex count against the buffer, the bounding-sphere clip when njControl3D has 0x100, the
+vertex transform 8C0A96E0, the mesh sets), lit by the L4 light setters (8C0AB584 ...). The HLE drew it as a CHUNK
+object: the NJS_MODEL's `points` pointer read as a vertex chunk list and `normals` as a polygon chunk list, so the
+normals' floats became strip chunks whose indices addressed whatever the vertex buffer held, the penguin's vertices
+drawn just before: 168 084 stale-vertex references in the trace of frame 6340 (`hle trace stale`, a temporary
+probe), the long slabs converging on the penguin. The strip itself (54 points, 26 translucent quads, texture 17, the
+pink foam, its UVs scrolled by the actor) was never drawn. **Old**: nj_ModelL4 has been in FAMILY(l4) since S5; no
+route reached a type-4 actor (S23's draw check: no nj_ModelL4 call).
+
+### 25.3 The fix (port/render/nj_model.c)
+
+`draw_object_with(c, o, depth, draw)`: the S23 walk with the model drawer as a parameter; nj_ModelL4 walks with
+`draw_basic` (the basic drawer nj_ObjectB already used, S8) in the L4 light (cur_fam 3). nj_MotionL4 / nj_ShapeMotionL4
+(8C0A7224 / 8C0A72F0) are the basic motion drawers: no game caller (only the unused wrappers 8C01112C / 8C011698),
+still the chunk motion walk, not modelled. A `hle trace basic` line per mesh set.
+
+### 25.4 Why no test saw it, and the test that does (`tools/s11.sh drawcheck`, vertices)
+
+No route drew a type-4 actor; and S23's check compares (model, XMTRX) only: with the old HLE the foam route's
+nj_ModelL4 calls were "exact" (the same walk, the same model pointers and matrices: verified with the old handler put
+back). S24 extends PENPEN_DRAWCHECK to the transformed vertices:
+
+- the L1 (8C0D01E0) and basic (8C0AB13C) per-model functions are no longer returned from at their entry: they run to
+  their return in the interpreter. The vertex buffer njInitVertexBuffer would allocate (the HLE replaces it: 0x8C1EF30C
+  pointer, 0x8C1EF310 capacity) is set to a 2 MB scratch window at physical 0x04000000 (rt.c: `rt_low`, reads and
+  writes there go to host memory while the check runs), the vertex transforms' projection constants (0x8C1EFD5C: x / y
+  scale, centre) to njSetScreen's; their store-queue flushes are routed by QACR0/1 like the SH-4's (area 1: the
+  scratch; area 3: RAM; the TA stream, whose destination is 0 here, dropped); every write marks a 16-byte entry;
+- at the per-model function's return the entries it (or the shape pass before it) wrote are that model's vertices:
+  index, screen x, y, 1/z; the HLE's are the vb entries vlist / draw_basic wrote for the model, projected;
+- compared per model: the same indices, the same view-space point rebuilt from (x, y, 1/z) within 1e-4 of its length +
+  1e-3 (a point on the eye plane: z alone); nj_ModelL4 compares 1/z only (8C0AB13C's projection constants come in FPU
+  registers the check does not set up). The I/O register file is saved and restored around the original's run.
+- compared: the drawers of the L1 models / motions (nj_ModelL1, nj_MotionL1, nj_ObjectL1) and nj_ModelL4. Not compared
+  (counted as such): the shape motions and links (their vertex keys / blend are S8's reading, not modelled to match;
+  the links' original run loops on into the step limit), the L2 family (its per-model function 8C0D0A8C loops for ever
+  without the Kamui state), the L3 family (32-byte entries). Those keep S23's (model, XMTRX) check.
+
+With the old nj_ModelL4 handler put back, the foam route's check reports `VERTS frame 6050 fn 8c0ab8c8 model 0
+8c097bb0 vertices 54/0` on every nj_ModelL4 call (the original transforms the strip's 54 points, the old HLE none).
+
+### 25.5 Seen, not changed
+
+- **The near plane.** The L1 strip writer for strips with vertices at z <= 1 (8C118568; chosen by 8C0CFA56 when the
+  vertex transform counted any) skips every triangle with a vertex whose 1/z is not in (0, 1]: the original does not
+  clip, it drops; the HLE clips (tri3). Read in the decompilation only, not compared (the check stops at the vertices);
+  it changes what a camera inside a wall shows.
+- **White rectangles** over the demo's penguins near the ground (the slide trail of nj_ObjectB: texture 202 drawn
+  white, frames 4200 / 6120 of the demo): S8's trail, before and after the fix; not investigated.
+
+### 25.6 Results and next
+
+Tests (end of S24): drawcheck (22 routes, every 10th frame) **194 383 drawer calls, (model, XMTRX) 0 differ;
+148 284 calls / 12 943 290 vertices compared, 0 differ** (before the fix: every nj_ModelL4 call on foam, 54/0);
+pure vs genlib (`--no-interp`) **22 / 22 identical, native and wasm, both digests; native = wasm on all 22**; route difftest (22 routes) **84 397 samples, 0 FAIL** (4 189 exports:
+2 256 pass, 1 933 untested); `tools/rtw.sh build` (penpen.wasm **1 293 592 bytes**) + `check` **OK**; browser e2e
+**done** (two boots, the save found after the reload, "0 recompiled functions, 4189 of them hand-written"; its frames/s
+line was not captured). Screenshots: the foam route before (slabs, a brown screen) and after (the pink foam, the
+corridor).
+
+Next: the vertex check for the L2 family (its per-model function needs the Kamui state it loops on), the L3 family
+(32-byte entries, its projection), the shape motions' keys and the links' blend; then the near plane as the original
+(25.5) once a check can see triangles.

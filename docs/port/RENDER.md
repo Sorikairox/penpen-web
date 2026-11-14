@@ -118,7 +118,9 @@ load time because the game reads the PVM into the texture buffer area and overwr
   divisor), FMAC order, angles through floats; nothing drawn when a frame is not before its motion's end. Links
   (nj_ShapeMotionL1b ...: object, {motion[2], frame[2]}, rate): both motions per node, blended by the rate.
   **Checked against the original** by `tools/s11.sh drawcheck` (PENPEN_DRAWCHECK: the original drawer run in the
-  interpreter first, its per-model draws trapped, the (model, XMTRX) lists compared bit for bit).
+  interpreter first, its per-model draws trapped, the (model, XMTRX) lists compared bit for bit; S24: for the L1 and
+  basic drawers the per-model functions run on and each model's transformed vertices, the SDK's vertex buffer, are
+  compared with the HLE's: DECOMP.md 25.4).
 - **Conventions, checked at run time** (`render check` line: our transform = the SDK's njCalcPoint): view space
   **+z forward, y down the screen**; screen = cx + dist·x/z, cy + dist·y/z with njSetScreen's {dist, w, h, cx,
   cy} at 0x8C1EF2A4 (554.3, 320, 240 here; 60° horizontal); near plane at 0x8C1EF2D0 (1.0; far 10000).
@@ -154,6 +156,11 @@ load time because the game reads the PVM into the texture buffer area and overwr
   ignore light 0x02000000, double side 0x00800000, environment 0x00400000, texture 0x00200000, alpha
   0x00100000, ignore specular 0x00080000, flips/clamps 0x40000–0x8000, filter 13–14). It is the slide trail
   behind each character (32 quads, vertex colours fading out, texture 202, alpha). Lit with the L1 light.
+- **The "L4" family is Ninja's basic-model family** (S24): nj_ModelL4 (8C0AB8C8, one caller: the scrolling strip,
+  actor type 4, e.g. Sweets' pink foam) walks a basic NJS_OBJECT tree (the chunk walk's rules) and draws each NJS_MODEL
+  with the basic drawer (`draw_basic`, as nj_ObjectB) in the L4 light. S5-S23 read it as a chunk object: slabs of stale
+  vertices across the screen (the user's S24 report). nj_MotionL4 / nj_ShapeMotionL4 (basic motions) have no caller:
+  not modelled.
 - 2D (S8, nj_draw.c): `njDrawPolygon(vtx {x, y, z, ARGB}, n, trans)` = one strip, z used as 1/w as the SDK
   does; `njDrawTriangle2D/njDrawLine2D(NJS_POINT2COL, n, pri, attr)` with the attr bits read in the SDK (1
   fan, 2 connected, 0x40 translucent; 0x80000000 texture and 0x20 not modelled), lines as 1-pixel quads.
@@ -199,6 +206,9 @@ house 1104, course map 1563, race 1762).
 | 3000 | 12.6 s in: the player still at the start line (the script presses nothing after 1760), rivals gone ahead, distance haze (fog) |
 
 Known wrong or missing (to do):
+
+- The near plane (S24, read in the decompilation): Ninja's L1 strip writer drops every triangle with a vertex nearer
+  than z = 1 (8C118568); the HLE clips it (tri3). A camera inside a wall shows the wall here, not on hardware.
 
 - Translucency is sorted per triangle (no per-pixel autosort); no punch-through list is used by the game.
 - Flat shading and ignore-ambient strip flags ignored; the L2 IntensityN second value (100 on the route) is

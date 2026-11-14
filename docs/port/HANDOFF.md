@@ -2,6 +2,46 @@
 
 Newest session first. Read `docs/port/PLAN.md` (disc facts, survey, approach, phases, rules) before working.
 
+## S24 — 2026-11-14: the foam glitch: nj_ModelL4 is the basic-model drawer; the draw check compares vertices
+
+All guest code ran in `--network none --read-only --cap-drop ALL --security-opt no-new-privileges --tmpfs /tmp`
+containers; `git log --all -- port/gen` stays empty. Design and numbers: `docs/port/DECOMP.md` 25, `RENDER.md` 5.
+
+1. **The user's report** (public genlib build, iPhone): on Sweets' running section, from the moment the penguin hit the
+   pink slow foam, slabs across the screen converging on the penguin. **Reproduced** (route **foam**: the attract demo,
+   which races course 0 = Sweets' Easy course, kept past its time-out by poking Game.mode_frames; its computer player
+   reaches the foam at ~6049): native (trace) and wasm (screenshots), from frame 6050.
+2. **Root cause** (DECOMP 25.2): the foam is the course's type-4 actor (the scrolling strip), drawn with
+   **nj_ModelL4** (8C0AB8C8, its only caller). The census's "L4" family is Ninja's BASIC-model family (NJS_OBJECT /
+   NJS_MODEL); the HLE read it as a chunk object since S5, the NJS_MODEL's normals as strip chunks indexing whatever the
+   vertex buffer held (the penguin just drawn): 168 084 stale-vertex references in one frame, and the strip itself never
+   drawn. Old, not a regression; no route had reached a type-4 actor.
+3. **The fix** (port/render/nj_model.c): the object walk takes its model drawer; nj_ModelL4 walks with draw_basic in the
+   L4 light. The pink foam now shows, no slabs.
+4. **The test that would have caught it** (`tools/s11.sh drawcheck`, DECOMP 25.4): S23's (model, XMTRX) check passed
+   the old handler (same walk and matrices). S24 lets the original L1 and basic per-model functions run to their return
+   in the interpreter (the SDK's vertex buffer set up in a scratch window, rt.c; store queues routed by QACR) and
+   compares each model's transformed vertices (index, x, y, 1/z) with the HLE's. With the old handler put back:
+   `vertices 54/0` on every nj_ModelL4 call.
+
+Tests (end of S24): drawcheck 22 routes, every 10th frame: **194 383 drawer calls, (model, XMTRX) 0 differ;
+148 284 calls / 12 943 290 vertices compared, 0 differ** (not compared, counted: shape motions, links, L2, L3);
+pure vs genlib (`--no-interp`) **22 / 22 identical, native and wasm, both digests; native = wasm on all 22**;
+route difftest (22 routes) **84 397 samples, 0 FAIL**; rtw build (penpen.wasm 1 293 592 bytes) + check OK; browser e2e
+done (the save found after the reload; its frames/s line was not captured). Not rerun: corpora replay, sh4, fpu,
+ninjatest (no change to the code they cover).
+
+Screenshots (`/private/tmp/claude-501/-Users-sorikairo-Code-pokemonsnap/f6d4a533-34b6-4407-a635-03b29c8ddb2f/scratchpad/s24/`, PNG, not in git): before_foam_f06340 /
+f06440 / f06460 (the old build: slabs, a brown screen), after_foam_f06120 / f06240 (the penguin on the pink foam) /
+f06340 / f06440 / f06460 (the corridor); e2e/b1-house, b1-race, b1-race-late (the browser).
+
+Not verified: on hardware / the user's own race (a time trial or cup race at 1'18": the route is the demo's computer
+player on the same course); the strip's light and specular (draw_basic as nj_ObjectB's; 8C0AB13C not read in full)
+and its bounding-sphere clip (not modelled); nj_MotionL4 / nj_ShapeMotionL4 (no caller). Seen, not changed: Ninja's
+L1 strip writer drops triangles nearer than z = 1, the HLE clips them (RENDER.md 7); the slide trail's white
+rectangles in the demo. Next: the vertex check for the L2 / L3 families and the shape motions (DECOMP 25.4), the near
+plane as the original.
+
 ## S23 — 2026-11-14: the characters' bind pose: the draw HLE checked against the original Ninja drawers
 
 All guest code ran in `--network none --read-only --cap-drop ALL --security-opt no-new-privileges --tmpfs /tmp`
