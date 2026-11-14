@@ -7,8 +7,8 @@
   "files": {
     "wasm": {
       "path": "penpen.wasm",
-      "sha256": "4b99ec5354e144a4185c2f97e96b1a8cd4e52819468234e5778bba3daa511a7a",
-      "size": 1291816
+      "sha256": "134470ae7f01cde06ffcaeeb5c6085fa80724972b82ffcd37d4998a53fdbb7ba",
+      "size": 1293592
     },
     "js": {
       "path": "penpen.js",
