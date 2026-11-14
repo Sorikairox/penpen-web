@@ -106,6 +106,8 @@ static void shape_get(uint32_t a0, uint32_t a1, uint32_t i, float *o) {
   for (int k = 0; k < 3; k++) { float x = nj_f(s0 + 4u * (uint32_t)k); o[k] = a1 ? x + (nj_f(s1 + 4u * (uint32_t)k) - x) * shape_t : x; }
 }
 static uint32_t n_unknown_v, n_unknown_p;
+static int dc_recording; /* S24: the draw check marks the vertex-buffer entries each model writes */
+static void dc_hle_mark(uint32_t i), dc_hle_model_end(void);
 static void vlist(uint32_t a) {
   for (int guard = 0; guard < 4096; guard++) {
     uint32_t h = rd32(a), t = h & 0xFF, fl = (h >> 8) & 0xFF, sz = h >> 16;
@@ -130,6 +132,7 @@ static void vlist(uint32_t a) {
       if (t == 37 || t == 44) { idx = off + (extra & 0xFFFF); wgt = (float)(extra >> 16) / 255.0f; mode = (int)(fl & 3); }
       if (idx >= NVB) continue;
       vb_t *v = &vb[idx];
+      dc_hle_mark(idx);
       float tp[3], tn[3];
       xform(p, tp);
       if (nw) xnorm(nn, tn); else { tn[0] = tn[1] = 0; tn[2] = 1; }
@@ -349,6 +352,7 @@ static void draw_model(uint32_t m) {
   uint32_t vl = rd32(m), pl = rd32(m + 4);
   if (sh4_is_ram(vl)) vlist(vl);
   if (sh4_is_ram(pl)) plist(pl, 0);
+  dc_hle_model_end();
   n_models++;
 }
 static void mat_reset(void) {
@@ -626,9 +630,9 @@ static void self_check(SH4 *c, uint32_t model) {
 
 /* ---- S23: the draw check (PENPEN_DRAWCHECK=N, native test builds): every N-th frame, each drawer call is first run
  * as the ORIGINAL Ninja code in the interpreter (the disc's code at its address, on a copy of the CPU; RAM restored
- * afterwards), its per-model draw functions (L1 8C0D01E0, L2 8C0D0A8C, L3 8C0D1850, the L3 motions' 8C11A720:
- * model in r4, the current
- * matrix in XMTRX) trapped to record (model, XMTRX); then the HLE runs and records the same at draw_model. The two
+ * afterwards), its per-model draw functions (L1 8C0D01E0, L2 8C0D0A8C, L3 8C0D1850, the L3 motions' 8C11A720, S24: the
+ * basic models' 8C0AB13C of nj_ModelL4: model in r4, the current matrix in XMTRX) trapped to record (model, XMTRX);
+ * then the HLE runs and records the same at draw_model. The two
  * lists are compared bit for bit (and within 1e-4 relative). The HLE shares nothing with the original's drawers, so
  * a difference in the node walk, the motion's keys, the matrices or the callback shows here (S5-S22: every
  * comparison had the same HLE on both sides). ---- */
@@ -642,21 +646,106 @@ static int dc_n[2], dc_every = -1;
 static uint32_t dc_calls, dc_exact, dc_near, dc_bad, dc_bad_logged;
 static struct { uint32_t fn, calls, exact, near, bad; } dc_fn[24];
 static int dc_nfn;
+/* S24: the vertices each side transforms, per model: the original's from the SDK's vertex buffer (its entries this
+ * model wrote: index, screen x, y and 1/z, as the SDK keeps them in 16-byte entries), the HLE's from its own buffer
+ * (the entries this model wrote, projected as tri3 does). A model read in the wrong format, a wrong vertex count or
+ * index offset, a wrong transform or shape key shows here even when the matrices agree (S23's check). */
+#define DC_VN 262144
+typedef struct { uint32_t idx; float x, y, iw; } dc_vtx;
+static dc_vtx *dc_v[2];
+static int dc_vn[2], dc_seg[2][DC_N];
 static void dc_record(int side, uint32_t model, const uint32_t *xm) {
-  if (dc_n[side] < DC_N) { dc_list[side][dc_n[side]].model = model; memcpy(dc_list[side][dc_n[side]].m, xm, 64); }
+  if (dc_n[side] < DC_N) { dc_list[side][dc_n[side]].model = model; memcpy(dc_list[side][dc_n[side]].m, xm, 64); dc_seg[side][dc_n[side]] = dc_vn[side]; }
   dc_n[side]++;
+}
+static void dc_vtx_add(int side, uint32_t idx, float x, float y, float iw) {
+  if (dc_v[side] && dc_vn[side] < DC_VN) { dc_vtx *v = &dc_v[side][dc_vn[side]]; v->idx = idx; v->x = x; v->y = y; v->iw = iw; }
+  dc_vn[side]++;
+}
+/* the original side: the vertex buffer in the capture's scratch area (rt.c), its entries' writes marked */
+#define DC_VB_LOW 0x04100000u /* physical, in the capture's scratch window (rt.c: 0x04000000-0x041FFFFF) */
+#define DC_VB_CAP 0x8000u
+extern uint8_t *rt_low;
+extern void (*rt_low_write)(uint32_t a, uint32_t n);
+void rt_low_begin(void), rt_low_end(void);
+void rt_io_save(int restore);
+static uint8_t dc_mark[DC_VB_CAP];
+static uint32_t dc_marked[DC_VB_CAP];
+static int dc_nmarked;
+static void dc_low_write(uint32_t a, uint32_t n) {
+  for (uint32_t e = a; e < a + n; e += 16) {
+    if (e < DC_VB_LOW || e >= DC_VB_LOW + DC_VB_CAP * 16) continue;
+    uint32_t i = (e - DC_VB_LOW) >> 4;
+    if (!dc_mark[i]) { dc_mark[i] = 1; dc_marked[dc_nmarked++] = i; }
+  }
+}
+static int dc_ucmp(const void *a, const void *b) { uint32_t x = *(const uint32_t *)a, y = *(const uint32_t *)b; return x < y ? -1 : x > y; }
+static void dc_orig_model_end(void) {
+  qsort(dc_marked, (size_t)dc_nmarked, sizeof(uint32_t), dc_ucmp);
+  for (int k = 0; k < dc_nmarked; k++) {
+    uint32_t i = dc_marked[k];
+    float f[3];
+    memcpy(f, rt_low + (DC_VB_LOW - 0x04000000u) + i * 16, 12);
+    dc_vtx_add(0, i, f[0], f[1], f[2]);
+    dc_mark[i] = 0;
+  }
+  dc_nmarked = 0;
+}
+/* the HLE side: the entries of vb this model wrote */
+static uint8_t dc_hmark[NVB];
+static uint32_t dc_hmarked[NVB];
+static int dc_nhmarked;
+static void dc_hle_mark(uint32_t i) { if (dc_recording && i < NVB && !dc_hmark[i]) { dc_hmark[i] = 1; dc_hmarked[dc_nhmarked++] = i; } }
+static void dc_hle_model_end(void) {
+  if (!dc_recording) return;
+  qsort(dc_hmarked, (size_t)dc_nhmarked, sizeof(uint32_t), dc_ucmp);
+  float dist = nj_f(NJG_SCREEN), cx = nj_f(NJG_SCREEN + 12), cy = nj_f(NJG_SCREEN + 16);
+  for (int k = 0; k < dc_nhmarked; k++) {
+    uint32_t i = dc_hmarked[k];
+    float iw = 1.0f / vb[i].p[2];
+    dc_vtx_add(1, i, cx + dist * vb[i].p[0] * iw, cy + dist * vb[i].p[1] * iw, iw);
+    dc_hmark[i] = 0;
+  }
+  dc_nhmarked = 0;
 }
 static uint8_t *dc_ram;
 #define DC_MAGIC 0x8C000F08u
+#define DC_VBUF_PTR 0x8C1EF30Cu /* the SDK's transformed-vertex buffer: pointer, capacity (vertices) */
+#define DC_VBUF_CAP 0x8C1EF310u
+#define DC_PROJ 0x8C1EFD5Cu
+/* the per-model functions (model in r4, the current matrix in XMTRX): L1 8C0D01E0, L2 8C0D0A8C, L3 8C0D1850, the L3
+ * motions' 8C11A720, the basic models' 8C0AB13C (nj_ModelL4). S23 returned at their entry; S24 records there and lets
+ * the L1 and basic ones run to their return (their vertex buffer writes are the model's vertices; the L2 one loops
+ * for ever without the Kamui state the HLE replaces, the L3 ones keep 32-byte entries: those still return at once);
+ * a per-model function entered inside another is not a new model */
+static int dc_is_model_fn(uint32_t pc) {
+  return pc == ORIG(0x0D01E0u) || pc == ORIG(0x0D0A8Cu) || pc == ORIG(0x0D1850u) || pc == ORIG(0x11A720u) || pc == ORIG(0x0AB13Cu);
+}
+static int dc_verts_kind(uint32_t fn);
 static int dc_original(SH4 *c, uint32_t fn) {
+  int run = dc_verts_kind(fn) != 0; /* the other drawers' models return at once (the links' run on into a loop) */
   c->pc = fn; c->pr = DC_MAGIC;
-  for (long n = 0; n < 4000000; n++) {
+  uint32_t ret = 0, sp = 0;
+  for (int k = 0; k < dc_nmarked; k++) dc_mark[dc_marked[k]] = 0;
+  dc_nmarked = 0;
+  rt_low_write = dc_low_write;
+  rt_low_begin();
+  int r = 2;
+  for (long n = 0; n < 8000000; n++) {
     uint32_t pc = c->pc;
-    if (pc == DC_MAGIC) return 0;
-    if (pc == ORIG(0x0D01E0u) || pc == ORIG(0x0D0A8Cu) || pc == ORIG(0x0D1850u) || pc == ORIG(0x11A720u) || pc == ORIG(0x0AB13Cu)) { dc_record(0, c->r[4], c->xf.u); c->r[0] = 0; c->pc = c->pr; continue; }
-    if (sh4_step(c)) return 1;
+    if (pc == DC_MAGIC) { r = 0; break; }
+    if (ret && pc == ret && c->r[15] == sp) { ret = 0; dc_orig_model_end(); }
+    if (!ret && dc_is_model_fn(pc)) {
+      dc_record(0, c->r[4], c->xf.u);
+      if (!run || (pc != ORIG(0x0D01E0u) && pc != ORIG(0x0AB13Cu))) { c->r[0] = 0; c->pc = c->pr; continue; } /* as S23 */
+      ret = c->pr; sp = c->r[15];
+    }
+    if (sh4_step(c)) { r = 1; break; }
   }
-  return 2;
+  if (ret) dc_orig_model_end();
+  rt_low_end();
+  rt_low_write = 0;
+  return r;
 }
 static float dc_f(uint32_t u) { float f; memcpy(&f, &u, 4); return f; }
 /* 1: run the check around this call (the HLE then records); the caller calls dc_end after the HLE */
@@ -671,15 +760,90 @@ static int dc_begin(SH4 *c, uint32_t fn) {
   }
   if (dc_every <= 0 || hle_frame() % (uint32_t)dc_every || rt_sandbox) return 0;
   if (!dc_ram) dc_ram = malloc(16u << 20);
+  if (!dc_v[0]) { dc_v[0] = malloc(sizeof(dc_vtx) * DC_VN); dc_v[1] = malloc(sizeof(dc_vtx) * DC_VN); }
   memcpy(dc_ram, sh4_ram, 16u << 20);
+  rt_io_save(0);
   SH4 save = *c;
   dc_n[0] = dc_n[1] = 0;
+  dc_vn[0] = dc_vn[1] = 0;
+  /* S24: the vertex buffer njInitVertexBuffer would set up (the HLE replaces it; RAM is restored after): in the
+   * capture's scratch area (rt.c), with its capacity */
+  wr32(DC_VBUF_PTR, DC_VB_LOW);
+  wr32(DC_VBUF_CAP, DC_VB_CAP);
+  /* and the vertex transforms' projection constants (8C118E80 ...: x scale, y scale, cx, cy at 0x8C1EFD5C), which
+   * the same set-up leaves at 0 here: njSetScreen's distance and centre (so x, y check the transform, not these) */
+  wr32(DC_PROJ, rd32(NJG_SCREEN)); wr32(DC_PROJ + 4, rd32(NJG_SCREEN));
+  wr32(DC_PROJ + 8, rd32(NJG_SCREEN + 12)); wr32(DC_PROJ + 12, rd32(NJG_SCREEN + 16));
   int r = dc_original(c, fn);
   *c = save;
   memcpy(sh4_ram, dc_ram, 16u << 20);
+  rt_io_save(1);
   if (r) { rt_log("render drawcheck frame %u fn %08x: the original stopped (%d) at %08x", hle_frame(), fn, r, c->pc); return 0; }
   dc_recording = 1;
   return 1;
+}
+/* S24: the vertices of one model on both sides: the same indices, and the same view-space point, rebuilt from screen
+ * x, y and 1/z with njSetScreen's distance and centre, within 1e-4 of its length + 1e-3 (the two transforms are
+ * different code: Ninja's FTRV / FDIV against the HLE's C; a vertex near z = 0 projects far off screen, so the
+ * screen coordinates themselves are no measure; a point on the eye plane compares z alone); `xy` 0 compares 1/z alone (the basic drawer's projection constants
+ * come in FPU registers the check does not set up) */
+static int dc_vnear(const dc_vtx *a, const dc_vtx *b, int xy) {
+  float dist = nj_f(NJG_SCREEN), cx = nj_f(NJG_SCREEN + 12), cy = nj_f(NJG_SCREEN + 16);
+  if (xy && !isfinite(dist)) /* njSetScreen's distance is a NaN in the owner scene, the staff roll and GOOD NIGHT: x, y NaN on both sides */
+    return isnan(a->x) == isnan(b->x) && isnan(a->y) == isnan(b->y) && fabsf(a->iw - b->iw) <= 1e-4f * fmaxf(fabsf(a->iw), fabsf(b->iw)) + 1e-12f;
+  float pa[3] = {xy ? (a->x - cx) / (dist * a->iw) : 0, xy ? (a->y - cy) / (dist * a->iw) : 0, 1.0f / a->iw};
+  float pb[3] = {xy ? (b->x - cx) / (dist * b->iw) : 0, xy ? (b->y - cy) / (dist * b->iw) : 0, 1.0f / b->iw};
+  if (fabsf(pa[2]) < 1e-2f || fabsf(pb[2]) < 1e-2f) return fabsf(pa[2] - pb[2]) < 2e-2f; /* on the eye plane: x, y undefined */
+  float len = 0;
+  for (int k = 0; k < 3; k++) len = fmaxf(len, fmaxf(fabsf(pa[k]), fabsf(pb[k])));
+  for (int k = 0; k < 3; k++) if (!(fabsf(pa[k] - pb[k]) <= 1e-4f * len + 1e-3f)) return 0;
+  return 1;
+}
+/* the drawers whose vertices are compared: the chunk L1 / L2 model and motion drawers (16-byte entries at the
+ * vertex's index, x, y, 1/z) and nj_ModelL4 (the basic drawer: 1/z only). Not compared, counted: the shape motions
+ * and links (their vertex keys / blend are not modelled to match: S8's reading), the L3 family (32-byte entries,
+ * its projection not set up here) */
+static int dc_verts_kind(uint32_t fn) {
+  switch (fn) {
+  case ORIG(0x0D0312u): case ORIG(0x0CC84Eu): case ORIG(0x0D02FEu): return 2;
+  case ORIG(0x0AB8C8u): return 1;
+  default: return 0;
+  }
+}
+static uint32_t dc_vx_calls, dc_vx_bad, dc_vx_logged, dc_vx_models, dc_vx_empty, dc_vx_count[2], dc_vx_skipped;
+static struct { uint32_t bad, logged; } dc_vfn[24];
+/* 1 when every model's vertices match; logs the first model that does not */
+static int dc_verts_match(uint32_t fn, int f) {
+  int kind = dc_verts_kind(fn);
+  if (!kind) { dc_vx_skipped++; return 1; }
+  if (dc_n[0] != dc_n[1] || dc_n[0] > DC_N || dc_vn[0] > DC_VN || dc_vn[1] > DC_VN) {
+    if (f >= 24 ? dc_vx_logged++ < 40 : dc_vfn[f].logged++ < 6)
+      rt_log("render drawcheck VERTS frame %u fn %08x models %d/%d vertices %d/%d (not compared)", hle_frame(), fn, dc_n[0], dc_n[1], dc_vn[0], dc_vn[1]);
+    return 0;
+  }
+  dc_vx_count[0] += (uint32_t)dc_vn[0]; dc_vx_count[1] += (uint32_t)dc_vn[1];
+  int all = 1;
+  for (int i = 0; i < dc_n[0]; i++) {
+    int a0 = dc_seg[0][i], a1 = i + 1 < dc_n[0] ? dc_seg[0][i + 1] : dc_vn[0];
+    int b0 = dc_seg[1][i], b1 = i + 1 < dc_n[1] ? dc_seg[1][i + 1] : dc_vn[1];
+    dc_vx_models++;
+    if (a1 == a0) dc_vx_empty++;
+    int ok = a1 - a0 == b1 - b0, k = 0;
+    for (; ok && k < a1 - a0; k++)
+      if (dc_v[0][a0 + k].idx != dc_v[1][b0 + k].idx || !dc_vnear(&dc_v[0][a0 + k], &dc_v[1][b0 + k], kind == 2)) ok = 0;
+    if (!ok) {
+      all = 0;
+      if (f >= 24 ? dc_vx_logged++ < 40 : dc_vfn[f].logged++ < 6) {
+        int j = k > 0 ? k - 1 : 0;
+        const dc_vtx *x = a1 > a0 + j ? &dc_v[0][a0 + j] : 0, *y = b1 > b0 + j ? &dc_v[1][b0 + j] : 0;
+        rt_log("render drawcheck VERTS frame %u fn %08x model %d %08x vertices %d/%d at %d: %d (%d, %d e-3 px, %d e-6) / %d (%d, %d e-3 px, %d e-6)",
+               hle_frame(), fn, i, dc_list[0][i].model, a1 - a0, b1 - b0, j,
+               x ? (int)x->idx : -1, x ? (int)(x->x * 1e3f) : 0, x ? (int)(x->y * 1e3f) : 0, x ? (int)(x->iw * 1e6f) : 0,
+               y ? (int)y->idx : -1, y ? (int)(y->x * 1e3f) : 0, y ? (int)(y->y * 1e3f) : 0, y ? (int)(y->iw * 1e6f) : 0);
+      }
+    }
+  }
+  return all;
 }
 static void dc_end(uint32_t fn) {
   dc_recording = 0;
@@ -701,6 +865,10 @@ static void dc_end(uint32_t fn) {
   while (f < dc_nfn && dc_fn[f].fn != fn) f++;
   if (f == dc_nfn && dc_nfn < 24) dc_fn[dc_nfn++].fn = fn;
   if (f < 24) { dc_fn[f].calls++; if (exact) dc_fn[f].exact++; else if (!bad) dc_fn[f].near++; else dc_fn[f].bad++; }
+  int verts_ok = dc_verts_match(fn, f);
+  dc_vx_calls++;
+  if (!verts_ok) dc_vx_bad++;
+  if (f < 24 && !verts_ok) dc_vfn[f].bad++;
   if (exact) dc_exact++;
   else if (!bad) dc_near++;
   else {
@@ -717,8 +885,10 @@ static void dc_end(uint32_t fn) {
 void nj_drawcheck_log(void) {
   if (dc_every <= 0) return;
   for (int f = 0; f < dc_nfn; f++)
-    rt_log("render drawcheck fn %08x calls %u exact %u near %u differ %u", dc_fn[f].fn, dc_fn[f].calls, dc_fn[f].exact, dc_fn[f].near, dc_fn[f].bad);
+    rt_log("render drawcheck fn %08x calls %u exact %u near %u differ %u vertices-differ %u", dc_fn[f].fn, dc_fn[f].calls, dc_fn[f].exact, dc_fn[f].near, dc_fn[f].bad, dc_vfn[f].bad);
   rt_log("render drawcheck calls %u exact %u near %u differ %u", dc_calls, dc_exact, dc_near, dc_bad);
+  rt_log("render drawcheck vertices calls %u compared %u models %u (none transformed by the original %u) vertices %u/%u calls-differ %u",
+         dc_vx_calls, dc_vx_calls - dc_vx_skipped, dc_vx_models, dc_vx_empty, dc_vx_count[0], dc_vx_count[1], dc_vx_bad);
 }
 #define DC_WRAP(fn, call) do { int dc_ = dc_begin(c, fn); call; if (dc_) dc_end(fn); } while (0)
 
@@ -891,6 +1061,7 @@ static void draw_basic(uint32_t m) {
   for (uint32_t i = 0; i < np; i++) {
     float p[3] = {nj_f(pts + i * 12), nj_f(pts + i * 12 + 4), nj_f(pts + i * 12 + 8)};
     xform(p, vb[i].p);
+    dc_hle_mark(i);
     if (sh4_is_ram(nrm)) { float n[3] = {nj_f(nrm + i * 12), nj_f(nrm + i * 12 + 4), nj_f(nrm + i * 12 + 8)}; xnorm(n, vb[i].n); vb[i].hasn = 1; }
     else { vb[i].n[0] = vb[i].n[1] = 0; vb[i].n[2] = 1; vb[i].hasn = 0; }
     vb[i].hascol = 0;
@@ -968,6 +1139,7 @@ FAMILY(l3, 2, ORIG(0x0D1996u), ORIG(0x0CD0A6u), ORIG(0x0CD1F4u))
 static void draw_basic_l4(uint32_t m) {
   if (dc_recording) dc_record(1, m, cpu_now->xf.u);
   draw_basic(m);
+  dc_hle_model_end();
 }
 static void h_basic_object(SH4 *c) {
   hle_logcall(c, ""); cpu_now = c; mat_reset();

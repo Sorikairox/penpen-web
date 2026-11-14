@@ -15,7 +15,8 @@
 #                                 every route; prints the first difference, if any (ROUTES="a b": some routes)
 #   tools/s11.sh drawcheck [N]    S23: the draw HLE's node matrices against the ORIGINAL Ninja drawers run in the
 #                                 interpreter (port/render/nj_model.c, PENPEN_DRAWCHECK=N: every N-th frame, default 10)
-#                                 on every route, genlib native, PAR routes at a time (2); prints each route's verdict
+#                                 on every route, genlib native, PAR routes at a time (2); prints each route's verdict;
+#                                 S24: and each model's transformed vertices (the SDK's vertex buffer against the HLE's)
 #   tools/s11.sh progress         docs/progress/decomp.tsv + decomp_functions.tsv (tools/decomp_progress.py)
 #   tools/s11.sh mutate [args]    S12: mutation testing of src/ with Mull (tools/mull_run.py + tools/mull_gate.py in
 #                                 the penpen-mull:1 sandbox): every mutant through the gates of the routes that run
@@ -87,7 +88,8 @@ case "${1:-}" in
     wait
     routes | while IFS='	' read -r r f p x; do
       printf '%s: ' "$r"; grep -E '^render drawcheck calls' "$LOGS/drawcheck_$r.log" || echo "no summary (see $LOGS/drawcheck_$r.log)"
-      grep -E '^render drawcheck (DIFF|frame)|^render link' "$LOGS/drawcheck_$r.log" | head -5 || true
+      printf '%s: ' "$r"; grep -E '^render drawcheck vertices' "$LOGS/drawcheck_$r.log" || echo "no vertex summary"
+      grep -E '^render drawcheck (DIFF|VERTS|frame)|^render link' "$LOGS/drawcheck_$r.log" | head -5 || true
       grep -E '^boot stopped' "$LOGS/drawcheck_$r.log" | grep -v 'frame limit' || true
     done ;;
   corpus)

@@ -1,6 +1,8 @@
 /* Pen Pen port, S3: boot runtime core: guest RAM, call dispatch (HLE / recompiled / interpreter),
  * hardware I/O as a logged register file, logging. */
 #include <stdarg.h>
+#include <stdlib.h>
+#include <string.h>
 #include "rt.h"
 
 static uint8_t ram[16 << 20] __attribute__((aligned(16)));
@@ -115,13 +117,62 @@ static void io_write(uint32_t a, uint32_t v, int size) {
 /* S11: in a difftest sandbox (difftest.c) hardware accesses touch nothing real: reads replay the live call's (else
  * a fixed value per address), writes are logged per side and compared */
 #define SBX_IO_W(a, v, n) if (hwt_synth_live && !rt_hle_depth && !hwt_synth_hw) hwt_synth_odd_note("write", a); if (rt_sandbox) { hwt_io_write(a, v, n); return; }
-uint32_t sh4_io_r32(uint32_t a) { return io_read(a); }
-uint16_t sh4_io_r16(uint32_t a) { return (uint16_t)(io_read(a) >> ((a & 2) * 8)); }
-uint8_t sh4_io_r8(uint32_t a) { return (uint8_t)(io_read(a) >> ((a & 3) * 8)); }
-void sh4_io_w32(uint32_t a, uint32_t v) { SBX_IO_W(a, v, 4); io_write(a, v, 4); }
-void sh4_io_w16(uint32_t a, uint16_t v) { SBX_IO_W(a, v, 2); io_write(a, v, 2); }
-void sh4_io_w8(uint32_t a, uint8_t v) { SBX_IO_W(a, v, 1); io_write(a, v, 1); }
-void sh4_io_pref(uint32_t a) { (void)a; } /* store queues: the HLE replaces the TA/texture paths */
+/* S24: the draw check's run of the original drawers (port/render/nj_model.c). While rt_low_capture is set, RT_LOW
+ * (2 MB) at physical RT_LOW_AT is scratch memory: the SDK's vertex buffer, set there for the check (the HLE
+ * replaces njInitVertexBuffer, which would allocate it), written directly or through the store queues (a prefetch of a
+ * queue address sends it to ((QACRn & 0x1C) << 24) | (address & 0x03FFFFE0)); rt_low_write sees each write. Other
+ * store-queue flushes (the TA stream: its destination is 0, the Kamui set-up being HLE) are dropped; the I/O register
+ * file is left alone. */
+int rt_low_capture;
+void (*rt_low_write)(uint32_t a, uint32_t n);
+uint8_t *rt_low;
+static uint32_t rt_sq[2][8], rt_sq_mask[2];
+#define RT_LOW (2u << 20)
+void rt_low_begin(void) {
+#ifndef __EMSCRIPTEN__
+  if (!rt_low) rt_low = malloc(RT_LOW);
+  rt_low_capture = rt_low != 0;
+#endif
+}
+void rt_low_end(void) { rt_low_capture = 0; }
+#define SQ_CAPTURED(a) (rt_low_capture && (a) >= 0xE0000000u && (a) < 0xE4000000u)
+#define RT_LOW_AT 0x04000000u /* physical: the 64-bit texture memory's window, which nothing else touches here */
+#define LOW(a) (rt_low_capture && ((a) & 0x1FFFFFFFu) - RT_LOW_AT < RT_LOW)
+#define LOWP(a) (rt_low + (((a) & 0x1FFFFFFFu) - RT_LOW_AT))
+#define LOWW(a, n) if (rt_low_write) rt_low_write((a) & 0x1FFFFFFFu, n)
+uint32_t sh4_io_r32(uint32_t a) { if (LOW(a)) { uint32_t v; memcpy(&v, LOWP(a & ~3u), 4); return v; } return io_read(a); }
+uint16_t sh4_io_r16(uint32_t a) { if (LOW(a)) { uint16_t v; memcpy(&v, LOWP(a & ~1u), 2); return v; } return (uint16_t)(io_read(a) >> ((a & 2) * 8)); }
+uint8_t sh4_io_r8(uint32_t a) { if (LOW(a)) return *LOWP(a); return (uint8_t)(io_read(a) >> ((a & 3) * 8)); }
+void sh4_io_w32(uint32_t a, uint32_t v) {
+  if (SQ_CAPTURED(a)) { rt_sq[(a >> 5) & 1][(a >> 2) & 7] = v; rt_sq_mask[(a >> 5) & 1] |= 1u << ((a >> 2) & 7); return; }
+  if (LOW(a)) { memcpy(LOWP(a & ~3u), &v, 4); LOWW(a & ~3u, 4); return; }
+  SBX_IO_W(a, v, 4); io_write(a, v, 4);
+}
+void sh4_io_w16(uint32_t a, uint16_t v) { if (LOW(a)) { memcpy(LOWP(a & ~1u), &v, 2); LOWW(a & ~1u, 2); return; } SBX_IO_W(a, v, 2); io_write(a, v, 2); }
+void sh4_io_w8(uint32_t a, uint8_t v) { if (LOW(a)) { *LOWP(a) = v; LOWW(a, 1); return; } SBX_IO_W(a, v, 1); io_write(a, v, 1); }
+void sh4_io_pref(uint32_t a) {
+  if (!SQ_CAPTURED(a)) return; /* store queues: the HLE replaces the TA/texture paths */
+  uint32_t q = (a >> 5) & 1, ext = ((io_read_live(0xFF000038u + 4 * q) & 0x1Cu) << 24) | (a & 0x03FFFFE0u);
+  if ((ext >> 26) == 3) memcpy(sh4_ram + (ext & 0xFFFFE0u), rt_sq[q], 32);
+  else if (ext - RT_LOW_AT < RT_LOW) { /* the scratch: the halves the queue's writes touched since its last flush */
+    memcpy(rt_low + (ext - RT_LOW_AT), rt_sq[q], 32);
+    if (rt_sq_mask[q] & 0x0Fu) LOWW(ext, 16);
+    if (rt_sq_mask[q] & 0xF0u) LOWW(ext + 16, 16);
+  }
+  /* else: the TA FIFO (its destination is 0 here, the Kamui set-up being HLE): dropped */
+  rt_sq_mask[q] = 0;
+}
+/* S24: the I/O register file saved and restored around the draw check's run of the original drawers */
+#ifndef __EMSCRIPTEN__
+static struct { uint32_t a, v, nr, nw; } io_saved[IO_N];
+static int io_saved_n, io_saved_full;
+void rt_io_save(int restore) {
+  if (restore) { memcpy(io, io_saved, sizeof io); io_n = io_saved_n; io_full = io_saved_full; }
+  else { memcpy(io_saved, io, sizeof io); io_saved_n = io_n; io_saved_full = io_full; }
+}
+#else
+void rt_io_save(int restore) { (void)restore; } /* the draw check is native only */
+#endif
 
 /* ---- dispatch ---- */
 rt_fn rt_lookup(uint32_t a) {
